@@ -104,20 +104,24 @@
           "selector": "#bs-build-panel [data-building-id=\"1\"] .bs-build-row-name"
         },
         {
-          "type": "waitForSelector",
-          "selector": "#bs-inspector [data-action=\"research\"]"
+          "type": "awaitUsable",
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
         }
       ],
-      "description": "role: guard (issue #515, migrated #1768): placed rows no longer carry Upgrade; the player opens building #1's inspector, whose next tier (management_office tier 2) is research-locked, so it offers Research instead of Upgrade \u2014 there is no Upgrade control to click, and Research is present but disabled (no Research Center yet, inline reason shown). Command mode runs `build upgrade 1` and the console refuses (tier 2 not researched), so buildingCount is unchanged. Not `guard`: guard needs a present-but-disabled control, and the Upgrade action is absent by design.",
+      "description": "Placed rows carry no Upgrade (#515, #1768): the player opens building #1's inspector and clicks its Upgrade action. A plain new_game site has no quests, so tier 2 is purchasable at once; the upgrade is ordered in place and the building stays counted.",
       "expect": {
         "equals": {
           "buildingCount": 1
         },
-        "note": "rejected: Tier 2 management_office is not researched \u2014 confirms this is a genuine no-op, not a silent success",
-        "blocked": "#bs-inspector [data-action=\"research\"]"
+        "decreased": [
+          "cash"
+        ]
       },
-      "role": "guard",
-      "commandOutcome": "refused"
+      "role": "player"
     },
     {
       "command": "build list",

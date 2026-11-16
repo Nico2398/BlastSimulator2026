@@ -3,6 +3,7 @@
 
 import { sanitizeOreSaturation } from '../economy/OreSaturation.js';
 import { cancelLegacyUpgradeOrders } from './LegacyUpgradeOrders.js';
+import { removeLegacyResearchCenters } from './LegacyResearchCenter.js';
 import type { GameState } from './GameState.js';
 import { SAVE_VERSION } from './GameState.js';
 import { createTaxAuditState } from '../events/TaxAudit.js';
@@ -1078,6 +1079,8 @@ export function deserialize(json: string): GameState {
   if (preview && preview.shape !== BLAST_PREVIEW_SHAPE) obj['lastBlastPreview'] = null;
 
   const restored = obj as unknown as GameState;
+  // The Research Center is gone; building tiers come from quests. Its building, orders and queue are refunded away (#2283).
+  removeLegacyResearchCenters(restored);
   // Capacity is derived from the warehouses, never trusted from the save (#1369).
   syncLogisticsCapacity(restored.logistics, getStorageCapacity(restored.buildings));
   // Upgrades ordered before in-place upgrades existed (demolish + rebuild) are cancelled and refunded (#1875).

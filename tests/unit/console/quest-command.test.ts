@@ -6,12 +6,14 @@ import { questCommand } from '../../../src/console/commands/quest.js';
 import { makeEmptyGameContext } from '../../helpers/gameContext.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { getAllQuests, getQuest } from '../../../src/core/economy/QuestCatalog.js';
-import { isQuestCompleted } from '../../../src/core/economy/Quests.js';
+import { isQuestCompleted, isBuildingTierUnlocked } from '../../../src/core/economy/Quests.js';
 import { explosivesOfTier } from '../../../src/core/world/ExplosiveCatalog.js';
 import { fundForDeliveryWait } from '../../helpers/playthrough.js';
 
 const T2 = 'quest_explosive_t2';
 const T3 = 'quest_explosive_t3';
+const B2 = 'quest_building_t2';
+const B3 = 'quest_building_t3';
 
 function sandbox() {
   const { runner, ctx } = createRunner();
@@ -176,6 +178,93 @@ describe('quest complete — the scenario shortcut (#2280 C8)', () => {
     expect(runner.run(`quest complete ${T3}`).success).toBe(true);
     expect(isQuestCompleted(state, T3)).toBe(true);
     expect(isQuestCompleted(state, T2)).toBe(false);
+  });
+});
+
+describe('building-tier quests in the console (#2283)', () => {
+  beforeAll(() => setLocale('en'));
+  const allExplosiveNames = (): string[] => [...explosivesOfTier(2), ...explosivesOfTier(3)].map(e => nameOf(e.id));
+
+  it('quest list shows the building quests with their id, title and objective progress', () => {
+    const { runner } = sandbox();
+    const out = runner.run('quest list').output;
+    for (const id of [B2, B3]) {
+      expect(out).toContain(id);
+      expect(out).toContain(t(getQuest(id)!.titleKey));
+    }
+    expect(out).toMatch(/\d+\s*\/\s*4/);
+    expect(out).toMatch(/\d+\s*\/\s*8/);
+  });
+
+  it('quest list reports live building progress', () => {
+    const { runner, ctx } = sandbox();
+    runner.run('tick 1');
+    const standing = ctx.state!.buildings.buildings.length;
+    const out = runner.run('quest list').output;
+    expect(out).toMatch(new RegExp(`${standing}\\s*/\\s*4`));
+  });
+
+  it('quest detail names the architect, the pitch, the objectives and the tier reward, without explosives', () => {
+    const { runner } = sandbox();
+    const def = getQuest(B2)!;
+    const r = runner.run(`quest detail ${B2}`);
+    expect(r.success, r.output).toBe(true);
+    expect(r.output).toContain(t(def.titleKey));
+    expect(r.output).toContain(t('quest.giver.architect'));
+    expect(r.output).toContain(t(def.pitchKey));
+    expect(r.output).toMatch(/\/\s*4/);
+    expect(r.output).toMatch(/\/\s*2/);
+    expect(r.output).toMatch(/available/i);
+    for (const name of allExplosiveNames()) expect(r.output, name).not.toContain(name);
+    expect(r.output).not.toMatch(/\{\w+\}|quest\.[a-z_]+\.|undefined|NaN/);
+  });
+
+  it('quest detail of the T3 building quest names its prerequisite and its tier-3 reward', () => {
+    const { runner } = sandbox();
+    const out = runner.run(`quest detail ${B3}`).output;
+    expect(out).toContain(t(getQuest(B2)!.titleKey));
+    expect(out).toContain('3');
+    for (const name of allExplosiveNames()) expect(out, name).not.toContain(name);
+  });
+
+  it('quest complete completes a building quest without its objectives and opens the tier for every type', () => {
+    const { runner, ctx, state } = sandbox();
+    const seen: string[] = [];
+    ctx.emitter.on('quest:completed', ({ questId }) => seen.push(questId));
+    expect(isBuildingTierUnlocked(state, 'living_quarters', 2)).toBe(false);
+    const r = runner.run(`quest complete ${B2}`);
+    expect(r.success, r.output).toBe(true);
+    expect(isQuestCompleted(state, B2)).toBe(true);
+    expect(seen).toEqual([B2]);
+    expect(isBuildingTierUnlocked(state, 'living_quarters', 2)).toBe(true);
+    expect(isBuildingTierUnlocked(state, 'geology_lab', 2)).toBe(true);
+    expect(isBuildingTierUnlocked(state, 'living_quarters', 3)).toBe(false);
+  });
+
+  it('quest complete refuses a building quest already completed', () => {
+    const { runner } = sandbox();
+    runner.run(`quest complete ${B2}`);
+    expect(runner.run(`quest complete ${B2}`).success).toBe(false);
+  });
+
+  it('the T3 building quest can be completed on its own', () => {
+    const { runner, state } = sandbox();
+    expect(runner.run(`quest complete ${B3}`).success).toBe(true);
+    expect(isBuildingTierUnlocked(state, 'living_quarters', 3)).toBe(true);
+    expect(isQuestCompleted(state, B2)).toBe(false);
+  });
+
+  it('the explosive quests do not open building tiers', () => {
+    const { runner, state } = sandbox();
+    runner.run(`quest complete ${T2}`);
+    runner.run(`quest complete ${T3}`);
+    expect(isBuildingTierUnlocked(state, 'living_quarters', 2)).toBe(false);
+  });
+
+  it('quest complete still fails on a site without quests', () => {
+    const { runner } = createRunner();
+    expect(runner.run('new_game mine_type:desert seed:42').success).toBe(true);
+    expect(runner.run(`quest complete ${B2}`).success).toBe(false);
   });
 });
 

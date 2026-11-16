@@ -361,7 +361,6 @@ describe('completeRestForEmployee (#945 — with-building rest lands exactly at 
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.fatigue = 25;
 
-    state.buildings.unlockedTiers.living_quarters = 3; // tier 2+ requires research unlock
     const placed = placeBuilding(state.buildings, 'living_quarters', 5, 5, 100, 100, 2);
     expect(placed.success).toBe(true);
 

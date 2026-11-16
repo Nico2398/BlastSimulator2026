@@ -65,8 +65,6 @@ export interface SerializableGameState {
   /** Buildings ordered but not yet built (state.plannedBuildings.length) — proves a build order queues work instead of creating the building instantly (#556). */
   orderedBuildingCount: number;
   chargedCount: number;
-  /** Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length) — proves a research task actually completed (reaches 0) rather than a `tick N` pad merely running, which a spontaneous mid-window event can silently cut short (tickCommand auto-pauses and refuses further ticks the instant one fires). */
-  researchQueueLength: number;
   /** Completed survey results (SurveyResult[], state.surveyResults). */
   surveyCount: number;
   /** Queued-but-not-yet-claimed PendingActions (state.pendingActions) — includes auto-inserted rest tasks. */
@@ -234,7 +232,6 @@ export function serializeGameState(ctx: MiningContext): SerializableGameState | 
     builtRampFlow: s.builtRamps[0]?.flow ?? 'both',
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
-    researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,

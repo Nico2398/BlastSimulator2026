@@ -41,10 +41,6 @@ function utilizationOf(b: Building, state: RowModelState): PlacedRowModel['utili
   switch (b.type) {
     case 'spoil_heap': return kgUtilization(b, b.storedSpoilKg ?? 0, capacity);
     case 'freight_warehouse': return kgUtilization(b, warehouseStoredKg(state.logistics, b.id), capacity);
-    case 'research_center': {
-      const busy = state.buildings.researchQueue.length > 0;
-      return { text: t(busy ? 'ui.build.row.util_research_busy' : 'ui.build.row.util_research_idle'), fraction: null, explain: utilizationExplain(b, 'research') };
-    }
     default: return null;
   }
 }

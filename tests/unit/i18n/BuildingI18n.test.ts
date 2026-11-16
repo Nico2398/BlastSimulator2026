@@ -11,7 +11,7 @@ import type { BuildingType, BuildingTier } from '../../../src/core/entities/Buil
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-  'research_center', 'living_quarters', 'freight_warehouse',
+  'living_quarters', 'freight_warehouse',
 ];
 
 const ALL_TIERS: BuildingTier[] = [1, 2, 3];
@@ -26,7 +26,7 @@ beforeEach(() => {
 
 describe('building generic name keys resolve in both locales', () => {
   for (const locale of LOCALES) {
-    it(`locale ${locale}: building.<type>.name keys resolve for all 8 types`, () => {
+    it(`locale ${locale}: building.<type>.name keys resolve for every tiered type`, () => {
       setLocale(locale);
       for (const type of ALL_BUILDING_TYPES) {
         const key = `building.${type}.name`;

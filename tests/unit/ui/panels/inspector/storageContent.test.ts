@@ -53,7 +53,7 @@ const liveAll = (root: HTMLElement, prefix: string): HTMLElement[] =>
   [...root.querySelectorAll<HTMLElement>(`[data-live^="${prefix}"]`)];
 
 describe('storageContents: non-storage buildings', () => {
-  it.each(['management_office', 'living_quarters', 'research_center', 'blast_workshop'] as BuildingType[])(
+  it.each(['management_office', 'living_quarters', 'blast_workshop'] as BuildingType[])(
     'returns null for %s',
     type => {
       const b = makeBuilding(type);

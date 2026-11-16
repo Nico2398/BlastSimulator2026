@@ -229,4 +229,33 @@ describe('wireProgressionNotifications — quest:completed (#2280)', () => {
     emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
     expect(text(notified[1]!)).not.toBe(text(notified[0]!));
   });
+
+  describe('a building-tier quest (#2283 C9)', () => {
+    const allExplosives = (): string[] => [...explosivesOfTier(2), ...explosivesOfTier(3)].map(e => t(e.nameKey));
+
+    it.each([['quest_building_t2', '2'], ['quest_building_t3', '3']])('%s raises one notice naming the quest and its tier, with no explosives', (id, tier) => {
+      emitter.fire('quest:completed', { questId: id });
+      expect(notified).toHaveLength(1);
+      const body = text(notified[0]!);
+      expect(body).toContain(t(getQuest(id)!.titleKey));
+      expect(body).toContain(tier);
+      for (const name of allExplosives()) expect(body, name).not.toContain(name);
+      expect(body).not.toMatch(/\{\w+\}|notification\.|undefined|NaN/);
+    });
+
+    it('the two building quests raise different notices, and different ones from an explosive quest', () => {
+      emitter.fire('quest:completed', { questId: 'quest_building_t2' });
+      emitter.fire('quest:completed', { questId: 'quest_building_t3' });
+      emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
+      expect(new Set(notified.map(text)).size).toBe(3);
+    });
+
+    it('follows the active locale', () => {
+      emitter.fire('quest:completed', { questId: 'quest_building_t2' });
+      setLocale('fr');
+      emitter.fire('quest:completed', { questId: 'quest_building_t2' });
+      expect(text(notified[1]!)).not.toBe(text(notified[0]!));
+      expect(text(notified[1]!)).toContain(t(getQuest('quest_building_t2')!.titleKey));
+    });
+  });
 });

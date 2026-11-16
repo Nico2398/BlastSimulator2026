@@ -16,8 +16,6 @@ import {
   EVENT_PAYCUT_SALARY_PCT,
   EVENT_RAISE_DAYS,
   EVENT_RAISE_SALARY_PCT,
-  EVENT_RESEARCH_DISCOUNT_DAYS,
-  EVENT_RESEARCH_DISCOUNT_PCT,
   EVENT_RETAINER_DAYS,
   EVENT_RETAINER_PER_DAY,
   EVENT_SCRUTINY_DAYS,
@@ -322,7 +320,7 @@ export const POLITICS_EVENTS_1: EventDef[] = [
     options: [
       { cashDelta: -40000, scoreDelta: { ecology: 10 }, effectTag: 'comply_reform',
         effects: [
-          { type: 'cost_factor', what: 'research', pct: EVENT_RESEARCH_DISCOUNT_PCT, days: EVENT_RESEARCH_DISCOUNT_DAYS },
+          { type: 'cost_factor', what: 'explosive', pct: EVENT_EXPLOSIVE_DISCOUNT_PCT, days: EVENT_EXPLOSIVE_SURCHARGE_DAYS },
         ] },
       { cashDelta: -15000, corruptionDelta: 20, effectTag: 'offshore_shell' },
       { cashDelta: -25000, effectTag: 'lobby_against_reform',

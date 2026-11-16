@@ -10,6 +10,9 @@ import { placeBuilding } from '../../../../src/core/entities/Building.js';
 import { purchaseVehicle, resolveVehicleDriver, ROLE_LICENCE_REQUIRED } from '../../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../src/core/math/Random.js';
+import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest } from '../../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../../src/core/economy/QuestCatalog.js';
 import { addHole, holeNumericId } from '../../../../src/core/mining/DrillPlan.js';
 import type { EntityPick } from '../../../../src/ui/scene/ScenePicking.js';
 import { readFileSync } from 'node:fs';
@@ -90,7 +93,7 @@ describe('Inspector', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     const { building } = placeBuilding(state.buildings, 'management_office', 2, 2, 32, 32, 1, 0, 0) as { building: { id: number } };
-    state.buildings.unlockedTiers['management_office'] = 2; // a locked next tier shows Research instead (#1758)
+    state.buildings.unlockedTiers['management_office'] = 2; // a locked next tier keeps Upgrade, disabled (#2283)
 
     bar.show(entity('building', building.id), state);
     const labels = Array.from(root.querySelectorAll('button')).map(b => b.textContent);
@@ -767,27 +770,56 @@ describe('Inspector building action strip (#1758)', () => {
     Array.from(root.querySelectorAll('button[data-action]')).map(b => b.getAttribute('data-action')!).filter(a => a !== 'locate');
   const btn = (root: HTMLElement, a: string): HTMLButtonElement => root.querySelector(`button[data-action="${a}"]`) as HTMLButtonElement;
 
-  it('a locked next tier swaps Upgrade for Research; unlocking swaps it back', () => {
-    const { bar, root } = makeBar();
+  /** A progression-style site: quests exist, so the next tier is locked behind one (#2283). */
+  function questSite(): ReturnType<typeof makeState> {
     const state = makeState();
-    const id = placed(state);
+    state.grade = createGradeState();
+    state.quests = createQuestState();
     state.cash = 1e9;
-    bar.show(entity('building', id), state);
-    expect(actions(root)).toEqual(['research', 'move', 'demolish']);
+    return state;
+  }
+  const quest2 = (): string => t(getQuest('quest_building_t2')!.titleKey);
 
-    state.buildings.unlockedTiers['management_office'] = 2;
+  it('a locked next tier keeps Upgrade, disabled and naming the quest; completing the quest enables it', () => {
+    const { bar, root } = makeBar();
+    const state = questSite();
+    const id = placed(state);
+    bar.show(entity('building', id), state);
+    expect(actions(root)).toEqual(['upgrade', 'move', 'demolish']);
+    const upgrade = btn(root, 'upgrade');
+    expect(upgrade.disabled).toBe(true);
+    expect(upgrade.title).toContain(quest2());
+
+    completeQuest(state, 'quest_building_t2');
     bar.update(state);
     expect(actions(root)).toEqual(['upgrade', 'move', 'demolish']);
+    expect(btn(root, 'upgrade').disabled).toBe(false);
   });
 
-  it('the research button shows its literal label, not a translation key', () => {
+  it('no Research button appears on a building whose next tier is locked', () => {
+    const { bar, root } = makeBar();
+    const state = questSite();
+    bar.show(entity('building', placed(state)), state);
+    expect(root.querySelector('button[data-action="research"]')).toBeNull();
+  });
+
+  it('on a site without quests the next tier is open: Upgrade is enabled with nothing unlocked', () => {
     const { bar, root } = makeBar();
     const state = makeState();
     state.cash = 1e9;
     bar.show(entity('building', placed(state)), state);
-    const text = btn(root, 'research').textContent ?? '';
-    expect(text.trim().length).toBeGreaterThan(0);
-    expect(text).not.toMatch(/^(inspector|ui)\./);
+    expect(actions(root)).toEqual(['upgrade', 'move', 'demolish']);
+    expect(btn(root, 'upgrade').disabled).toBe(false);
+  });
+
+  it('the locked upgrade button shows a literal label and title, not a translation key', () => {
+    const { bar, root } = makeBar();
+    const state = questSite();
+    bar.show(entity('building', placed(state)), state);
+    const upgrade = btn(root, 'upgrade');
+    expect((upgrade.textContent ?? '').trim().length).toBeGreaterThan(0);
+    expect(upgrade.textContent).not.toMatch(/^(inspector|ui)\./);
+    expect(upgrade.title).not.toMatch(/^(inspector|ui)\./);
   });
 
   it('a disabled action carries its reason as the tooltip', () => {
@@ -818,20 +850,6 @@ describe('Inspector building action strip (#1758)', () => {
     expect(btn(root, 'upgrade')).toBe(upgrade);
     expect(upgrade.disabled).toBe(false);
     expect(upgrade.title).not.toBe('');
-  });
-
-  it('queued research updates the Research button text in place as it progresses', () => {
-    const { bar, root } = makeBar();
-    const state = makeState();
-    state.cash = 1e9;
-    bar.show(entity('building', placed(state)), state);
-    const research = btn(root, 'research');
-    const before = research.textContent;
-    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 2, ticksRemaining: 5, cost: 1, conditions: [] });
-    bar.update(state);
-    expect(btn(root, 'research')).toBe(research);
-    expect(research.textContent).not.toBe(before);
-    expect(research.disabled).toBe(true);
   });
 
   it('a building with a demolition ordered shows every action disabled', () => {
@@ -871,14 +889,9 @@ describe('Inspector building actions — what src/main.ts routes them to (#1758)
     expect(body).not.toContain('build upgrade');
   });
 
-  it('research queues through the UI manager', () => {
-    expect(caseBody('research')).toContain('uiManager.queueBuildingResearch(');
-  });
-
-  it('a research refusal is surfaced as a notification, not dropped', () => {
-    const body = caseBody('research');
-    expect(body).toContain('if (refusal)');
-    expect(body).toContain('uiManager.notify(');
+  it('has no research route any more', () => {
+    expect(mainTs).not.toContain("case 'research':");
+    expect(mainTs).not.toContain('queueBuildingResearch');
   });
 
   it('the demolish confirm is handed the freight ore stored in the warehouse', () => {

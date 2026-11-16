@@ -15,7 +15,6 @@ import { warehouseStoredKg } from '../../src/core/economy/FreightWarehouses.js';
 import { fundForDeliveryWait } from '../helpers/playthrough.js';
 
 const SEED = 42;
-const MAX_RESEARCH_TICKS = 3000;
 const MAX_REBUILD_TICKS = 3000;
 
 function refresh(state: GameState): void {
@@ -52,7 +51,7 @@ function putStoredOre(state: GameState, warehouseId: number, massKg: number): vo
   });
 }
 
-function startWithResearchedTier2(opts: { blast?: boolean } = {}) {
+function startWithTier2Open(opts: { blast?: boolean } = {}) {
   setLocale('en');
   const { runner, ctx } = createRunner();
   const run = (c: string) => runner.run(c);
@@ -61,18 +60,15 @@ function startWithResearchedTier2(opts: { blast?: boolean } = {}) {
   state.events.eventFreqMultiplier = 0; // a pending event halts `tick`; hauling pace is under test
   refresh(state);
   if (opts.blast === true) fireOpeningShot(run, state);
-  expect(run('build research_center at:20,48')).toMatchObject({ success: true });
-  tickUntil(run, state, () => state.buildings.buildings.some(b => b.type === 'research_center' && b.active), 1500);
-  expect(state.buildings.buildings.some(b => b.type === 'research_center' && b.active)).toBe(true);
-  expect(run('research queue type:freight_warehouse tier:2')).toMatchObject({ success: true });
-  tickUntil(run, state, () => state.buildings.researchQueue.length === 0, MAX_RESEARCH_TICKS);
-  expect(state.buildings.researchQueue).toHaveLength(0);
+  // The sandbox is a progression site: tier 2 opens with the T2 building quest.
+  expect(run('build upgrade 1')).toMatchObject({ success: false });
+  expect(run('quest complete quest_building_t2')).toMatchObject({ success: true });
   return { run, state, ctx };
 }
 
 describe('kit warehouse upgrade (#1830)', () => {
   it('upgrades the kit freight warehouse to tier 2 with the tier-2 capacity', () => {
-    const { run, state } = startWithResearchedTier2();
+    const { run, state } = startWithTier2Open();
     const kit = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
     expect(kit.id).toBe(1);
     // No Building Destroyer, no driver: an upgrade is in-place construction (#1875).
@@ -88,7 +84,7 @@ describe('kit warehouse upgrade (#1830)', () => {
   });
 
   it('keeps the same id and the stored ore through the upgrade, without a destroyer (#1875)', () => {
-    const { run, state } = startWithResearchedTier2();
+    const { run, state } = startWithTier2Open();
     const stored = 12_345;
     putStoredOre(state, 1, stored);
     expect(warehouseStoredKg(state.logistics, 1)).toBeCloseTo(stored);
@@ -103,7 +99,7 @@ describe('kit warehouse upgrade (#1830)', () => {
   });
 
   it('the warehouse never leaves state while the upgrade runs', () => {
-    const { run, state } = startWithResearchedTier2();
+    const { run, state } = startWithTier2Open();
     expect(run('build upgrade 1')).toMatchObject({ success: true });
     for (let n = 0; n < MAX_REBUILD_TICKS && state.plannedBuildings.length > 0; n++) {
       refresh(state);
@@ -114,12 +110,12 @@ describe('kit warehouse upgrade (#1830)', () => {
   });
 
   it('refusal names the blocking building when something sits on the tier-2 footprint', () => {
-    const { run, state } = startWithResearchedTier2();
+    const { run, state } = startWithTier2Open();
     const kit = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
     const t1 = getDefSize(getBuildingDef('freight_warehouse', 1));
     const t2 = getDefSize(getBuildingDef('freight_warehouse', 2));
     // Force a blocker on the cells only tier 2 covers, clear of tier 1.
-    state.buildings.buildings = state.buildings.buildings.filter(b => b.id === kit.id || b.type === 'research_center');
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id === kit.id);
     state.buildings.buildings.push({
       ...kit, id: 900, type: 'management_office', tier: 1,
       x: kit.x + t1.sizeX, z: kit.z,
@@ -131,7 +127,7 @@ describe('kit warehouse upgrade (#1830)', () => {
   });
 
   it('a blocker that appears after the order fails the completion: refunded, tier unchanged (#1875)', () => {
-    const { run, state } = startWithResearchedTier2();
+    const { run, state } = startWithTier2Open();
     const kit = state.buildings.buildings.find(b => b.id === 1)!;
     const t1 = getDefSize(getBuildingDef('freight_warehouse', 1));
     expect(run('build upgrade 1')).toMatchObject({ success: true });
@@ -146,10 +142,10 @@ describe('kit warehouse upgrade (#1830)', () => {
   });
 
   it('refusal text is translated in french', () => {
-    const { run, state } = startWithResearchedTier2();
+    const { run, state } = startWithTier2Open();
     const kit = state.buildings.buildings.find(b => b.type === 'freight_warehouse')!;
     const t1 = getDefSize(getBuildingDef('freight_warehouse', 1));
-    state.buildings.buildings = state.buildings.buildings.filter(b => b.id === kit.id || b.type === 'research_center');
+    state.buildings.buildings = state.buildings.buildings.filter(b => b.id === kit.id);
     state.buildings.buildings.push({ ...kit, id: 900, type: 'management_office', tier: 1, x: kit.x + t1.sizeX, z: kit.z });
     setLocale('fr');
     try {
@@ -186,7 +182,7 @@ describe('kit warehouse upgrade (#1830)', () => {
     }
 
     it('kit alone: the upgrade completes within the bound, and its builder order never reads target_unreachable', () => {
-      const { run, state } = startWithResearchedTier2({ blast: true });
+      const { run, state } = startWithTier2Open({ blast: true });
       expect(run('build upgrade 1')).toMatchObject({ success: true });
       const { ticks, unreachable } = runUpgrade(run, state, MAX_REBUILD_TICKS);
       expect(state.buildings.buildings.some(b => b.type === 'freight_warehouse' && b.tier === 2)).toBe(true);
@@ -195,7 +191,7 @@ describe('kit warehouse upgrade (#1830)', () => {
     });
 
     it('kit + 2 extra debris haulers + 1 hired driver: tier 2 within the bound of the order', () => {
-      const { run, state } = startWithResearchedTier2({ blast: true });
+      const { run, state } = startWithTier2Open({ blast: true });
       expect(run('vehicle buy debris_hauler tier:1')).toMatchObject({ success: true });
       expect(run('vehicle buy debris_hauler tier:1')).toMatchObject({ success: true });
       expect(run('employee hire role:driver')).toMatchObject({ success: true });
@@ -206,7 +202,7 @@ describe('kit warehouse upgrade (#1830)', () => {
     });
 
     it('kit + 2 extra debris haulers + 1 hired driver: the builder order never reads target_unreachable', () => {
-      const { run, state } = startWithResearchedTier2({ blast: true });
+      const { run, state } = startWithTier2Open({ blast: true });
       expect(run('vehicle buy debris_hauler tier:1')).toMatchObject({ success: true });
       expect(run('vehicle buy debris_hauler tier:1')).toMatchObject({ success: true });
       expect(run('employee hire role:driver')).toMatchObject({ success: true });

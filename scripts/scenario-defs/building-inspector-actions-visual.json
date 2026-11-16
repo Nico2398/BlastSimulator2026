@@ -1,6 +1,6 @@
 {
   "name": "building-inspector-actions-visual",
-  "description": "The building inspector acts in place (#1758). A player selects buildings by clicking them in the scene, never opening the Build panel: researches then upgrades a management office (Research gives way to Upgrade; no Building Destroyer needed: the status follows upgrading, operating at tier 2), moves it with the footprint placement tool armed straight from the inspector, and demolishes a freight warehouse holding hauled ore through the confirm that names the ore lost. The hauling prefix is hauling-gate's own.",
+  "description": "The building inspector acts in place (#1758). A player selects buildings by clicking them in the scene, never opening the Build panel: upgrades a management office (no Building Destroyer needed: the status follows upgrading, operating at tier 2), moves it with the footprint placement tool armed straight from the inspector, and demolishes a freight warehouse holding hauled ore through the confirm that names the ore lost. The hauling prefix is hauling-gate's own.",
   "shots": [
     {
       "name": "overview",
@@ -11,7 +11,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:600000 staffed:true",
-      "description": "Staffed opening (#551) with a generous cushion: the hauling prefix below, three placed buildings, a Wrecking Rascal, research and an upgrade all draw on one balance. The prefix up to the tick 60 step is hauling-gate's own, so the freight warehouse (building #1) ends up holding hauled ore before the inspector steps start.",
+      "description": "Staffed opening (#551) with a generous cushion: the hauling prefix below, two placed buildings, a Wrecking Rascal and an upgrade all draw on one balance. The prefix up to the tick 60 step is hauling-gate's own, so the freight warehouse (building #1) ends up holding hauled ore before the inspector steps start.",
       "interaction": [
         {
           "type": "command",
@@ -174,7 +174,7 @@
     },
     {
       "command": "state",
-      "description": "#1820: select the freight warehouse (#1) before any Research Center or Building Destroyer exists. The inspector shows signed money (Research \u00b7 $5,000, Move \u00b7 $7,500, Demolish \u00b7 $4,000, upkeep $10/h), Research is disabled with the inline reason 'Needs a Research Center', and Demolish stays enabled with the note 'The order will wait: no Building Destroyer in the fleet.'",
+      "description": "#1820: select the freight warehouse (#1) before any Building Destroyer exists. The inspector shows signed money (Move \u00b7 $7,500, Demolish \u00b7 $4,000, upkeep $10/h), and Demolish stays enabled with the note 'The order will wait: no Building Destroyer in the fleet.'",
       "role": "player",
       "interaction": [
         {
@@ -195,8 +195,11 @@
         }
       ],
       "expect": {
-        "blocked": "#bs-inspector [data-action=\"research\"]",
-        "note": "Research blocked: no Research Center yet; Demolish still usable with a wait note."
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        },
+        "note": "Demolish was usable with a wait note before the inspector closed (awaitUsable); viewing the inspector orders nothing."
       }
     },
     {
@@ -523,87 +526,6 @@
       "commandOutcome": "either"
     },
     {
-      "command": "build research_center at:26,14",
-      "description": "Placed from the Build panel's catalog row for research_center; the Build panel is opened with ensurePanel because earlier steps left a different panel up.",
-      "interaction": [
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "cameraFocus",
-          "x": 26,
-          "z": 14,
-          "distance": 20
-        },
-        {
-          "type": "pickTile",
-          "x": 26,
-          "z": 14
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "equals": {
-          "orderedBuildingCount": 1
-        },
-        "note": "Confirming placement only queues a construction site (#556); the next step waits for it to land before its id is referred to."
-      }
-    },
-    {
-      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
-      "description": "Drive the site to completion. Building ids follow completion order, so each building is awaited before the next is ordered: warehouse #1, research_center #2, management_office #3. Speeds up via the HUD's 8x button first.",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-hud-top .bs-speed-btn button[data-speed=\"8\"]"
-        },
-        {
-          "type": "waitUntil",
-          "field": "buildingCount",
-          "equals": 2,
-          "maxTicks": 400,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "buildingCount": 2,
-          "orderedBuildingCount": 0
-        }
-      }
-    },
-    {
       "command": "build management_office at:14,5",
       "description": "Placed from the Build panel's catalog row for management_office; the Build panel is opened with ensurePanel because earlier steps left a different panel up.",
       "interaction": [
@@ -656,8 +578,8 @@
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
-      "description": "Drive the site to completion. Building ids follow completion order, so each building is awaited before the next is ordered: warehouse #1, research_center #2, management_office #3. Speeds up via the HUD's 8x button first.",
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
+      "description": "Drive the site to completion. Building ids follow completion order: warehouse #1, management_office #2. Speeds up via the HUD's 8x button first.",
       "timeout": 95,
       "interaction": [
         {
@@ -671,7 +593,7 @@
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 3,
+          "equals": 2,
           "maxTicks": 400,
           "timeoutMs": 90000
         }
@@ -679,14 +601,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 3,
+          "buildingCount": 2,
           "orderedBuildingCount": 0
         }
       }
     },
     {
       "command": "state",
-      "description": "Close the Build panel left open by the placements above, then select the management office (#3) by clicking it in the scene, so every action below is provably the inspector's own; no Building Destroyer exists in the fleet, and none is needed for the upgrade below (#1875). Its next tier is locked, so the action strip offers Research, not Upgrade.",
+      "description": "Close the Build panel left open by the placement above, then select the management office (#2) by clicking it in the scene, so every action below is provably the inspector's own; no Building Destroyer exists in the fleet, and none is needed for the upgrade below (#1875). A plain site has no quests, so its tier 2 is purchasable at once and the action strip offers Upgrade.",
       "role": "player",
       "interaction": [
         {
@@ -697,60 +619,23 @@
         {
           "type": "clickEntity",
           "kind": "building",
-          "id": 3
+          "id": 2
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-inspector [data-action=\"research\"]"
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
         },
         {
           "type": "screenshot"
         }
       ],
       "expect": {
-        "usable": "#bs-inspector [data-action=\"research\"]"
+        "usable": "#bs-inspector [data-action=\"upgrade\"]"
       }
     },
     {
-      "command": "research queue type:management_office tier:2",
-      "description": "Queue the research from the inspector's Research action, which shows its cost and duration; the Build panel stays closed.",
-      "role": "player",
-      "interaction": [
-        {
-          "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"research\"]"
-        }
-      ],
-      "expect": {
-        "decreased": [
-          "cash"
-        ],
-        "blocked": "#bs-build-panel .bs-build-buy-btn"
-      }
-    },
-    {
-      "command": "wait_until field:researchQueueLength equals:0 max_ticks:400",
-      "description": "Wait on the research queue draining; the inspector follows the progress and then swaps Research for Upgrade.",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "researchQueueLength",
-          "equals": 0,
-          "maxTicks": 400,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "researchQueueLength": 0
-        }
-      }
-    },
-    {
-      "command": "build upgrade 3",
-      "description": "Research done: Upgrade replaces Research in the strip, with no destroyer wait note (#1875). Clicking it orders in-place construction; the inspector keeps following building #3 and Upgrade, Move and Demolish are all disabled while the upgrade is ordered.",
+      "command": "build upgrade 2",
+      "description": "Upgrade is usable at once (#1875). Clicking it orders in-place construction; the inspector keeps following building #2 and Upgrade, Move and Demolish are all disabled while the upgrade is ordered.",
       "role": "player",
       "interaction": [
         {
@@ -770,7 +655,7 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 3
+          "buildingCount": 2
         },
         "blocked": "#bs-inspector [data-action=\"move\"]"
       }
@@ -802,7 +687,7 @@
       }
     },
     {
-      "command": "build move 3 to:14,12",
+      "command": "build move 2 to:14,12",
       "description": "Move arms the footprint placement tool straight from the inspector: the tile picker appears with the Build panel still closed. Pick the new tile and confirm.",
       "role": "player",
       "interaction": [
@@ -848,7 +733,7 @@
         ],
         "blocked": "#bs-build-panel .bs-build-buy-btn",
         "equals": {
-          "buildingCount": 3
+          "buildingCount": 2
         }
       }
     },
@@ -930,19 +815,19 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 3
+          "buildingCount": 2
         }
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:2 max_ticks:900",
+      "command": "wait_until field:buildingCount equals:1 max_ticks:900",
       "description": "Wait for the Wrecking Rascal to finish; the ore stored in the warehouse is gone with it.",
       "timeout": 95,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 2,
+          "equals": 1,
           "maxTicks": 900,
           "timeoutMs": 90000
         }
@@ -950,7 +835,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 2,
+          "buildingCount": 1,
           "storedMassKg": 0
         }
       }

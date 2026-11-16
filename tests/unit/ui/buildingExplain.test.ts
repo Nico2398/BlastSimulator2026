@@ -172,28 +172,22 @@ describe('buildingExplain — utilizationExplain', () => {
     expect(utilizationExplain(building({ type: 'spoil_heap' }), 'kg')).toMatch(/kg/i);
   });
 
-  it('research says it is the research queue', () => {
-    expect(utilizationExplain(building({ type: 'research_center' }), 'research')).toMatch(/research|queue/i);
-  });
-
   it('gives each kind a text of its own', () => {
     const texts = new Set([
       utilizationExplain(building(), 'beds'),
       utilizationExplain(building({ type: 'spoil_heap' }), 'kg'),
-      utilizationExplain(building({ type: 'research_center' }), 'research'),
     ]);
-    expect(texts.size).toBe(3);
+    expect(texts.size).toBe(2);
   });
 
   it('is translated for every kind', () => {
     expectTranslated(() => utilizationExplain(building(), 'beds'));
     expectTranslated(() => utilizationExplain(building({ type: 'spoil_heap' }), 'kg'));
-    expectTranslated(() => utilizationExplain(building({ type: 'research_center' }), 'research'));
   });
 
   it('never prints a NaN or an undefined for any type', () => {
     for (const type of getAllBuildingTypes() as BuildingType[]) {
-      for (const kind of ['beds', 'kg', 'research'] as const) {
+      for (const kind of ['beds', 'kg'] as const) {
         expect(utilizationExplain(building({ type }), kind)).not.toMatch(/NaN|undefined/);
       }
     }

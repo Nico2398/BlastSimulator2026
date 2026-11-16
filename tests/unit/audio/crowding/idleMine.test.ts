@@ -87,7 +87,7 @@ describe('a full-screen menu', () => {
     bedsBefore = sim.recorder.beds.length;
     sim.menuUp = true;
     sim.frames(1); // the director learns about the menu on the next frame, as in the render loop
-    // The world keeps raising events behind the menu: a shift change, a level-up, research, a collapse, hauling,
+    // The world keeps raising events behind the menu: a shift change, a level-up, a collapse, hauling,
     // a lightning flash and a game command (the console is reachable from the page even behind a menu).
     const { emitter } = sim.engine;
     const state = sim.state!;
@@ -96,7 +96,6 @@ describe('a full-screen menu', () => {
     for (let second = 0; second < MENU_S; second++) {
       emitter.emit('employee:shift_change', { employeeId });
       emitter.emit('employee:levelup', { employeeId, category: 'driving.truck', oldLevel: 1, newLevel: 2 });
-      emitter.emit('research:completed', { targetType: 'living_quarters', targetTier: 2 });
       emitter.emit('employee:collapsed', { employeeId, needKey: 'fatigue' });
       emitter.emit('vehicle:haul_loaded', { vehicleId, fragmentId: 1 });
       emitter.emit('vehicle:haul_delivered', { vehicleId, fragmentId: 1 });

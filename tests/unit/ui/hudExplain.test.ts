@@ -15,7 +15,7 @@ afterEach(() => setLocale('en'));
 
 const ALL_KINDS: readonly ModifierKind[] = [
   'work_stoppage', 'work_rate', 'morale_drift', 'salary_factor', 'recurring_charge',
-  'blast_ban', 'haul_pause', 'drill_ban', 'survey_cost', 'research_cost',
+  'blast_ban', 'haul_pause', 'drill_ban', 'survey_cost',
   'contract_price', 'explosive_price', 'upkeep_surcharge', 'forced_weather',
   'event_weight', 'out_of_service', 'permit_delay',
 ];

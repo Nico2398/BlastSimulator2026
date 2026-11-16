@@ -626,7 +626,7 @@ describe('resolveWaitStatus — real waitsOnWork steps (#1014)', () => {
     it(`${stepId}: does not wait on an unrelated planned building of a different type`, () => {
       const s = baseState();
       s.plannedBuildings = [
-        { id: 1, buildingId: 1, type: 'research_center', tier: 1, x: 0, z: 0, actionId: 1, cost: 100 } as never,
+        { id: 1, buildingId: 1, type: 'geology_lab', tier: 1, x: 0, z: 0, actionId: 1, cost: 100 } as never,
       ];
       expect(resolveWaitStatus(TUTORIAL_STAGES[stepId]!, s).waiting).toBe(false);
     });

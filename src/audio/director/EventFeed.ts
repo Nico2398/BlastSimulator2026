@@ -33,8 +33,8 @@ const ENTITY_CUES: Readonly<Record<EntityIntent, EntityCue>> = {
   collapse: { sound: 'worker_collapse', entity: 'employee', budgeted: false },
 };
 
-// Owner of the `unlock` (research:completed) and `level_up` (employee:levelup) sounds: this feed. Their toasts are
-// created silent (researchNotifications, crewNotifications), so the toast cue never doubles them.
+// Owner of the `unlock` (quest:completed) and `level_up` (employee:levelup) sounds: this feed. Their toasts are
+// created silent (progressionNotifications, crewNotifications), so the toast cue never doubles them.
 const FLAG_SOUNDS: Readonly<Record<FlagIntent, OneShotId>> = {
   levelUp: 'level_up',
   shiftWhistle: 'shift_whistle',
@@ -61,7 +61,7 @@ export class EventFeed {
     subs.on('employee:collapsed', e => this.mark('collapse', e.employeeId));
     subs.on('employee:levelup', () => this.flags.add('levelUp'));
     subs.on('employee:shift_change', () => this.flags.add('shiftWhistle'));
-    subs.on('research:completed', () => this.flags.add('unlock'));
+    subs.on('quest:completed', () => this.flags.add('unlock'));
     subs.on('level:complete', () => this.stings.play('win'));
     subs.on('bankruptcy:triggered', () => this.stings.play('lose'));
     subs.on('arrest:triggered', () => this.stings.play('lose'));

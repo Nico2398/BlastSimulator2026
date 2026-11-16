@@ -160,7 +160,7 @@ const WINDOW_CSS = `
 .bs-build-card-top > div:last-child { flex: 1 1 auto !important; }
 .bs-build-card-top span:first-child { font-size: 12.5px !important; }
 .bs-build-card-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: auto; }
-.bs-build-card-actions .bs-build-buy-btn, .bs-build-card-actions .bs-build-research-btn { flex: 1 1 auto !important; padding: 7px 10px !important; font-size: 10px !important; }
+.bs-build-card-actions .bs-build-buy-btn { flex: 1 1 auto !important; padding: 7px 10px !important; font-size: 10px !important; }
 .bs-build-placed-row { flex-wrap: nowrap !important; align-items: flex-start !important; gap: 9px !important; padding: 8px !important; border-radius: 9px !important; }
 .bsx-window .bs-build-terrain-tools { flex-direction: row !important; flex-wrap: wrap; }
 .bsx-window .bs-build-terrain-tools > button { width: auto !important; flex: 1 1 200px; }

@@ -151,7 +151,7 @@ All four layers must pass before any PR is merged. `npm run validate` enforces t
 - **Scope:** Console command sequences exercising partial gameplay loops. No DOM, no Three.js. May import from `src/console/`.
 - **Requirements:** Minimum 8 scenarios per test suite (10 recommended)
 - **Available suites (16 total):**
-  - `buildings.integration.test.ts` — placement, rejection, demolition, blast destruction, living quarters, research center, overcapacity, protected voxels
+  - `buildings.integration.test.ts` — placement, rejection, demolition, blast destruction, living quarters, overcapacity, protected voxels
   - `vehicles.integration.test.ts` — purchase/qualification, traffic, damage/repair, blast destruction, driver re-entry, payload tracking
   - `skills.integration.test.ts` — qualification, training, XP, level-up, proficiency, salary, errors, ghost preview, duration
   - `survey.integration.test.ts` — seismic/core/aerial surveys, stale data, luck/bad RNG, skill scaling, building damage, overlapping surveys
@@ -206,7 +206,7 @@ All four layers must pass before any PR is merged. `npm run validate` enforces t
 | `needs-cycle.json` | 7 | 3 workers → 20 ticks → canteen auto-queued |
 | `ramp-navigation.json` | 6 | Build ramp → agent reaches lower bench |
 | `vibration-budget.json` | — | Exceed vibration budget 3× → $5,000 fine |
-| `building-lifecycle.json` | 1 | Place → research → demolish → rebuild Tier 2 |
+| `building-lifecycle.json` | 1 | Place → upgrade → move → demolish |
 | `vehicle-traffic.json` | 2 | 4 haulers on narrow ramp → TrafficJamEvent |
 | `employee-training.json` | 3 | Hire generalist → train → blast task accepted |
 | `blast-undercharge.json` | 5 | 30% optimal charge → oversized fragments, zero projections |

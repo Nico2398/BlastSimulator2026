@@ -4,7 +4,7 @@ import type { GameState } from '../../src/core/state/GameState.js';
 import type { BlastReport, FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { isOversized } from '../../src/core/mining/BlastCalc.js';
 import { accumulateOreMass } from '../../src/core/mining/BlastOreReport.js';
-import { BUILDING_TIERS, getAllBuildingTypes, getBuildingDef, getUpgradeCost, isSingleTierType } from '../../src/core/entities/Building.js';
+import { BUILDING_TIERS, getAllBuildingTypes, getUpgradeCost, isSingleTierType } from '../../src/core/entities/Building.js';
 import { getAllVehicleRoles, getVehicleDefByTier } from '../../src/core/entities/Vehicle.js';
 import { HIRING_COSTS } from '../../src/core/config/balance.js';
 import type { Transaction } from '../../src/core/economy/Finance.js';
@@ -88,7 +88,6 @@ interface ProbeMetrics {
   boulderOreSoldShare: number | null;
   affordableTick: {
     warehouseT2: number | null;
-    researchCenter: number | null;
     secondHauler: number | null;
   };
 }
@@ -173,11 +172,10 @@ export class MetricsObserver {
   private readonly tierReachedTick: Record<string, number> = {};
   private tierSeen = '0.1';
   private readonly affordableTick: ProbeMetrics['affordableTick'] = {
-    warehouseT2: null, researchCenter: null, secondHauler: null,
+    warehouseT2: null, secondHauler: null,
   };
   private readonly costs = {
     warehouseT2: getUpgradeCost('freight_warehouse', 2),
-    researchCenter: getBuildingDef('research_center', 1).constructionCost,
     secondHauler: getVehicleDefByTier('debris_hauler', 1).purchaseCost + HIRING_COSTS.driver,
   };
 

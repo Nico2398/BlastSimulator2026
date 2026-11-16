@@ -6,7 +6,9 @@ import type { ActionSpec, InspectorLinks, InspectorView } from '../../../../../s
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { GameState, PendingAction } from '../../../../../src/core/state/GameState.js';
 import { getBuildingDef, getUpgradeCost, getMoveCost, getDemolishCost, type Building } from '../../../../../src/core/entities/Building.js';
-import { getResearchTaskDef } from '../../../../../src/core/config/balance.js';
+import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest } from '../../../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../../../src/core/economy/QuestCatalog.js';
 import { hireEmployee, createEmployeeState } from '../../../../../src/core/entities/Employee.js';
 import { Random } from '../../../../../src/core/math/Random.js';
 import { RESERVATION_REFUSAL } from '../../../../../src/core/entities/PlacementReservations.js';
@@ -77,9 +79,14 @@ function addSite(s: GameState, id: number, remaining: number | null, total: numb
   return { builderId: employee.id };
 }
 
-function addResearchCenter(s: GameState): void {
-  s.buildings.buildings.push(makeBuilding({ id: 90, type: 'research_center', x: 40, z: 40 }));
+/** The same site on a progression ladder: quests exist, so higher building tiers are locked behind them (#2283). */
+function withQuests(s: GameState): GameState {
+  s.grade = createGradeState();
+  s.quests = createQuestState();
+  return s;
 }
+
+const questTitle = (id: string): string => t(getQuest(id)!.titleKey);
 
 describe('building inspector — status line per state', () => {
   it('operating, out of service, demolition ordered and rebuilding each read differently, with no raw keys', () => {
@@ -212,28 +219,50 @@ describe('building inspector — action strip', () => {
     expect(getUpgradeCost('management_office', 2)).toBeGreaterThan(0);
   });
 
-  it('research replaces upgrade when the next tier is locked, carrying cost and duration', () => {
-    const withLab = stateWith(makeBuilding());
-    addResearchCenter(withLab);
-    const view = viewOf(withLab);
-    expect(view.actions.map(a => a.action)).toEqual(['research', 'move', 'demolish']);
-    const research = actionOf(view, 'research')!;
-    expect(research.disabled ?? false).toBe(false);
-    const def = getResearchTaskDef('management_office', 2);
-    const shown = `${research.label ?? ''} ${research.title ?? ''}`;
-    expect(shown).toContain(String(def.ticks));
+  it('keeps the upgrade action, disabled and naming the quest, when the next tier is locked', () => {
+    const s = withQuests(stateWith(makeBuilding()));
+    const view = viewOf(s);
+    expect(view.actions.map(a => a.action)).toEqual(['upgrade', 'move', 'demolish']);
+    expect(view.actions.some(a => (a.action as string) === 'research')).toBe(false);
+    const up = actionOf(view, 'upgrade')!;
+    expect(up.disabled).toBe(true);
+    expect(up.title).toBe(t('inspector.reason.quest_required', { tier: 2, quest: questTitle('quest_building_t2') }));
+    expect(up.title).toContain(questTitle('quest_building_t2'));
   });
 
-  it('once research is queued the research action is disabled and shows live progress', () => {
-    const s = stateWith(makeBuilding());
-    addResearchCenter(s);
-    const def = getResearchTaskDef('management_office', 2);
-    s.buildings.researchQueue.push({
-      targetType: 'management_office', targetTier: 2, ticksRemaining: Math.floor(def.ticks / 2), cost: def.cost, conditions: [],
-    });
-    const research = actionOf(viewOf(s), 'research')!;
-    expect(research.disabled).toBe(true);
-    expect(`${research.label ?? ''} ${research.title ?? ''}`).toMatch(/\d/);
+  it('a tier-2 building names the T3 quest, even with the T2 quest completed', () => {
+    const s = withQuests(stateWith(makeBuilding({ tier: 2 })));
+    completeQuest(s, 'quest_building_t2');
+    const up = actionOf(viewOf(s), 'upgrade')!;
+    expect(up.disabled).toBe(true);
+    expect(up.title).toBe(t('inspector.reason.quest_required', { tier: 3, quest: questTitle('quest_building_t3') }));
+  });
+
+  it('the locked title reads in French under the French locale', () => {
+    const s = withQuests(stateWith(makeBuilding()));
+    const en = actionOf(viewOf(s), 'upgrade')!.title;
+    setLocale('fr');
+    try {
+      const up = actionOf(viewOf(s), 'upgrade')!;
+      expect(up.title).not.toBe(en);
+      expect(up.title).toBe(t('inspector.reason.quest_required', { tier: 2, quest: questTitle('quest_building_t2') }));
+    } finally {
+      setLocale('en');
+    }
+  });
+
+  it('the upgrade is enabled once the quest completes, at its usual cost', () => {
+    const b = makeBuilding();
+    const s = withQuests(stateWith(b));
+    completeQuest(s, 'quest_building_t2');
+    const up = actionOf(viewOf(s), 'upgrade')!;
+    expect(up.disabled ?? false).toBe(false);
+    expect(up.label).toBe(`${t('inspector.action.upgrade')} · $${formatMoney(getUpgradeCost(b.type, 2))}`);
+  });
+
+  it('the upgrade is enabled on a site without quests with nothing unlocked', () => {
+    const up = actionOf(viewOf(stateWith(makeBuilding())), 'upgrade')!;
+    expect(up.disabled ?? false).toBe(false);
   });
 
   it('upgrade is disabled with a visible reason at max tier', () => {
@@ -306,21 +335,17 @@ describe('building inspector — people and activity sections (#1760)', () => {
     expect(root.querySelector(`[data-select-kind="employee"][data-select-id="${employee.id}"]`)!.textContent).toContain('Zed Sleeper');
   });
 
-  it('a school view carries the courses and a research center view carries the research line', () => {
+  it('a school view carries the courses', () => {
     const school = makeBuilding({ type: 'blasting_academy' });
     const sRoot = document.createElement('div');
     sRoot.append(...viewOf(stateWith(school)).sections);
     expect(sRoot.querySelector('[data-course]')).not.toBeNull();
-    const rc = makeBuilding({ type: 'research_center' });
-    const rRoot = document.createElement('div');
-    rRoot.append(...viewOf(stateWith(rc)).sections);
-    expect(rRoot.querySelector('[data-live="research-idle"]')).not.toBeNull();
   });
 
-  it('a building that is neither home, school nor lab carries none of the three sections', () => {
+  it('a building that is neither home nor school carries neither section', () => {
     const root = document.createElement('div');
     root.append(...viewOf(stateWith(makeBuilding({ type: 'freight_warehouse' }))).sections);
-    expect(root.querySelector('[data-course], [data-live="research-idle"], [data-live="seats"]')).toBeNull();
+    expect(root.querySelector('[data-course], [data-live="seats"]')).toBeNull();
   });
 
   it('the view signature changes when a trainee enrols', () => {
@@ -343,22 +368,15 @@ describe('building inspector — money carries the currency sign (#1820)', () =>
     return root.querySelector('[data-live="upkeep"]')!.textContent ?? '';
   };
 
-  function labelled(s: GameState): InspectorView {
-    addResearchCenter(s);
-    return viewOf(s);
-  }
-
   it('upkeep reads $cost/h', () => {
     const b = warehouse();
     const upkeep = getBuildingDef(b.type, b.tier).operatingCostPerTick;
     expect(upkeepOf(viewOf(stateWith(b)))).toContain(`$${formatMoney(upkeep)}/h`);
   });
 
-  it('Research, Move and Demolish labels carry $ before the grouped amount', () => {
+  it('Move and Demolish labels carry $ before the grouped amount', () => {
     const b = warehouse();
-    const view = labelled(stateWith(b));
-    const research = getResearchTaskDef('freight_warehouse', 2);
-    expect(actionOf(view, 'research')!.label).toContain(`$${formatMoney(research.cost)}`);
+    const view = viewOf(stateWith(b));
     expect(actionOf(view, 'move')!.label).toBe(`${t('inspector.action.move')} · $${formatMoney(getMoveCost(b))}`);
     expect(actionOf(view, 'demolish')!.label).toBe(`${t('inspector.action.demolish')} · $${formatMoney(getDemolishCost(b))}`);
   });
@@ -380,87 +398,18 @@ describe('building inspector — money carries the currency sign (#1820)', () =>
   it('the French locale places the sign after the amount', () => {
     setLocale('fr');
     const b = warehouse();
-    const view = labelled(stateWith(b));
+    const view = viewOf(stateWith(b));
     const upkeep = getBuildingDef(b.type, b.tier).operatingCostPerTick;
     expect(upkeepOf(view)).toContain(`${formatMoney(upkeep)} $ par h`);
     expect(actionOf(view, 'move')!.label).toContain(`${formatMoney(getMoveCost(b))} $`);
     expect(actionOf(view, 'move')!.label).not.toContain(`$${formatMoney(getMoveCost(b))}`);
-    expect(actionOf(view, 'research')!.label).toContain(`${formatMoney(getResearchTaskDef('freight_warehouse', 2).cost)} $`);
     const broke = actionOf(viewOf(stateWith(b, 0)), 'move')!;
     expect(broke.title).toContain(`${formatMoney(getMoveCost(b))} $`);
   });
 
-  it('a queued research line and a course row carry the sign', () => {
-    const s = stateWith(makeBuilding({ type: 'research_center' }));
-    // The head of the queue renders as running (no cost); the money shows on the pending lines behind it.
-    s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 2, ticksRemaining: 5, cost: 100, conditions: [] });
-    s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 2, ticksRemaining: 5, cost: 5000, conditions: [] });
-    expect(textOf(viewOf(s))).toContain('$5,000');
+  it('a course row carries the sign', () => {
     const school = makeBuilding({ type: 'blasting_academy' });
     expect(textOf(viewOf(stateWith(school)))).toMatch(/fee \$[\d,]+/);
-  });
-});
-
-describe('building inspector — research duration (#1820)', () => {
-  it('instant tier-2 research shows no tick count', () => {
-    const s = stateWith(makeBuilding({ type: 'freight_warehouse' }));
-    addResearchCenter(s);
-    expect(getResearchTaskDef('freight_warehouse', 2).ticks).toBe(0);
-    const label = actionOf(viewOf(s), 'research')!.label!;
-    expect(label).not.toMatch(/tick/i);
-    expect(label).not.toMatch(/\b0\b/);
-  });
-
-  it('tier-3 research still shows its duration', () => {
-    const s = stateWith(makeBuilding({ type: 'freight_warehouse', tier: 2 }));
-    addResearchCenter(s);
-    s.buildings.unlockedTiers['freight_warehouse'] = 2;
-    const research = actionOf(viewOf(s), 'research')!;
-    expect(research.disabled ?? false).toBe(false);
-    expect(research.label).toContain('50 ticks');
-  });
-});
-
-describe('building inspector — research prerequisite (#1820)', () => {
-  it('without a Research Center the Research action is disabled and names it', () => {
-    const research = actionOf(viewOf(stateWith(makeBuilding({ type: 'freight_warehouse' }))), 'research')!;
-    expect(research.disabled).toBe(true);
-    expect(research.title).toBe(t('inspector.reason.research_no_center'));
-    expect(research.title).toContain('Research Center');
-  });
-
-  it('with an operating Research Center it is enabled and carries no reason', () => {
-    const s = stateWith(makeBuilding({ type: 'freight_warehouse' }));
-    addResearchCenter(s);
-    const research = actionOf(viewOf(s), 'research')!;
-    expect(research.disabled ?? false).toBe(false);
-    expect(research.title).toBeUndefined();
-  });
-
-  it('tier 3 without the tier-2 research is disabled and names the missing tier', () => {
-    const s = stateWith(makeBuilding({ type: 'freight_warehouse', tier: 2 }));
-    addResearchCenter(s);
-    const research = actionOf(viewOf(s), 'research')!;
-    expect(research.disabled).toBe(true);
-    expect(research.title).toBe(t('inspector.reason.research_needs_tier', { tier: 2 }));
-  });
-
-  it('queued research still shows progress and is disabled', () => {
-    const s = stateWith(makeBuilding({ type: 'freight_warehouse', tier: 2 }));
-    addResearchCenter(s);
-    s.buildings.unlockedTiers['freight_warehouse'] = 2;
-    s.buildings.researchQueue.push({ targetType: 'freight_warehouse', targetTier: 3, ticksRemaining: 20, cost: 12000, conditions: [] });
-    const research = actionOf(viewOf(s), 'research')!;
-    expect(research.disabled).toBe(true);
-    expect(research.label).toBe(t('ui.build.research_progress', { percent: Math.round(((50 - 20) / 50) * 100), remaining: 20 }));
-  });
-
-  it('cash short with a Research Center keeps the cash reason', () => {
-    const s = stateWith(makeBuilding({ type: 'freight_warehouse' }), 0);
-    addResearchCenter(s);
-    const research = actionOf(viewOf(s), 'research')!;
-    expect(research.disabled).toBe(true);
-    expect(research.title).toContain('Not enough cash');
   });
 });
 

@@ -9,10 +9,6 @@ import {
   getStorageCapacity,
   getBuildingScoreEffects,
   getBuildingDef,
-  isPlacementBlockedByResearch,
-  queueResearchTask,
-  tickResearch,
-  isTierUnlocked,
   findNearestActiveBuildingOfType,
   getDemolishCost,
   getUpgradeCost,
@@ -147,96 +143,43 @@ describe('demolishBuilding()', () => {
   });
 });
 
-// ── isPlacementBlockedByResearch (#410 — currently a no-op stub, always false) ──
+// ── placeBuilding — no tier gate (#2283): the order is gated by the console, placement completes a paid order ──
 
-describe('isPlacementBlockedByResearch', () => {
-  it('never blocks tier 1, regardless of research state', () => {
-    const state = createBuildingState();
-    expect(isPlacementBlockedByResearch(state, 'living_quarters', 1)).toBe(false);
-  });
-
-  it('blocks tier 2 when the tier has not been researched', () => {
-    const state = createBuildingState();
-    expect(isPlacementBlockedByResearch(state, 'living_quarters', 2)).toBe(true);
-  });
-
-  it('blocks tier 3 when only tier 2 has been researched', () => {
-    const state = createBuildingState();
-    state.unlockedTiers['living_quarters'] = 2;
-    expect(isPlacementBlockedByResearch(state, 'living_quarters', 3)).toBe(true);
-  });
-
-  it('does not block tier 2 once tier 2 has been researched', () => {
-    const state = createBuildingState();
-    state.unlockedTiers['living_quarters'] = 2;
-    expect(isPlacementBlockedByResearch(state, 'living_quarters', 2)).toBe(false);
-  });
-
-  it('does not block tier 3 once tier 3 has been researched', () => {
-    const state = createBuildingState();
-    state.unlockedTiers['living_quarters'] = 3;
-    expect(isPlacementBlockedByResearch(state, 'living_quarters', 3)).toBe(false);
-  });
-
-  it('a research unlock for one building type does not unblock another type', () => {
-    const state = createBuildingState();
-    state.unlockedTiers['geology_lab'] = 3;
-    expect(isPlacementBlockedByResearch(state, 'driving_center', 2)).toBe(true);
-  });
-});
-
-// ── placeBuilding — research gating (#410) ──────────────────────────────────
-
-describe('placeBuilding — research gating', () => {
-  it('places a tier-1 building with no research required', () => {
+describe('placeBuilding — tiers', () => {
+  it('places a tier-1 building', () => {
     const state = createBuildingState();
     const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 1);
     expect(result.success).toBe(true);
   });
 
-  it('rejects placing a tier-2 building when the tier has not been researched', () => {
+  it('places a tier-2 building with nothing unlocked, charging its tier cost', () => {
     const state = createBuildingState();
     const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 2);
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/research/i);
-    expect(state.buildings).toHaveLength(0);
+    expect(result.success, result.error).toBe(true);
+    expect(result.cost).toBe(getBuildingDef('living_quarters', 2).constructionCost);
+    expect(state.buildings).toHaveLength(1);
+    expect(state.buildings[0]!.tier).toBe(2);
   });
 
-  it('rejects placing a tier-3 building when only tier 2 has been researched', () => {
+  it('places a tier-3 building with nothing unlocked', () => {
     const state = createBuildingState();
-    state.unlockedTiers['living_quarters'] = 2;
+    const result = placeBuilding(state, 'geology_lab', 0, 0, 64, 64, 3);
+    expect(result.success, result.error).toBe(true);
+    expect(state.buildings[0]!.tier).toBe(3);
+  });
+
+  it('never refuses a tier for a locked tier, whatever unlockedTiers holds', () => {
+    const state = createBuildingState();
+    state.unlockedTiers['living_quarters'] = 1;
     const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 3);
-    expect(result.success).toBe(false);
-    expect(result.error).toMatch(/research/i);
+    expect(result.success, result.error).toBe(true);
+    expect(result.errorKey).toBeUndefined();
   });
+});
 
-  it('allows placing a tier-2 building once tier 2 has been researched via the queue', () => {
-    const state = createBuildingState();
-    // A placed research_center is required before any research task can be queued.
-    placeBuilding(state, 'research_center', 40, 40, 64, 64);
-
-    const queueResult = queueResearchTask(state, 'living_quarters', 2);
-    expect(queueResult.success, JSON.stringify(queueResult)).toBe(true);
-    // Tier-2 (first upgrade) tasks are cost-only — 0 ticks, so a single tick completes them.
-    tickResearch(state);
-    expect(isTierUnlocked(state, 'living_quarters', 2)).toBe(true);
-
-    const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 2);
-    expect(result.success).toBe(true);
-    // Two buildings now: the research_center placed above, plus this living_quarters.
-    expect(state.buildings).toHaveLength(2);
-  });
-
-  it('still rejects tier 3 after only tier 2 has completed research', () => {
-    const state = createBuildingState();
-    placeBuilding(state, 'research_center', 40, 40, 64, 64);
-
-    const queueResult = queueResearchTask(state, 'living_quarters', 2);
-    expect(queueResult.success, JSON.stringify(queueResult)).toBe(true);
-    tickResearch(state);
-
-    const result = placeBuilding(state, 'living_quarters', 0, 0, 64, 64, 3);
-    expect(result.success).toBe(false);
+describe('createBuildingState', () => {
+  it('holds exactly the buildings, the id counter and the unlocked tiers', () => {
+    expect(createBuildingState()).toEqual({ buildings: [], nextId: 1, unlockedTiers: {} });
   });
 });
 
@@ -347,7 +290,6 @@ describe('getUpgradeCost()', () => {
   const PRICES: ReadonlyArray<readonly [BuildingType, number, number]> = [
     ['freight_warehouse', 28_500, 54_000],
     ['living_quarters', 20_000, 37_500],
-    ['research_center', 47_500, 90_000],
     ['blasting_academy', 28_500, 54_000],
     ['driving_center', 24_000, 45_000],
     ['management_office', 16_000, 30_000],
@@ -779,7 +721,7 @@ describe('getBuildingPeopleCapacity (#1202)', () => {
   });
 
   it('buildings that take no people hold none, whatever their capacity field counts', () => {
-    for (const type of ['research_center', 'freight_warehouse'] as const) {
+    for (const type of ['freight_warehouse'] as const) {
       for (const tier of [1, 2, 3] as const) {
         expect(getBuildingPeopleCapacity(type, tier)).toBe(0);
       }

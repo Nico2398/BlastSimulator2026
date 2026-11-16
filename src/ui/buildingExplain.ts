@@ -12,7 +12,7 @@ import { factorFor } from '../core/events/ActiveModifiers.js';
 import type { GameState } from '../core/state/GameState.js';
 
 /** Which stored/occupied figure a placed row's utilization shows. */
-type UtilizationKind = 'beds' | 'kg' | 'research';
+type UtilizationKind = 'beds' | 'kg';
 
 const TIERS: readonly BuildingTier[] = [1, 2, 3];
 

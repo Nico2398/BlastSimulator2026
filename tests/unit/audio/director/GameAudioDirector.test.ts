@@ -135,7 +135,7 @@ describe('GameAudioDirector state cues', () => {
     expect(s.player.ids.sort()).toEqual(['building_built', 'coins_big', 'vehicle_start']);
 
     s.player.clear();
-    addBuilding(s.state, 'research_center', 9, 9);
+    addBuilding(s.state, 'geology_lab', 9, 9);
     advanceTicks(s.state, 9);
     s.command('tick 9');
     expect(s.player.plays).toHaveLength(0);
@@ -267,10 +267,10 @@ describe('GameAudioDirector event cues', () => {
 
   it('flushes event cues on the next frame when no command followed', () => {
     const s = started();
-    s.emitter.emit('research:completed', { targetType: 'living_quarters', targetTier: 2 });
+    s.emitter.emit('employee:levelup', { employeeId: 1, category: 'driving.drill_rig', oldLevel: 1, newLevel: 2 });
     expect(s.player.plays).toHaveLength(0);
     s.run(FRAME);
-    expect(s.player.ids).toEqual(['unlock']);
+    expect(s.player.ids).toEqual(['level_up']);
   });
 });
 
@@ -281,7 +281,7 @@ describe('GameAudioDirector menus and pause', () => {
     addBuilding(s.state, 'living_quarters', 3, 3);
     s.state.events.pendingEvent = { eventId: 'x', firedAtTick: 1 };
     s.emitter.emit('employee:shift_change', { employeeId: 1 });
-    s.emitter.emit('research:completed', { targetType: 'living_quarters', targetTier: 2 });
+    s.emitter.emit('employee:levelup', { employeeId: 1, category: 'driving.drill_rig', oldLevel: 1, newLevel: 2 });
     s.command('tick');
     s.run(3, { menuUp: true });
     s.run(3);

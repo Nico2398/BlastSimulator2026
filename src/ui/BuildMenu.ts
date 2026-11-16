@@ -2,8 +2,7 @@
 // Catalog of buildable types with tier selection; clicking arms the shared
 // placement tool. Also lists placed buildings (identity, HP, utilization,
 // badge, Locate; no action buttons, #1768 — the inspector drives Move,
-// Upgrade, Research and Demolish through armMove / requestUpgrade /
-// queueResearchFor). Terrain ramps (carved, not a building)
+// Upgrade and Demolish through armMove / requestUpgrade). Terrain ramps (carved, not a building)
 // get their own small section between the two lists.
 //
 // Root id, the catalog rows' `data-build-type`, the buy button's
@@ -20,8 +19,8 @@
 // This was the one panel the P0-P9 redesign never reached — still the
 // pre-redesign `.bs-ui`/`.bs-panel` dark/gold chrome with a plain text
 // title and a bottom Close button. This pass is chrome-only: same catalog
-// logic, same placed-row list, same ramp tool, same research-queue
-// handling, just rebuilt onto the shared `bsx-root` docked-panel
+// logic, same placed-row list, same ramp tool, same tier
+// gating, just rebuilt onto the shared `bsx-root` docked-panel
 // convention (46px header with icon chip + title + close button,
 // scrollable body) that every other panel already uses.
 
@@ -42,10 +41,7 @@ import {
   getBuildingDef,
   getDefSize,
   getMoveCost,
-  isTierUnlocked,
   isSingleTierType,
-  getResearchProgress,
-  getResearchTicksRemaining,
   isFootprintBuildable,
   type BuildingType,
   type BuildingTier,
@@ -57,8 +53,7 @@ import { placementRefusalReason, hoverRefusal, claimRefusalText, type PlacementK
 import { RampTool } from './RampTool.js';
 import type { RampDef } from '../core/mining/Ramp.js';
 import type { SpiralSurface } from '../core/mining/RampSpiral.js';
-import { getResearchTaskDef } from '../core/config/balance.js';
-import { researchCostFor } from '../core/events/ActiveModifiers.js';
+import { buildingTierLockedByQuest, type QuestDef } from '../core/economy/Quests.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameConsoleFn } from './gameConsole.js';
 import type { ConfirmModalConfig } from './panels/ConfirmModal.js';
@@ -114,13 +109,9 @@ export class BuildMenu extends PanelBase {
    *  Building count alone misses an upgrade, which destroys the old id and
    *  places a new one — the count stays flat while the id and tier both change. */
   private lastPlacedSignature: string | null = null;
-  /** Serialized `unlockedTiers` for change detection — a completed research
-   *  task changes tier availability without changing cash or placed count. */
+  /** Serialized `unlockedTiers` and completed quests for change detection — a completed quest
+   *  changes tier availability without changing cash or placed count. */
   private lastUnlockedSignature = '';
-  /** Serialized `researchQueue` contents for change detection — queuing
-   *  research hides the "Queue Research" button without changing cash,
-   *  placed count, or unlockedTiers. */
-  private lastResearchQueueSignature = '';
   /** Serialized `plannedBuildings` contents for change detection (#556) —
    *  a construction site starting or completing changes each catalog row's
    *  under-construction count without changing cash or placed count. */
@@ -254,12 +245,9 @@ export class BuildMenu extends PanelBase {
       this.refreshCatalogButtons(state.cash);
     }
     const placedSig = state.buildings.buildings.map((b) => `${b.id}:${b.tier}`).join(',');
-    const unlockedSig = JSON.stringify(state.buildings.unlockedTiers);
+    const unlockedSig = JSON.stringify([state.buildings.unlockedTiers, state.quests?.completed ?? null]);
     const unlockedChanged = unlockedSig !== this.lastUnlockedSignature;
     if (unlockedChanged) this.lastUnlockedSignature = unlockedSig;
-    const queueSig = state.buildings.researchQueue.map((r) => `${r.targetType}:${r.targetTier}`).join(',');
-    const queueChanged = queueSig !== this.lastResearchQueueSignature;
-    if (queueChanged) this.lastResearchQueueSignature = queueSig;
     if (placedSig !== this.lastPlacedSignature) {
       this.lastPlacedSignature = placedSig;
       this.refreshPlacedList(state.buildings.buildings);
@@ -267,8 +255,7 @@ export class BuildMenu extends PanelBase {
     const siteModels = new Map(state.plannedBuildings.map((pb) => [pb.buildingId, siteRowModel(pb, state)]));
     this.syncSites(state, siteModels);
     this.syncLiveRows(state, siteModels);
-    if (unlockedChanged || queueChanged) this.refreshCatalogButtons(state.cash);
-    else if (state.buildings.researchQueue.length > 0) this.refreshResearchProgress();
+    if (unlockedChanged) this.refreshCatalogButtons(state.cash);
 
     const plannedSig = state.plannedBuildings.map((pb) => `${pb.id}:${pb.type}`).join(',');
     if (plannedSig !== this.lastPlannedBuildingsSignature) {
@@ -345,14 +332,14 @@ export class BuildMenu extends PanelBase {
     }, b.id);
   }
 
-  /** Order the next-tier upgrade of `buildingId`: research guard, then the cutoff confirm, then `build upgrade` (#1758). */
+  /** Order the next-tier upgrade of `buildingId`: quest guard, then the cutoff confirm, then `build upgrade` (#1758). */
   requestUpgrade(buildingId: number): void {
     const state = this.lastState;
     const b = state?.buildings.buildings.find((x) => x.id === buildingId);
     if (!state || !b) return;
     const { upgrade } = buildingActionRules(state, b);
     if (upgrade.kind === 'locked') {
-      this.setStatus(t('ui.build.research_required', { tier: upgrade.nextTier! }));
+      this.setStatus(t(upgrade.reasonKey!, upgrade.reasonParams));
       return;
     }
     const doUpgrade = (): void => {
@@ -379,56 +366,6 @@ export class BuildMenu extends PanelBase {
   setFlowResultHandler(cb: (message: string) => void): void {
     this.flowResultCb = cb;
   }
-
-  /**
-   * Queue a Research Center task for `type` tier `tier` and report progress.
-   * Called by the catalog row's "Queue Research" button (place-blocked) and, via
-   * `queueResearchFor`, by the inspector's Research action (upgrade-blocked) —
-   * the only in-game paths to unlock tier 2/3.
-   */
-  queueResearch(type: BuildingType, tier: BuildingTier): void {
-    if (tier === 1) return;
-    this.setStatus(this.runResearchQueue(type, tier).message);
-  }
-
-  /** Runs `research queue` and words the outcome; shared by the catalog button and the inspector. */
-  private runResearchQueue(type: BuildingType, tier: BuildingTier): { ok: boolean; message: string } {
-    const cmdResult = this.gameConsole?.(`research queue type:${type} tier:${tier}`);
-    if (!cmdResult?.success) {
-      return { ok: false, message: t(BuildMenu.RESEARCH_FAILURE_KEYS[cmdResult?.code ?? ''] ?? 'ui.build.research_queue_failed') };
-    }
-    const task = this.lastState?.buildings.researchQueue.find(
-      (r) => r.targetType === type && r.targetTier === tier,
-    );
-    this.refreshCatalogButtons(this.lastCash);
-    return {
-      ok: true,
-      message: task ? t('ui.build.research_queued', { ticks: getResearchTicksRemaining(task) }) : t('ui.build.research_queued_generic'),
-    };
-  }
-
-  /** Inspector entry: null on success (status set) or nothing to research; else the translated refusal, with no status set. */
-  queueResearchFor(buildingId: number): string | null {
-    const b = this.lastState?.buildings.buildings.find((x) => x.id === buildingId);
-    const nextTier = b ? this.nextTierOf(b) : null;
-    if (!b || nextTier === null) return null;
-    const result = this.runResearchQueue(b.type, nextTier);
-    if (!result.ok) return result.message;
-    this.setStatus(result.message);
-    return null;
-  }
-
-  /** Maps `research queue`'s failure `code` (src/console/commands/research.ts)
-   *  to a translated status message — the raw `output` is core's plain-English
-   *  string and must never reach the player. */
-  private static readonly RESEARCH_FAILURE_KEYS: Record<string, string> = {
-    no_research_center: 'ui.build.research_failed_no_research_center',
-    already_unlocked: 'ui.build.research_failed_already_unlocked',
-    already_queued: 'ui.build.research_failed_already_queued',
-    conditions_not_met: 'ui.build.research_failed_conditions_not_met',
-    insufficient_funds: 'ui.build.research_failed_insufficient_funds',
-    usage: 'ui.build.research_queue_failed',
-  };
 
   // ── Section headers (bsx-section look, static text bound for locale refresh) ──
 
@@ -705,8 +642,9 @@ export class BuildMenu extends PanelBase {
     const placeBtn = button('primary', t('ui.build.place'), {
       onClick: () => {
         const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-        if (this.isTierLocked(type, tier)) {
-          this.setStatus(t('ui.build.research_required', { tier }));
+        const lockedBy = this.tierLockedBy(type, tier);
+        if (lockedBy) {
+          this.setStatus(this.lockReason(tier, lockedBy.titleKey));
           return;
         }
         this.armBuildingPointTool(type, tier, t(`building.${type}.t${tier}.name`), (x, z) => {
@@ -719,17 +657,8 @@ export class BuildMenu extends PanelBase {
     placeBtn.classList.add('bs-build-buy-btn');
     placeBtn.style.cssText = 'flex:0 1 auto;min-width:0;height:auto;padding:6px 9px;font-size:9px;white-space:normal;line-height:1.25';
 
-    const researchBtn = button('locked', t('ui.build.queue_research_button'), {
-      onClick: () => {
-        const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-        this.queueResearch(type, tier);
-      },
-    });
-    researchBtn.classList.add('bs-build-research-btn');
-    researchBtn.style.cssText = 'flex:0 1 auto;min-width:0;height:auto;padding:6px 8px;font-size:9px;white-space:normal;line-height:1.2;display:none';
-
     const top = el('div', { className: 'bs-build-card-top', children: [portraitSlot, info] });
-    const actions = el('div', { className: 'bs-build-card-actions', children: [tierWrap, placeBtn, researchBtn] });
+    const actions = el('div', { className: 'bs-build-card-actions', children: [tierWrap, placeBtn] });
     row.append(top, actions);
     return row;
   }
@@ -739,64 +668,14 @@ export class BuildMenu extends PanelBase {
     target.textContent = t('ui.build.cost', { cost: formatMoney(def.constructionCost) });
   }
 
-  /** Research price after live research_cost modifiers. */
-  private researchCost(base: number): number {
-    const s = this.lastState;
-    return s ? researchCostFor(base, s.events.activeModifiers, s.tickCount) : base;
+  /** The open quest gating `tier` of `type` on this site; null when it may be placed. */
+  private tierLockedBy(type: BuildingType, tier: BuildingTier): QuestDef | null {
+    return this.lastState ? buildingTierLockedByQuest(this.lastState, type, tier) : null;
   }
 
-  /**
-   * Catalog rows only (placed rows carry no research button): label the row's
-   * research button with its cost and duration, or — when a task for that
-   * building/tier is already queued — hide it and show the live progress.
-   */
-  private syncResearchControls(
-    row: HTMLElement,
-    type: BuildingType,
-    tier: BuildingTier,
-    locked: boolean,
-  ): void {
-    const btn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn');
-    if (!btn) return;
-    const researchTier = tier > 1 ? (tier as 2 | 3) : null;
-    if (researchTier !== null) {
-      const def = getResearchTaskDef(type, researchTier);
-      btn.textContent = t('ui.build.queue_research_cost', { cost: formatMoney(this.researchCost(def.cost)), duration: def.ticks });
-    }
-    const task = locked && researchTier !== null
-      ? this.lastState?.buildings.researchQueue.find((r) => r.targetType === type && r.targetTier === researchTier)
-      : undefined;
-    btn.style.display = locked && !task ? '' : 'none';
-    const existing = row.querySelector<HTMLElement>('.bs-build-research-progress');
-    if (task) {
-      const { fraction } = getResearchProgress(task);
-      let progressEl = existing;
-      if (!progressEl) {
-        progressEl = el('span', { className: 'bs-build-research-progress' });
-        progressEl.style.cssText = 'flex:1 1 100%;font:500 9px/1.2 var(--bsx-font-mono);color:var(--bsx-text-micro)';
-        row.append(progressEl);
-      }
-      progressEl.textContent = t('ui.build.research_progress', {
-        percent: Math.round(fraction * 100),
-        remaining: getResearchTicksRemaining(task),
-      });
-    } else {
-      existing?.remove();
-    }
-  }
-
-  /** True when `tier` of `type` still needs research (tier 1 is always available). */
-  private isTierLocked(type: BuildingType, tier: BuildingTier): boolean {
-    return tier > 1 && !!this.lastState && !isTierUnlocked(this.lastState.buildings, type, tier);
-  }
-
-  private nextTierOf(b: Building): BuildingTier | null {
-    return b.tier < 3 && !isSingleTierType(b.type) ? ((b.tier + 1) as BuildingTier) : null;
-  }
-
-  /** Update progress text on existing catalog rows in place (called every tick while research is queued). */
-  private refreshResearchProgress(): void {
-    for (const row of this.catalogRows()) this.syncCatalogRow(row);
+  /** Why a tier cannot be placed yet, naming the quest that opens it. */
+  private lockReason(tier: BuildingTier, questTitleKey: string): string {
+    return t('inspector.reason.quest_required', { tier, quest: t(questTitleKey) });
   }
 
   private refreshCatalogButtons(cash: number): void {
@@ -816,17 +695,16 @@ export class BuildMenu extends PanelBase {
     return [...Array.from(this.catalogEl.children), ...Array.from(this.vanityEl.children)] as HTMLElement[];
   }
 
-  /** Sync one catalog row: buy-button state (when `cash` given) and research controls. */
+  /** Sync one catalog row: buy-button state (when `cash` given) and its tier lock. */
   private syncCatalogRow(row: HTMLElement, cash?: number): void {
     const type = row.dataset['buildType'] as BuildingType | undefined;
     if (!type) return;
     const tier = (this.selectedTiers.get(type) ?? 1) as BuildingTier;
-    const locked = this.isTierLocked(type, tier);
-    if (cash !== undefined) {
-      const btn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn');
-      if (btn) btn.disabled = cash < getBuildingDef(type, tier).constructionCost || locked;
-    }
-    this.syncResearchControls(row, type, tier, locked);
+    const lockedBy = this.tierLockedBy(type, tier);
+    const btn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn');
+    if (!btn) return;
+    if (cash !== undefined) btn.disabled = cash < getBuildingDef(type, tier).constructionCost || lockedBy !== null;
+    btn.title = lockedBy ? this.lockReason(tier, lockedBy.titleKey) : '';
   }
 
   // ── Placed buildings list ──────────────────────────────────────────────────

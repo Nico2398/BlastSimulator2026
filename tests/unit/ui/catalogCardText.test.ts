@@ -224,10 +224,6 @@ describe('buildingCardTooltip', () => {
     }
   }
 
-  it('research center has no capacity line', () => {
-    expect(buildingCardTooltip(getBuildingDef('research_center', 1))).not.toContain('Capacity');
-  });
-
   it('storage buildings state capacity in kg', () => {
     for (const type of ['freight_warehouse'] as const) {
       expect(buildingCardTooltip(getBuildingDef(type, 1))).toContain('kg');

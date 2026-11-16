@@ -29,7 +29,7 @@ describe('BuildingMesh', () => {
     const bm = new BuildingMesh(scene);
     const types: Building['type'][] = [
       'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-      'research_center', 'living_quarters', 'freight_warehouse',
+      'living_quarters', 'freight_warehouse',
     ];
     types.forEach((type, i) => bm.addBuilding(makeBuilding(i, type)));
     expect(bm.count).toBe(types.length);
@@ -199,17 +199,17 @@ describe('BuildingMesh — model refresh (real assets)', () => {
     const library = await loadedModelLibrary([]);
     const scene = new THREE.Scene();
     const bm = new BuildingMesh(scene, library);
-    bm.addBuilding(makeBuilding(1, 'research_center'));
+    bm.addBuilding(makeBuilding(1, 'geology_lab'));
     expect(bm.getInstance(1)!.isFallback).toBe(true);
     bm.refreshModels(); // asset still missing — no change
     expect(bm.getInstance(1)!.isFallback).toBe(true);
-    const loaded = await loadedModelLibrary(['building_research_center_t1']);
-    library.register('building_research_center_t1', (loaded as unknown as { prototypes: Map<string, never> })['prototypes'].get('building_research_center_t1')!);
+    const loaded = await loadedModelLibrary(['building_geology_lab_t1']);
+    library.register('building_geology_lab_t1', (loaded as unknown as { prototypes: Map<string, never> })['prototypes'].get('building_geology_lab_t1')!);
     bm.refreshModels();
     const inst = bm.getInstance(1)!;
     expect(inst.isFallback).toBe(false);
     const group = scene.children[0] as THREE.Group;
-    // Model root + entry pin + exit pin, pins above the antenna tip.
+    // Model root + entry pin + exit pin, pins above the model's roof.
     expect(group.children).toHaveLength(3);
     const pins = group.children.slice(1) as THREE.Mesh[];
     for (const pin of pins) expect(pin.position.y).toBeGreaterThan(inst.bounds.max.y);
@@ -238,11 +238,11 @@ describe('instantiateBuildingModel (#1306)', () => {
   });
 
   it('is the same instance a real building of that type and tier draws (BuildingMesh shares the path)', async () => {
-    const library = await loadedModelLibrary([buildingModelId('research_center', 1)]);
+    const library = await loadedModelLibrary([buildingModelId('geology_lab', 1)]);
     const bm = new BuildingMesh(new THREE.Scene(), library);
-    bm.addBuilding(makeBuilding(1, 'research_center'));
+    bm.addBuilding(makeBuilding(1, 'geology_lab'));
     const viaMesh = bm.getInstance(1)!;
-    const direct = instantiateBuildingModel(library, 'research_center', 1);
+    const direct = instantiateBuildingModel(library, 'geology_lab', 1);
     expect(direct.root.name).toBe(viaMesh.root.name);
     expect(direct.bounds.equals(viaMesh.bounds)).toBe(true);
     direct.dispose();
@@ -253,7 +253,7 @@ describe('instantiateBuildingModel (#1306)', () => {
     const library = new ModelLibrary();
     const types: Building['type'][] = [
       'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-      'research_center', 'living_quarters', 'freight_warehouse',
+      'living_quarters', 'freight_warehouse',
     ];
     for (const type of types) {
       for (const tier of [1, 2, 3] as const) {

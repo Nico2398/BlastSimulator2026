@@ -22,10 +22,6 @@ function statusOf(state: GameState, def: QuestDef): string {
   return t(isQuestCompleted(state, def.id) ? 'quest.status.completed' : 'quest.status.available');
 }
 
-function rewardLine(def: QuestDef): string {
-  return questRewardLine(def);
-}
-
 function questList(state: GameState): CommandResult {
   const lines = getAllQuests().flatMap(def => [
     `${def.id}: ${t(def.titleKey)} [${statusOf(state, def)}]`,
@@ -42,7 +38,7 @@ function questDetail(state: GameState, id: string | undefined): CommandResult {
     t('quest.detail.giver', { giver: t(def.giverKey) }),
     t(def.pitchKey),
     ...questObjectiveStatuses(state, def).map(objectiveLine),
-    rewardLine(def),
+    questRewardLine(def),
   ];
   const missing = (def.requires ?? []).filter(r => !isQuestCompleted(state, r)).map(r => t(getQuest(r)?.titleKey ?? r));
   if (!questPrerequisitesMet(state, def)) lines.push(t('quest.detail.requires', { quests: missing.join(', ') }));

@@ -12,6 +12,9 @@ import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
 import { createQuestState, completeQuest } from '../../../../src/core/economy/Quests.js';
 import { getAllQuests, getQuest } from '../../../../src/core/economy/QuestCatalog.js';
 import { explosivesOfTier } from '../../../../src/core/world/ExplosiveCatalog.js';
+import { placeBuilding } from '../../../../src/core/entities/Building.js';
+import { createEmployeeState, hireEmployee } from '../../../../src/core/entities/Employee.js';
+import { Random } from '../../../../src/core/math/Random.js';
 import { meetTargets, tierTargets } from '../../../helpers/gradeLadder.js';
 import { MINE_GRADES, PERMIT_STRIKES_TO_SUSPEND, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS } from '../../../../src/core/config/balance.js';
 
@@ -633,5 +636,113 @@ describe('PermitPanel — the Progression panel and its quests (#2280)', () => {
     panel.update(s);
     expect(questEls()).toHaveLength(getAllQuests().length);
     expect(objectives(T2)).toHaveLength(2);
+  });
+
+  describe('building-tier quests (#2283 C9)', () => {
+    const B2 = 'quest_building_t2';
+    const B3 = 'quest_building_t3';
+    const allExplosiveNames = (): string[] => [...names(2), ...names(3)];
+
+    /** Bring the number of standing buildings up to `n`. */
+    function standBuildings(s: GameState, n: number): void {
+      for (let i = s.buildings.buildings.length; i < n; i++) {
+        const type = i === 0 ? 'living_quarters' : 'management_office';
+        expect(placeBuilding(s.buildings, type, 4 + i * 8, 20, 128, 128).success).toBe(true);
+      }
+    }
+
+    it('lists the building quests beside the explosive ones, all available', () => {
+      panel.update(questSite());
+      expect(questEls().map(e => e.dataset['questId'])).toEqual(expect.arrayContaining([B2, B3, T2, T3]));
+      expect(questEl(B2).dataset['state']).toBe('available');
+      expect(questEl(B3).dataset['state']).toBe('available');
+    });
+
+    it('shows the architect as giver and the quest title', () => {
+      panel.update(questSite());
+      expect(questEl(B2).querySelector('[data-role="quest-giver"]')!.textContent).toContain(t('quest.giver.architect'));
+      expect(questEl(B2).textContent).toContain(t(getQuest(B2)!.titleKey));
+    });
+
+    it('renders one objective row per objective, with its kind', () => {
+      panel.update(questSite());
+      expect(objectives(B2).map(o => o.dataset['kind']).sort()).toEqual(['buildings_built', 'crew_housed']);
+      expect(objectives(B3).map(o => o.dataset['kind']).sort()).toEqual(['buildings_built', 'crew_housed', 'safety_score']);
+    });
+
+    it('the buildings objective follows the standing buildings: text, bar and met flag', () => {
+      const s = questSite();
+      panel.update(s);
+      expect(objective(B2, 'buildings_built').dataset['met']).toBe('false');
+      expect(barWidth(objective(B2, 'buildings_built'))).toBe('0%');
+      standBuildings(s, 2);
+      panel.update(s);
+      expect(barWidth(objective(B2, 'buildings_built'))).toBe('50%');
+      expect(objective(B2, 'buildings_built').textContent).toMatch(/2[\s\S]*4/);
+      standBuildings(s, 4);
+      panel.update(s);
+      expect(barWidth(objective(B2, 'buildings_built'))).toBe('100%');
+      expect(objective(B2, 'buildings_built').dataset['met']).toBe('true');
+    });
+
+    it('the housed-crew objective follows the roster against the beds', () => {
+      const s = questSite();
+      standBuildings(s, 1);
+      panel.update(s);
+      expect(objective(B2, 'crew_housed').dataset['met']).toBe('false');
+      const pool = createEmployeeState();
+      for (let i = 0; i < 2; i++) {
+        const { employee } = hireEmployee(pool, 'driller', new Random(10 + i), 0, 0);
+        employee.id = 500 + i;
+        s.employees.employees.push(employee);
+      }
+      panel.update(s);
+      expect(objective(B2, 'crew_housed').dataset['met']).toBe('true');
+      expect(barWidth(objective(B2, 'crew_housed'))).toBe('100%');
+    });
+
+    it('the reward line names the building tier, not explosives', () => {
+      panel.update(questSite());
+      for (const [id, tier] of [[B2, 2], [B3, 3]] as const) {
+        const reward = questEl(id).querySelector('[data-role="quest-reward"]')!.textContent!;
+        expect(reward, id).toContain(String(tier));
+        for (const name of allExplosiveNames()) expect(reward, `${id} ${name}`).not.toContain(name);
+        expect(reward).not.toMatch(/\{\w+\}|quest\.|undefined|NaN/);
+        expect(reward).not.toBe(questEl(T2).querySelector('[data-role="quest-reward"]')!.textContent);
+      }
+    });
+
+    it('the explosive quests keep naming their explosives', () => {
+      panel.update(questSite());
+      const t2 = questEl(T2).querySelector('[data-role="quest-reward"]')!.textContent!;
+      expect(names(2).some(n => t2.includes(n))).toBe(true);
+    });
+
+    it('the building T3 quest carries a prerequisite note naming the building T2 quest', () => {
+      panel.update(questSite());
+      const note = questEl(B3).querySelector('[data-role="quest-requires"]');
+      expect(note).not.toBeNull();
+      expect(note!.textContent).toContain(t(getQuest(B2)!.titleKey));
+      expect(questEl(B2).querySelector('[data-role="quest-requires"]')).toBeNull();
+    });
+
+    it('a completed building quest reads completed and the other stays available', () => {
+      const s = questSite();
+      panel.update(s);
+      completeQuest(s, B2);
+      panel.update(s);
+      expect(questEl(B2).dataset['state']).toBe('completed');
+      expect(questEl(B3).dataset['state']).toBe('available');
+      expect(questEl(T2).dataset['state']).toBe('available');
+    });
+
+    it('renders in French without raw keys', () => {
+      const s = questSite();
+      setLocale('fr');
+      panel.refreshLocale();
+      panel.update(s);
+      expect(questEl(B2).textContent).toContain(t(getQuest(B2)!.titleKey));
+      expect(questEl(B2).textContent).not.toMatch(/quest\.|\{\w+\}/);
+    });
   });
 });

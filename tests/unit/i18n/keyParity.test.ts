@@ -545,8 +545,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #2287: +2 keys (meteoritic rock name, description).
     // #2286: +4 keys (long-range prospection card, note, island row, empty list): 5057.
     // #2280: +28 keys (quests, explosive tier locks, progression panel, notification): 5085.
-    // #2282: +8 keys (dealer quests, fleet objective, vehicle reward and notification), -2 (vehicle tier unlock lines): 5091.
-    expect(Object.keys(en).length).toBe(5091);
+    // #2283: Research Center and research UI removed (-55 keys), building-tier quests added (+12) on top of #2282's 5091: 5048.
+    expect(Object.keys(en).length).toBe(5048);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {
@@ -643,13 +643,12 @@ describe('en.json / fr.json — no untranslated (byte-identical) value outside t
   });
 });
 
-describe('inspector occupants and research keys (#1760)', () => {
+describe('inspector occupants keys (#1760)', () => {
   const keys = [
-    'inspector.section.residents', 'inspector.section.trainees', 'inspector.section.courses', 'inspector.section.research',
+    'inspector.section.residents', 'inspector.section.trainees', 'inspector.section.courses',
     'inspector.beds', 'inspector.seats', 'inspector.resident_rest', 'inspector.housing_effect',
     'inspector.overcapacity_warning', 'inspector.no_residents', 'inspector.no_trainees', 'inspector.trainee_row',
-    'inspector.walking_in', 'inspector.course_row', 'inspector.course_superseded', 'inspector.research_running',
-    'inspector.research_pending', 'inspector.research_paused', 'inspector.research_idle',
+    'inspector.walking_in', 'inspector.course_row', 'inspector.course_superseded',
   ];
   it.each(keys)('%s exists in en and fr with non-empty text', key => {
     expect(en[key], `en ${key}`).toBeTruthy();

@@ -9,10 +9,8 @@
 //     boomite's old [1,8]kg range; now each hole filled up to the stemming)
 //     must not produce "Missing charge", and the blast must destroy the
 //     warehouses in its footprint.
-//   - building-tier-system-visual / building-research-visual /
-//     building-research-progression-visual: once tier-gating is wired, a
-//     direct Tier 2/3 build must be rejected before research completes, and
-//     must succeed afterward.
+//   - building-tier-system-visual: the tier upgrades are accepted once their
+//     building-tier quests are completed (#2283) and land under the same id.
 //
 // DO NOT implement anything here — only add implementation to src/.
 
@@ -61,7 +59,7 @@ function isPlacementOrderCommand(command: string): boolean {
  * of extra ticks (walk time + `BUILDING_CONSTRUCTION_BASE_DURATION_TICKS`
  * per order) the original budget never had to cover, and every one of those
  * ticks drains employee upkeep. Sized generously against the worst case
- * observed (a T3 research_center order short by ~$14k under the padded
+ * observed (a T3 building order short by ~$14k under the padded
  * cash figure already in these files).
  */
 const CASH_BUFFER = 200000; // also keeps the mine out of bankruptcy, which freezes it (#1313)
@@ -159,43 +157,31 @@ function driveConstructionOrders(steps: ScenarioStepDef[]): ScenarioStepDef[] {
  * run's one-issue budget went to #1022; noted in the PR's follow-up comment
  * instead).
  */
-const FOOTPRINT_RELOCATIONS: Record<string, ReadonlyArray<readonly [number, number]>> = {
-  'building-tier-system-visual': [
-    [26, 14], // research_center T1
-    [2, 8],   // living_quarters, upgraded T1 -> T2 -> T3 in place — bench sized for the T3 5x4 footprint
-    [14, 5],  // management_office T1
-  ],
-  'building-research-visual': [
-    [3, 5],   // research_center T1
-    [22, 22], // research_center T2 attempt #1 (refused before the footprint check — research gate) — same target as #2 so both name the same command text
-    [22, 22], // research_center T2 attempt #2, placed as its own building
-    // research_center T3, placed as its own building, off the surveyed
-    // corridor between spawn and the T2 building above (a target whose walk
-    // squeezes past an existing footprint can strand the assigned employee
-    // indefinitely — #1008 Finding).
-    [40, 37],
-  ],
-  'building-research-progression-visual': [
-    [3, 5],
-    [22, 22],
-    [22, 22],
-    [40, 37],
-  ],
+const FOOTPRINT_RELOCATIONS: Record<string, Readonly<Record<string, ReadonlyArray<readonly [number, number]>>>> = {
+  'building-tier-system-visual': {
+    // upgraded T1 -> T2 -> T3 in place — bench sized for the T3 5x4 footprint
+    living_quarters: [[2, 8]],
+    management_office: [[14, 5]],
+  },
 };
 
 function relocateFootprints(name: string, steps: ScenarioStepDef[]): ScenarioStepDef[] {
-  const targets = FOOTPRINT_RELOCATIONS[name];
-  if (!targets) return steps;
+  const targetsByType = FOOTPRINT_RELOCATIONS[name];
+  if (!targetsByType) return steps;
 
-  let nextTarget = 0;
-  const buildAtPattern = /^(build \S+) at:\d+,\d+/;
+  const consumed: Record<string, number> = {};
+  const buildAtPattern = /^build (\S+) at:\d+,\d+/;
 
   return steps.map(step => {
     const match = step.command.match(buildAtPattern);
-    if (!match || nextTarget >= targets.length) return step;
+    if (!match) return step;
+    const type = match[1]!;
+    const targets = targetsByType[type];
+    const index = consumed[type] ?? 0;
+    if (!targets || index >= targets.length) return step;
+    consumed[type] = index + 1;
 
-    const [to] = [targets[nextTarget]!];
-    nextTarget++;
+    const to = targets[index]!;
     const toAt = `at:${to[0]},${to[1]}`;
 
     const command = step.command.replace(/at:\d+,\d+/, toAt);
@@ -237,18 +223,6 @@ function stepForNth(results: StepResult[], commandPrefix: string, occurrence: nu
   return found;
 }
 
-/** Index (in `results`) of the Nth (0-indexed) result whose command starts with the given prefix. */
-function stepIndexForNth(results: StepResult[], commandPrefix: string, occurrence: number): number {
-  let seen = 0;
-  for (let i = 0; i < results.length; i++) {
-    if (results[i]!.command.startsWith(commandPrefix)) {
-      if (seen === occurrence) return i;
-      seen++;
-    }
-  }
-  throw new Error(`No occurrence #${occurrence} found for command prefix "${commandPrefix}"`);
-}
-
 describe('building-destruction-visual — scenario-runner (#410)', () => {
   it('the blast step succeeds and does not report "Missing charge"', () => {
     const { results } = runScenarioSteps('building-destruction-visual');
@@ -282,7 +256,7 @@ describe('building-destruction-visual — scenario-runner (#410)', () => {
 });
 
 describe('building-tier-system-visual — scenario-runner (#410)', () => {
-  it('the tier-2 upgrade is accepted after research completes, and lands at tier 2 under the same id (#1392)', () => {
+  it('the tier-2 upgrade is accepted after its quest completes, and lands at tier 2 under the same id (#1392)', () => {
     const { results } = runScenarioSteps('building-tier-system-visual');
     const firstUpgrade = stepForNth(results, 'build upgrade', 0);
     expect(firstUpgrade.error).toBeUndefined();
@@ -291,98 +265,14 @@ describe('building-tier-system-visual — scenario-runner (#410)', () => {
     expect(landed.error).toBeUndefined();
   });
 
-  it('the tier-3 upgrade is accepted after its own research completes, and ends at tier 3 under the same id (#1392)', () => {
+  it('the tier-3 upgrade is accepted after its own quest completes, and ends at tier 3 under the same id (#1392)', () => {
     const { engine, results } = runScenarioSteps('building-tier-system-visual');
     const secondUpgrade = stepForNth(results, 'build upgrade', 1);
     expect(secondUpgrade.error).toBeUndefined();
     expect(secondUpgrade.commandOutput).toMatch(/ordered/i);
-    const quarters = engine.ctx.state!.buildings.buildings.find(b => b.type === 'living_quarters');
-    expect(quarters?.tier).toBe(3);
-    expect(quarters?.id).toBe(2);
-  });
-});
-
-describe('building-research-visual — scenario-runner (#410)', () => {
-  it('the first direct tier-2 attempt is rejected — demonstrates the gate', () => {
-    const { results } = runScenarioSteps('building-research-visual');
-    const firstAttempt = stepForNth(results, 'build research_center at:22,22 tier:2', 0);
-    // #556: "ordered" is the fixed prefix of a successful order confirmation
-    // (buildOrder.ts's orderBuildingCommand) — a rejection never contains it.
-    // Note the building TYPE itself is "research_center", so matching
-    // /research/i alone would pass on a successful order too.
-    expect(firstAttempt.commandOutput).not.toMatch(/ordered/);
-  });
-
-  it('the second tier-2 attempt succeeds once research has completed', () => {
-    // #556: confirming the order only queues a construction site — it does
-    // not create the building. `driveConstructionOrders` spliced a
-    // `waitUntil` step in right after the order, driving ticks until an
-    // idle employee actually finishes it; assert against the post-wait
-    // state, not the order step's own "ordered" confirmation text.
-    const { engine, results } = runScenarioSteps('building-research-visual');
-    const orderIdx = stepIndexForNth(results, 'build research_center at:22,22 tier:2', 1);
-    const orderStep = results[orderIdx]!;
-    expect(orderStep.error).toBeUndefined();
-    expect(orderStep.commandOutput).toMatch(/ordered/);
-    expect(orderStep.commandOutput).toMatch(/T2/);
-
-    const waitStep = results[orderIdx + 1]!;
-    expect(waitStep.error).toBeUndefined();
-
-    const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 2);
-    expect(built).toBeDefined();
-    expect(built!.x).toBe(22);
-    expect(built!.z).toBe(22);
-  });
-
-  it('the tier-3 build succeeds after tier-3 research completes', () => {
-    const { engine, results } = runScenarioSteps('building-research-visual');
-    const orderIdx = stepIndexForNth(results, 'build research_center at:40,37 tier:3', 0);
-    const orderStep = results[orderIdx]!;
-    expect(orderStep.error).toBeUndefined();
-    expect(orderStep.commandOutput).toMatch(/ordered/);
-    expect(orderStep.commandOutput).toMatch(/T3/);
-
-    const waitStep = results[orderIdx + 1]!;
-    expect(waitStep.error).toBeUndefined();
-
-    const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 3);
-    expect(built).toBeDefined();
-    expect(built!.x).toBe(40);
-    expect(built!.z).toBe(37);
-  });
-});
-
-describe('building-research-progression-visual — scenario-runner (#410)', () => {
-  it('a direct tier-2 build is rejected before research, then succeeds after', () => {
-    const { engine, results } = runScenarioSteps('building-research-progression-visual');
-
-    const rejected = stepForNth(results, 'build research_center at:22,22 tier:2', 0);
-    expect(rejected.commandOutput).not.toMatch(/ordered/);
-
-    const orderIdx = stepIndexForNth(results, 'build research_center at:22,22 tier:2', 1);
-    const acceptedStep = results[orderIdx]!;
-    expect(acceptedStep.error).toBeUndefined();
-    expect(acceptedStep.commandOutput).toMatch(/ordered/);
-    expect(acceptedStep.commandOutput).toMatch(/T2/);
-
-    const waitStep = results[orderIdx + 1]!;
-    expect(waitStep.error).toBeUndefined();
-
-    const built = engine.ctx.state!.buildings.buildings.find(b => b.type === 'research_center' && b.tier === 2);
-    expect(built).toBeDefined();
-  });
-
-  it('research status reports progress and then clears once complete', () => {
-    const { results } = runScenarioSteps('building-research-progression-visual');
-    const statusSteps = results.filter(r => r.command.startsWith('research status'));
-    expect(statusSteps.length).toBeGreaterThanOrEqual(3);
-
-    // First status check happens right after queuing — task still pending.
-    expect(statusSteps[0]!.commandOutput).toContain('Research Center');
-
-    // Last status check happens after the tick-pad — queue should be empty.
-    const lastStatus = statusSteps[statusSteps.length - 1]!;
-    expect(lastStatus.commandOutput.toLowerCase()).toMatch(/no.*research|empty|none/);
+    const quarters = engine.ctx.state!.buildings.buildings.filter(b => b.type === 'living_quarters');
+    expect(quarters).toHaveLength(1);
+    expect(quarters[0]!.tier).toBe(3);
+    expect(engine.ctx.state!.buildings.buildings.some(b => (b.type as string) === 'research_center')).toBe(false);
   });
 });

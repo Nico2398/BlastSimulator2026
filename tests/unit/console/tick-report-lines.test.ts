@@ -16,6 +16,7 @@ import type { TickReport } from '../../../src/core/engine/TickPipeline.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 
 function baseReport(overrides: Partial<TickReport>): TickReport {
+  // Built without any research field (#2283); cast so the literal fits whichever fields the report has.
   return {
     tick: 1,
     contractsExpired: [],
@@ -24,7 +25,6 @@ function baseReport(overrides: Partial<TickReport>): TickReport {
     mafiaExposed: false,
     needEvents: [],
     trainingCompletions: [],
-    researchCancelled: undefined,
     taskCompletions: [],
     stuckEmployees: [],
     abandonedActions: [],
@@ -42,7 +42,7 @@ function baseReport(overrides: Partial<TickReport>): TickReport {
     },
     paused: false,
     ...overrides,
-  };
+  } as TickReport;
 }
 
 afterEach(() => {

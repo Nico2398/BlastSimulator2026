@@ -144,34 +144,6 @@ export const BUILDING_DEFS: BuildingDefCatalog = {
     },
   },
 
-  // ── Research Center ─────────────────────────────────────────────────────────
-  research_center: {
-    1: {
-      type: 'research_center', tier: 1,
-      nameKey: 'building.research_center.t1.name',
-      footprint: rect(2, 3), entryPoint: entry(), exitPoint: exit_(2),
-      constructionCost: 25000, demolishCost: 6000, operatingCostPerTick: 15,
-      capacity: 5, maxHp: 100, structuralResistance: 3000,
-      scoreEffects: {},
-    },
-    2: {
-      type: 'research_center', tier: 2,
-      nameKey: 'building.research_center.t2.name',
-      footprint: rect(3, 3), entryPoint: entry(), exitPoint: exit_(3),
-      constructionCost: 60000, demolishCost: 14000, operatingCostPerTick: 25,
-      capacity: 10, maxHp: 160, structuralResistance: 5000,
-      scoreEffects: {},
-    },
-    3: {
-      type: 'research_center', tier: 3,
-      nameKey: 'building.research_center.t3.name',
-      footprint: rect(4, 4), entryPoint: entry(), exitPoint: exit_(4),
-      constructionCost: 120000, demolishCost: 28000, operatingCostPerTick: 40,
-      capacity: 20, maxHp: 240, structuralResistance: 8000,
-      scoreEffects: {},
-    },
-  },
-
   // ── Living Quarters ─────────────────────────────────────────────────────────
   living_quarters: {
     1: {

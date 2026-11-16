@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-// UIManager routes the building inspector's Move / Upgrade / Research to the
+// UIManager routes the building inspector's Move / Upgrade to the
 // Build panel's shared flows without ever opening the panel (#1758).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
 import { MiniMap } from '../../../src/ui/MiniMap.js';
 import { createGame } from '../../../src/core/state/GameState.js';
+import { createQuestState } from '../../../src/core/economy/Quests.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { PlacementKit } from '../../../src/ui/scene/PlacementKit.js';
 import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler } from '../../../src/ui/scene/PlacementController.js';
@@ -95,16 +96,14 @@ describe('UIManager — building flows without the Build panel (#1758)', () => {
   });
 
   it('upgradeBuilding on a locked tier does not upgrade', () => {
+    state.quests = createQuestState();
     ui.update(state);
     ui.upgradeBuilding(7);
     expect(gameConsole).not.toHaveBeenCalledWith(expect.stringContaining('build upgrade'));
   });
 
-  it('queueBuildingResearch dispatches research queue for the next tier of the building, panel closed', () => {
-    ui.update(state);
-    ui.queueBuildingResearch(7);
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
-    expect(panelOpen()).toBe(false);
+  it('has no research flow any more', () => {
+    expect((ui as unknown as Record<string, unknown>)['queueBuildingResearch']).toBeUndefined();
   });
 
   it('the state fed to update() is the one the flows read, even with the Build panel hidden', () => {

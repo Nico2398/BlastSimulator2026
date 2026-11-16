@@ -1,8 +1,8 @@
 ---
 name: gameplay-buildings
 description: >
-  Buildings system specification for BlastSimulator2026: 8 building types (7 with 3 tiers, the Spoil Heap with one),
-  placement rules, training buildings, living quarters, warehouses, Research Center,
+  Buildings system specification for BlastSimulator2026: 7 building types (6 with 3 tiers, the Spoil Heap with one),
+  placement rules, training buildings, living quarters, warehouses, tier quests,
   and destruction effects. Use when implementing or modifying buildings,
   construction, demolition, tier upgrades, or any building-gated action.
 ---
@@ -13,7 +13,7 @@ Buildings are player's infrastructure layer. Gate actions behind qualified emplo
 
 - **Every action requires qualified employee.** No qualified employee → immediate error, not silent queue.
 - **Training buildings** upskill employees for time + fee. A course at a tier-N school brings a skill to level N, so a higher tier teaches higher levels, at a higher fee and longer course (still multiplied by the tier's faster speed). Hiring is not a cheaper route to a high level: only schools and work raise one.
-- **Research Center** prerequisite for unlocking higher tiers of all other buildings — a placed Research Center building is required before any research task can be queued, not just implied by the unlock fiction.
+- **Tier quests** unlock higher tiers: tier 2 and 3 buildings are earned by playing (the architect's two quests), not bought from a research queue.
 - **Placement tradeoff:** Far-from-pit reduces projection damage risk but increases travel time (productivity loss).
 
 ## Building Types & Tier Names
@@ -26,43 +26,26 @@ All tier names are fictional and humorous. Localized via i18n (`en.json` + `fr.j
 | Blasting Academy | "Boom Shack" | "Detonation Den" | "The Kaboom Institute" | Trains explosives handling and blast sequencing |
 | Management Office | "The Cupboard" | "Bureaucracy Box" | "Corner Office Supreme" | Trains HR and commercial operations |
 | Geology Lab | "Rock Shed" | "Stone Science HQ" | "Institute of Expensive Rocks" | Trains survey techniques |
-| Research Center | "Think Tank Tent" | "Innovation Bunker" | "The Ivory Crater" | Unlocks higher tiers (paid research tasks) |
 | Living Quarters | "The Cells" | "Staff Dormitory" | "Unnecessarily Luxurious Hotel" | Houses + feeds employees; grade → well-being |
 | Freight Warehouse | "The Pile" | "Stuff Bunker" | "Hoarder's Paradise" | Stores ore debris; primary income source |
 | Spoil Heap | "The Dump" | (single tier) | (single tier) | Takes barren rock hauled off the blast; 1,500 t capacity (`SPOIL_HEAP_CAPACITY_KG`, one ordinary shot); no crew needed |
 
 ## Tier System
 
-Tier 1 is available from the start. Higher tiers unlocked by paid Research Center tasks.
+Tier 1 is available from the start. Tiers 2 and 3 of every multi-tier type come from quests, on progression sites only (a site with `state.quests`: grade sites, sandbox, campaign levels). Any other site is ungated and every tier is purchasable.
 
-**A placed `research_center` building is a hard prerequisite to queue any research task.** No research center on the map → no research task can be queued, enforced at the point research is queued, not left to the unlock fiction.
-
-Research task shape:
-- **Cost** (money) — every research task has one.
-- **Duration** (ticks occupying the Research Center) — every task beyond the first upgrade has one.
-- **Conditions** (prerequisites already met — e.g. a specific other building already at a given tier, or another research already completed) — every task beyond the first upgrade has these too.
-- **Exception — first upgrade (tier 1 → tier 2) of any building type:** cost only, no duration, no conditions.
-
-**Research Center speed and slots.** The tier of the best operating Research Center (no stacking across centers; `getResearchCenterProfile`) sets how fast and how many tasks run:
-
-| Tier | Speed (ticks per tick) | Parallel slots |
-|------|------------------------|----------------|
-| 1 | 1 | 1 |
-| 2 | 1.5 | 2 |
-| 3 | 2 | 3 |
-
-(`RESEARCH_CENTER_SPEED_BY_TIER`, `RESEARCH_CENTER_SLOTS_BY_TIER`, `balance.ts`.) The first `slots` queued tasks (`getActiveResearchTasks`) each lose `speed` from `ticksRemaining` per tick; every task reaching 0 completes the same tick. `ticksRemaining` can be fractional, so every display shows `Math.ceil` of it. Cancel (no centre left, head task refunded) and the closed-centre pause (no progress) also apply.
-
-`tickResearch` emits `research:completed` (tier unlocked) and `research:cancelled` (with refund); `wireResearchNotifications` raises the toasts. The Build Menu catalog row's research button shows cost and duration (`ui.build.queue_research_cost`); once queued it is replaced by live progress (`getResearchProgress`, `.bs-build-research-progress`). A placed building's research progress and Research action live in the inspector.
+- **Quests** (`QuestCatalog.ts`, giver "Gustavo Betonski", `quest.giver.architect`): `quest_building_t2` ("Prove You Can Keep a Roof Up": `buildings_built` >= `QUEST_BUILDING_T2_BUILDINGS`, `crew_housed` >= `QUEST_BUILDING_T2_CREW_HOUSED`) opens tier 2; `quest_building_t3` (requires the tier-2 quest; also `safety_score` >= `QUEST_BUILDING_T3_SAFETY_SCORE`) opens tier 3. `crew_housed` = min(employees, bed capacity). `advanceQuests` completes them from game state; the console `quest complete <id>` is the scenario shortcut.
+- **Gate**: `buildingTierLockedByQuest` / `isBuildingTierUnlocked` (`Quests.ts`). `unlockedTiers[type]` is the grandfather record: a tier research unlocked in an old save stays unlocked. Single-tier types never unlock above tier 1. The gate runs at order time (console `build` and `build upgrade`, refusals `entities.build_tier_locked` / `entities.build_upgrade_tier_locked` name the quest; the Build panel's Place button and the inspector's Upgrade action are disabled with `inspector.reason.quest_required`); `placeBuilding`, completing a paid order, does not gate.
+- **Saves**: a save holding the removed Research Center loads with the building, its orders and queue removed and every cost refunded (`LegacyResearchCenter.ts`).
 
 Higher tiers: larger capacity, better performance, larger physical footprint.
 Upgrading: in place, see below. Costs the next tier's construction cost minus half the current tier's.
 `build destroy <id>` is a queued order, not instant: cost is charged at order time (full refund on cancel), a Building Destroyer with a licensed driver carries the demolition out (`gameplay-vehicle-fleet`; it ranks in the same tier as `charge_hole`, so it starts within a bounded wait even when every driver is hauling debris), and the building stays standing and operating until it finishes. A second order on a building already being demolished is refused. `maxBuildingTier` in serialized state is the highest standing tier (0 when none).
 
-**Upgrade is in place.** `build upgrade <id>` needs what placing a new building of that tier needs: the tier's research, the money, room for the bigger footprint (`checkFootprintPlacement` over every occupant but the building itself, refusals name the blocker) and a free worker. No Building Destroyer, no demolition. Price = the next tier's `constructionCost` minus `BUILDING_UPGRADE_CREDIT_SHARE` (0.5, `balance.ts`) of the current tier's, rounded like `getMoveCost` (`getUpgradeCost(type, nextTier)`; a target tier <= 1 costs the full price). Freight warehouse T1->T2 28500, T2->T3 54000; living quarters 20000 / 37500; management office T1->T2 16000. T2->T3 applies the same rule one tier up. Charged at order time as `Upgrade <type> #id to T<n>`; the charge, `PlannedBuilding.cost` and the `place_building` payload cost are all this price, so a cancel or failure refunds exactly what was charged. New-build, Move and Demolish keep their own prices. The order reserves a `PlannedBuilding` with `upgrade: true` under the SAME building id (footprint blocked from order time) and queues a `place_building` action; on completion `completeUpgrade` raises the standing building's tier, so id, stock, residents and assignments carry over. `isUpgradeOrdered` refuses a second upgrade, a Move and a Demolish while one is pending (`inspector.reason.upgrade_ordered`). The building keeps standing and operating during the works (status `upgrading`, "Upgrading to tier N · X%", shown as a badge on its placed Build-menu row, not as a separate site row; operating state from `computeBuildingStatus` / `syncBuildingServiceFlags`); hp is refilled to the new tier's max on completion (`completeUpgrade` in `BuildingUpgrade.ts`); a building gone or a footprint that no longer fits at completion refunds the order; a save holding pending upgrade demolitions or orphaned rebuild sites of the legacy demolish-and-rebuild upgrade has them cancelled and refunded in full on load (`cancelLegacyUpgradeOrders`).
+**Upgrade is in place.** `build upgrade <id>` needs what placing a new building of that tier needs: the tier's quest (progression sites), the money, room for the bigger footprint (`checkFootprintPlacement` over every occupant but the building itself, refusals name the blocker) and a free worker. No Building Destroyer, no demolition. Price = the next tier's `constructionCost` minus `BUILDING_UPGRADE_CREDIT_SHARE` (0.5, `balance.ts`) of the current tier's, rounded like `getMoveCost` (`getUpgradeCost(type, nextTier)`; a target tier <= 1 costs the full price). Freight warehouse T1->T2 28500, T2->T3 54000; living quarters 20000 / 37500; management office T1->T2 16000. T2->T3 applies the same rule one tier up. Charged at order time as `Upgrade <type> #id to T<n>`; the charge, `PlannedBuilding.cost` and the `place_building` payload cost are all this price, so a cancel or failure refunds exactly what was charged. New-build, Move and Demolish keep their own prices. The order reserves a `PlannedBuilding` with `upgrade: true` under the SAME building id (footprint blocked from order time) and queues a `place_building` action; on completion `completeUpgrade` raises the standing building's tier, so id, stock, residents and assignments carry over. `isUpgradeOrdered` refuses a second upgrade, a Move and a Demolish while one is pending (`inspector.reason.upgrade_ordered`). The building keeps standing and operating during the works (status `upgrading`, "Upgrading to tier N · X%", shown as a badge on its placed Build-menu row, not as a separate site row; operating state from `computeBuildingStatus` / `syncBuildingServiceFlags`); hp is refilled to the new tier's max on completion (`completeUpgrade` in `BuildingUpgrade.ts`); a building gone or a footprint that no longer fits at completion refunds the order; a save holding pending upgrade demolitions or orphaned rebuild sites of the legacy demolish-and-rebuild upgrade has them cancelled and refunded in full on load (`cancelLegacyUpgradeOrders`).
 Demolish is confirmed from the inspector via `ConfirmModal`: it names the building, the cost, that nothing is refunded and it cannot be undone, plus the kg of stored explosives lost when any.
 
-Build menu rows carry no action buttons; Move, Upgrade, Research and Demolish are inspector actions. Build menu rows (placed buildings and `.bs-build-site-row` construction sites) are selectable: a click routes through the shared selection path (`selectionRoute.ts`), and `UIManager.setListSelection` feeds `BuildMenu.setSelectedEntity` to highlight the row of the scene selection. Construction progress renders through `fractionOf` (`core/math/Fraction.ts`).
+Build menu rows carry no action buttons; Move, Upgrade and Demolish are inspector actions. Build menu rows (placed buildings and `.bs-build-site-row` construction sites) are selectable: a click routes through the shared selection path (`selectionRoute.ts`), and `UIManager.setListSelection` feeds `BuildMenu.setSelectedEntity` to highlight the row of the scene selection. Construction progress renders through `fractionOf` (`core/math/Fraction.ts`).
 
 ## Training Buildings
 
@@ -108,7 +91,6 @@ Overcapacity (more employees than beds) → well-being penalty for all residents
 Well-being score: the tier's `wellBeing` effect (+2 / +4 / +6) is a per-tick gain damped as the score nears 100, so a higher tier settles at a higher equilibrium and no tier pins it at the cap. Beds come from `getBedCapacity` (sum of capacity over operating Living Quarters); a crew beyond the beds adds a crowding drag proportional to the unhoused share, on top of the productivity penalty. Overwork and accidents drag it too; see `gameplay-employee-needs`.
 Inspector occupants: a Living Quarters shows beds used/total, resident rows (name link, rest time left), the site-wide housing multiplier and an overcapacity warning when the crew outnumbers the beds.
 Inspector schools: the four training buildings show seats used/total, trainee rows (skill, level, time left), who is walking in, and the courses taught at the tier; a course whose skill a higher-tier school on site offers instead (`availableTrainingOffers`) is marked superseded.
-Inspector Research Center: one live row per active task (`research-running0..N-1`: target tier name, percent, ticks left rounded up), pending tasks with their cost (`research-pending{i}`), a speed/slots line (`inspector.research_speed`), "paused" while the centre is closed, and an idle line when the queue is empty. Console `research status` prints the same speed/slots header and per-task lines.
 
 ## Warehouses
 
@@ -171,7 +153,7 @@ Inspector Research Center: one live row per active task (`research-running0..N-1
 - **Crewless** (`isCrewlessBuilding`): `build spoil_heap at:x,z` and the Build menu validate funds and
   footprint as usual, then charge and place immediately (`placeBuilding`) — no `PlannedBuilding`, no
   `place_building` action, works with an empty roster.
-- **Single tier** (`isSingleTierType`): tiers 2/3 alias tier 1; no upgrade or research UI and
+- **Single tier** (`isSingleTierType`): tiers 2/3 alias tier 1; no upgrade UI and
   `build upgrade` is refused. The Build menu shows no capacity line.
 - **Leftover rock:** once an ore sale leaves a stored fragment barren, it leaves the warehouse
   at once (`releaseBarrenStoredFragments`, `Logistics.ts`): removed from `fragments`, debited from
@@ -210,7 +192,6 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
   lost (re-picked on delivery). Reported by the `logistics:warehouse_stock_lost` event (toast), the
   `blast` output, and a warning line on `build destroy`.
 - Well-being, Safety, Ecology score penalties applied
-- Research Center destroyed while its enabling research task is in-flight and no other active Research Center remains → the in-flight task is cancelled and its cost refunded in full; a task still pending behind it in the queue is cancelled/refunded in turn once it reaches the head with no Research Center present. If another active Research Center still exists, the in-flight task is unaffected.
 
 ## Building Effects Summary
 
@@ -220,7 +201,6 @@ Four single-tier, crewless buildings (`BuildingVanity.ts`, catalog `VANITY_PROJE
 | Living Quarters Tier 3 | Housing/feeding | High well-being → productivity ×1.10 |
 | Freight Warehouse | Enables ore sale contracts | Main income; throughput limited by distance |
 | Spoil Heap | Dumps barren rock off the freight pool | Without one, barren hauls are blocked |
-| Research Center | Unlocks building tiers | Occupied during each research task |
 | Training Buildings | Grants skill qualifications | Prevents unqualified-task errors |
 
 Safety score settles at a target set by buildings' `scoreEffects.safety` (Management Office raises); see Scores in `gameplay-game-design`.
@@ -234,6 +214,6 @@ Meanings the code does not state: `capacity` is role-specific (beds for Living Q
 
 Build catalog rows show a one-line purpose plus operating cost in $/h and a tooltip of absolute stats (footprint, capacity with unit, upkeep), built in `src/ui/catalogCardText.ts`; the tooltip follows the selected tier.
 
-Event closures: a live `out_of_service` modifier naming a building sets the derived `Building.outOfService` flag each tick (`syncBuildingServiceFlags`, after `tickModifiers`); the player's `active` choice is untouched. `isOperating(b)` (= active and not closed) gates ore/explosive/spoil storage, nearest-building lookups, well-being, training (`availableTrainingOffers` skips it, `enrolInTraining` refuses with `employees.train_school_closed`) and the Research Center (queueing blocked as `no_research_center`). A closed centre only pauses research progress; destroying or switching it off still cancels and refunds. `research_cost` scales the task cost at queue time (`scaledCost`); the stored `task.cost` is what cancel refunds.
+Event closures: a live `out_of_service` modifier naming a building sets the derived `Building.outOfService` flag each tick (`syncBuildingServiceFlags`, after `tickModifiers`); the player's `active` choice is untouched. `isOperating(b)` (= active and not closed) gates ore/explosive/spoil storage, nearest-building lookups, well-being, training (`availableTrainingOffers` skips it, `enrolInTraining` refuses with `employees.train_school_closed`).
 
 History: docs/context-history/gameplay-buildings.md

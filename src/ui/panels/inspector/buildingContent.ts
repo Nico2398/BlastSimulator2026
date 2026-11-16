@@ -15,7 +15,6 @@ import { buildingHpExplain, upkeepExplain } from '../../buildingExplain.js';
 import type { ActionSpec, InspectorLinks, InspectorView, KindContent } from './InspectorContent.js';
 import { storageContents } from './storageContent.js';
 import { residentsSection, schoolSection } from './occupantsContent.js';
-import { researchSection } from './researchContent.js';
 import { fractionOf } from '../../../core/math/Fraction.js';
 import { entityLink, findLive, kindLabel, liveRow, sectionOf, setLive } from './inspectorWidgets.js';
 
@@ -101,38 +100,14 @@ function waitNote(waitKey: InspectorWaitKey | null): string | undefined {
   return waitKey === null ? undefined : t(waitKey, { role: t('vehicle_type.building_destroyer') });
 }
 
-/** Research action: queued progress, then a rules block, then cash; instant research drops the tick count. */
-function researchAction(state: GameState, research: NonNullable<BuildingActionRules['research']>): ActionSpec {
-  const queuedText = research.queued
-    ? t('ui.build.research_progress', { percent: Math.round(research.queued.fraction * 100), remaining: research.queued.remaining })
-    : undefined;
-  const blockText = research.blocked ? t(research.blocked.reasonKey, research.blocked.reasonParams) : undefined;
-  const cashReason = state.cash < research.cost ? reasonText(REASON_CASH, research.cost, state.cash) : undefined;
-  const reason = queuedText ?? blockText ?? cashReason;
-  const label = research.queued
-    ? queuedText!
-    : research.duration === 0
-      ? t('inspector.action.cost_label', { action: t('inspector.action.research'), cost: formatMoney(research.cost) })
-      : t('inspector.action.research_cost', { cost: formatMoney(research.cost), duration: research.duration });
-  return {
-    action: 'research', labelKey: 'inspector.action.research', icon: 'up', variant: 'ghost', label,
-    disabled: reason !== undefined,
-    ...(reason !== undefined ? { title: reason } : {}),
-  };
-}
-
-/** Upgrade (or Research when the next tier is locked), Move, Demolish — each with cost and a visible reason when refused. */
+/** Upgrade (disabled and naming its quest while the tier is locked), Move, Demolish — each with cost and a visible reason when refused. */
 function standingActions(state: GameState, rules: BuildingActionRules): ActionSpec[] {
-  const { upgrade, research, move, demolish } = rules;
+  const { upgrade, move, demolish } = rules;
   const actions: ActionSpec[] = [];
-  if (upgrade.kind === 'locked' && research) {
-    actions.push(researchAction(state, research));
-  } else {
-    const reason = reasonText(upgrade.reasonKey, upgrade.cost ?? 0, state.cash, upgrade.reasonParams);
-    actions.push(upgrade.cost === null
-      ? { action: 'upgrade', labelKey: 'inspector.action.upgrade', icon: 'up', variant: 'ghost', disabled: true, ...(reason ? { title: reason } : {}) }
-      : { ...withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason), ...(reason === undefined ? { title: t('inspector.tip.upgrade') } : {}) });
-  }
+  const reason = reasonText(upgrade.reasonKey, upgrade.cost ?? 0, state.cash, upgrade.reasonParams);
+  actions.push(upgrade.cost === null
+    ? { action: 'upgrade', labelKey: 'inspector.action.upgrade', icon: 'up', variant: 'ghost', disabled: true, ...(reason ? { title: reason } : {}) }
+    : { ...withCost('upgrade', 'inspector.action.upgrade', 'up', upgrade.cost, reason), ...(reason === undefined ? { title: t('inspector.tip.upgrade') } : {}) });
   actions.push(
     withCost('move', 'inspector.action.move', 'drive', move.cost, reasonText(move.disabledReasonKey, move.cost, state.cash)),
     withCost('demolish', 'inspector.action.demolish', 'trash', demolish.cost, reasonText(demolish.disabledReasonKey, demolish.cost, state.cash), 'danger', waitNote(demolish.waitKey)),
@@ -222,8 +197,7 @@ export const buildingContent: KindContent = {
     const capacity = getBuildingPeopleCapacity(b.type, b.tier);
     const storage = storageContents(b, state);
     const peopleSection = residentsSection(b, state, links) ?? schoolSection(b, state, links);
-    const research = researchSection(b, state);
-    const extras = [storage, peopleSection, research];
+    const extras = [storage, peopleSection];
     const occupantNames = b.occupantIds.flatMap(id => state.employees.employees.find(e => e.id === id)?.name ?? []);
     const effects = nonZeroScoreEffects(def);
 
@@ -263,7 +237,6 @@ export const buildingContent: KindContent = {
         setLive(root, 'occupancy', t('building.occupancy', { inside: b.occupantIds.length, capacity }));
         storage?.sync(root);
         peopleSection?.sync(root);
-        research?.sync(root);
       },
     };
   },

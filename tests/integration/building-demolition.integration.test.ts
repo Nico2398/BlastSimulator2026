@@ -18,6 +18,9 @@ import { computeDemolitionDurationTicks } from '../../src/core/entities/Demoliti
 import { computeActionWorkTicks } from '../../src/core/engine/ActionSelection.js';
 import { setLocale, t } from '../../src/core/i18n/I18n.js';
 import type { PendingAction } from '../../src/core/state/GameState.js';
+import { createGradeState } from '../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest } from '../../src/core/economy/Quests.js';
+import { getQuest } from '../../src/core/economy/QuestCatalog.js';
 
 function staffedCtx(): GameContext {
   return makeGameContext({ mineType: 'desert', seed: 42, size: 32, staffed: true });
@@ -383,11 +386,16 @@ describe('build upgrade as in-place construction (#1875)', () => {
     const id = constructBuilding(ctx);
     const cash = ctx.state!.cash;
 
-    const unresearched = buildCommand(ctx, ['upgrade', String(id)], {});
-    expect(unresearched.success).toBe(false);
-    expect(unresearched.output).toMatch(/research/i);
+    // A progression-style site: the next tier is locked behind the T2 building quest (#2283).
+    ctx.state!.grade = createGradeState();
+    ctx.state!.quests = createQuestState();
+    const locked = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(locked.success).toBe(false);
+    expect(locked.output).toContain(t(getQuest('quest_building_t2')!.titleKey));
+    expect(ctx.state!.cash).toBe(cash);
 
-    ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
+    completeQuest(ctx.state!, 'quest_building_t2');
+    completeQuest(ctx.state!, 'quest_building_t3');
     ctx.state!.cash = 1;
     const broke = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(broke.success).toBe(false);

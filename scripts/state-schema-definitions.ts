@@ -50,7 +50,6 @@ export const GAME_STATE_SCHEMA: Schema = {
   builtRampFlow: { type: 'string', description: 'Traffic direction of the first built ramp: both, down or up; both when none is built' },
   orderedBuildingCount: { type: 'number', description: 'Buildings ordered but not yet built (state.plannedBuildings.length, #556)' },
   chargedCount: { type: 'number' },
-  researchQueueLength: { type: 'number', description: 'Research tasks queued at a Research Center, in progress or pending (state.buildings.researchQueue.length)' },
   surveyCount: { type: 'number', description: 'Completed survey results (state.surveyResults.length)' },
   unreachableGhostCount: { type: 'number', description: 'Ghost previews flagged unreachable (drawn red): no actor able to perform the action can reach it (state.ghostPreviews with unreachable === true)' },
   redGhostCount: { type: 'number', description: 'Unclaimed ghost previews drawn red for any reason: unreachable, or blocked (their action carries a blockedReason, e.g. explosives in transit) (state.ghostPreviews, !claimed && (unreachable || blocked))' },

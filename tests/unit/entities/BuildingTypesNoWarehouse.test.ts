@@ -1,7 +1,7 @@
 // BlastSimulator2026 — The explosive warehouse is not a building type any more (#2154)
 //
 // Explosives are bought as each hole is loaded (#2153), so nothing stores them. The type leaves the
-// definitions, the research table, the model manifest, the generator defs and both locales.
+// definitions, the model manifest, the generator defs and both locales.
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -10,7 +10,6 @@ import {
   BUILDING_DEFS,
   getAllBuildingTypes,
 } from '../../../src/core/entities/Building.js';
-import { RESEARCH_TASK_DEFS } from '../../../src/core/config/balance.js';
 
 const GONE = 'explosive_warehouse';
 const ROOT = resolve(__dirname, '../../..');
@@ -40,14 +39,6 @@ describe('explosive_warehouse is not a BuildingType (#2154)', () => {
         expect(def.nameKey, type).not.toContain(GONE);
       }
     }
-  });
-
-  it('has no research task row', () => {
-    expect(Object.keys(RESEARCH_TASK_DEFS)).not.toContain(GONE);
-  });
-
-  it('research table keys match the building types exactly', () => {
-    expect(Object.keys(RESEARCH_TASK_DEFS).sort()).toEqual([...getAllBuildingTypes()].sort());
   });
 });
 

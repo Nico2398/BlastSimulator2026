@@ -8,7 +8,6 @@ import { GameRenderer } from './renderer/GameRenderer.js';
 import { UIManager } from './ui/UIManager.js';
 import { wireCrewNotifications } from './ui/notify/crewNotifications.js';
 import { wireLogisticsNotifications } from './ui/notify/logisticsNotifications.js';
-import { wireResearchNotifications } from './ui/notify/researchNotifications.js';
 import { wireCorruptionNotifications } from './ui/notify/corruptionNotifications.js';
 import { wireProgressionNotifications } from './ui/notify/progressionNotifications.js';
 import { SavesModal, autosaveLossText } from './ui/panels/SavesModal.js';
@@ -612,7 +611,6 @@ emitter.on('blast:started', ({ originX, originZ }) => {
 emitter.on('blast:ended', () => { blastCarving = false; });
 
 wireCrewNotifications(emitter, () => ctx.state, n => uiManager.notify(n));
-wireResearchNotifications(emitter, n => uiManager.notify(n));
 wireLogisticsNotifications(emitter, n => uiManager.notify(n));
 wireCorruptionNotifications(emitter, n => uiManager.notify(n));
 wireProgressionNotifications(emitter, n => uiManager.notify(n));
@@ -851,12 +849,6 @@ window.__gameState = () => {
     // rationale as orderedHoleCount/orderedRampSegmentCount above (#556).
     orderedBuildingCount: s.plannedBuildings.length,
     chargedCount: Object.keys(s.chargesByHole).length,
-    // Research tasks queued at a Research Center, in progress or pending --
-    // mirrors serializeGameState's own field (console-api.ts). Proves a
-    // research task actually completed (reaches 0) rather than a `tick N`
-    // pad merely running, which a spontaneous mid-window event can silently
-    // cut short.
-    researchQueueLength: s.buildings.researchQueue.length,
     surveyCount: s.surveyResults.length,
     pendingActionCount: s.pendingActions.length,
     unreachableGhostCount: s.ghostPreviews.filter(g => g.unreachable === true).length,
@@ -1450,15 +1442,9 @@ inspector.setActionHandler((action, entity) => {
       break;
     }
     case 'upgrade':
-      // The Build panel's own flow (research guard, cutoff confirm) without opening the panel (#1758).
+      // The Build panel's own flow (quest guard, cutoff confirm) without opening the panel (#1758).
       uiManager.upgradeBuilding(entity.id);
       break;
-    case 'research':
-    {
-      const refusal = uiManager.queueBuildingResearch(entity.id);
-      if (refusal) uiManager.notify({ severity: 'warn', title: t('inspector.action.research'), body: refusal });
-      break;
-    }
     case 'move':
       uiManager.moveBuilding(entity.id);
       break;

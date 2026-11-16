@@ -192,12 +192,11 @@ describe('EventFeed one-per-burst cues', () => {
     expect(h.player.ids).toEqual(['shift_whistle', 'shift_whistle']);
   });
 
-  it('plays one level-up for a burst of promotions and one unlock for finished research', () => {
+  it('plays one level-up for a burst of promotions', () => {
     const { h, emitter, feed } = fixture();
     for (let id = 1; id <= 20; id++) emitter.emit('employee:levelup', { employeeId: id, category: 'driving.drill_rig', oldLevel: 1, newLevel: 2 });
-    emitter.emit('research:completed', { targetType: 'living_quarters', targetTier: 2 });
     feed.flush();
-    expect(h.player.ids.sort()).toEqual(['level_up', 'unlock']);
+    expect(h.player.ids).toEqual(['level_up']);
   });
 
   it('does nothing until flushed, and nothing after being cleared', () => {

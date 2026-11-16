@@ -162,16 +162,14 @@ describe('many things happening at once', () => {
     for (let i = 1; i < bells.length; i++) expect(bells[i]!.tS - bells[i - 1]!.tS).toBeGreaterThanOrEqual(20);
   });
 
-  it('plays one level-up and one unlock for forty promotions and ten finished researches', () => {
+  it('plays one level-up for forty promotions', () => {
     const before = sim.recorder.plays.length;
     for (let employeeId = 1; employeeId <= 40; employeeId++) {
       sim.engine.emitter.emit('employee:levelup', { employeeId, category: 'driving.truck', oldLevel: 1, newLevel: 2 });
     }
-    for (let i = 0; i < 10; i++) sim.engine.emitter.emit('research:completed', { targetType: 'research_center', targetTier: 2 });
     sim.frames(60);
     const ids = sim.recorder.plays.slice(before).map(p => p.id);
     expect(ids.filter(id => id === 'level_up')).toHaveLength(1);
-    expect(ids.filter(id => id === 'unlock')).toHaveLength(1);
   });
 
   it('keeps a hundred trucks hauling to the shared budget: a burst of three plus 1.5 a second', () => {

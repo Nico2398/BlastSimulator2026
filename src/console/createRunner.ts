@@ -50,7 +50,6 @@ import {
   zoneCommand,
   needsCommand,
 } from './commands/entities.js';
-import { researchCommand } from './commands/research.js';
 import { setPolicyCommand } from './commands/policy.js';
 import { permitCommand } from './commands/permit.js';
 import { questCommand } from './commands/quest.js';
@@ -313,11 +312,6 @@ export function createRunner(): RunnerWithContext {
   runner.register('set_policy', 'Set site policy (mode:shift_8h|shift_12h|continuous [fatigue:N])', (args, named) =>
     setPolicyCommand(ctx, args, named),
   );
-  runner.register('research', 'Research Center tasks (queue type:<BuildingType> tier:2|3|status)', (args, named) =>
-    researchCommand(ctx, args, named),
-  );
-
-  // --- Event commands (Phase 6) ---
   runner.register('tick', 'Advance time by N ticks (default 1)', (args, named) =>
     tickCommand(ctx, args, named),
   );

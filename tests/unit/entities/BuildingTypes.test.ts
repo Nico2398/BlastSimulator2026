@@ -16,7 +16,7 @@ import { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 
 const ALL_BUILDING_TYPES: BuildingType[] = [
   'driving_center', 'blasting_academy', 'management_office', 'geology_lab',
-  'research_center', 'living_quarters', 'freight_warehouse',
+  'living_quarters', 'freight_warehouse',
 ];
 
 const ALL_TIERS: BuildingTier[] = [1, 2, 3];
@@ -40,9 +40,9 @@ function makeFilledGrid(sizeX: number, sizeZ: number, fillUpToY: number): VoxelG
 // ── BuildingType union ───────────────────────────────────────────────────────
 
 describe('BuildingType union', () => {
-  it('contains exactly 13 canonical types', () => {
+  it('contains exactly 11 canonical types', () => {
     const types = getAllBuildingTypes();
-    // The 8 tiered types plus the single-tier spoil heap (#1530) and four vanity projects (#1947).
+    // The 6 tiered types plus the single-tier spoil heap (#1530) and four vanity projects (#1947).
     expect(types).toHaveLength(ALL_BUILDING_TYPES.length + 5);
     expect(types).toContain('spoil_heap');
   });
@@ -52,6 +52,11 @@ describe('BuildingType union', () => {
     for (const expected of ALL_BUILDING_TYPES) {
       expect(types).toContain(expected);
     }
+  });
+
+  it('does not contain the removed research_center (#2283)', () => {
+    expect(getAllBuildingTypes() as string[]).not.toContain('research_center');
+    expect(Object.keys(BUILDING_DEFS)).not.toContain('research_center');
   });
 
   it('does not contain the removed vehicle_depot (#1393)', () => {

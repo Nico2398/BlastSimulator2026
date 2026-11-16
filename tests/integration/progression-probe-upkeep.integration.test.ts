@@ -34,13 +34,15 @@ describe('probe upkeep through the low tail (#2126)', () => {
   }, 240000);
 
   it('reinvest leaves no building order waiting on a site its crew cannot climb to', () => {
-    // green_foothills digger seed 5 put its research centre on a terrace above the crew at t580.
+    // green_foothills digger seed 5 put one of its buildings on a terrace above the crew at t580.
     const cfg: ProbeRunConfig = { seed: 5, biome: 'green_foothills', kit: 'digger', strategy: 'reinvest', horizon: 900, eventPolicy: 'cheapest' };
     const kept: { engine?: RunnerWithContext } = {};
     runProbe(cfg, startSandbox(cfg, kept));
     const state = kept.engine!.ctx.state!;
     const stuck = state.pendingActions.filter(a => a.type === 'place_building' && a.blockedReason === 'target_unreachable');
     expect(stuck.map(a => `${a.targetX},${a.targetZ}`)).toEqual([]);
-    expect([...state.buildings.buildings, ...state.plannedBuildings].some(b => b.type === 'research_center')).toBe(true);
+    const sites = [...state.buildings.buildings, ...state.plannedBuildings];
+    expect(sites.length).toBeGreaterThan(0);
+    expect(sites.some(b => (b.type as string) === 'research_center')).toBe(false);
   }, 180000);
 });
