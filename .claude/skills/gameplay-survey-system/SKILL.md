@@ -1,8 +1,8 @@
 ---
 name: gameplay-survey-system
 description: >
-  Rock composition and survey system for BlastSimulator2026: 3 survey methods (seismic,
-  core sample, aerial), estimation algorithm with Gaussian noise and skill scaling,
+  Rock composition and survey system for BlastSimulator2026: 4 survey methods (seismic,
+  core sample, aerial, prospection), estimation algorithm with Gaussian noise and skill scaling,
   and ore grade reporting post-blast. Use when implementing or
   modifying surveys, ore discovery, voxel composition, or post-blast ore yield mechanics.
 ---
@@ -13,15 +13,18 @@ Players should not know exactly what ore is in ground — discovery is rewarding
 
 ## Survey Methods
 
-Three tools with different cost/accuracy/coverage tradeoffs:
+Four tools with different cost/accuracy/coverage tradeoffs:
 
 | Method | Tool | i18n Key | Cost ($) | Time (ticks) | Accuracy | Coverage |
 |--------|------|---------|---------|-------------|---------|---------|
 | Seismic Survey | Detonates small charge + records reflections | `survey.seismic` | 3,000 | 8 | ±15% ore density | 20-cell radius, down to `SURVEY_DEPTH_BELOW_SURFACE.seismic` (25 m) below the surface |
 | Core Sample | Drills narrow extraction core | `survey.core_sample` | 800 | 4 | ±5% ore density | Single column, down to `SURVEY_DEPTH_BELOW_SURFACE.core_sample` (40 m, the deepest drill-rig hole) below the surface |
 | Aerial Spectroscopy | Drone scans surface mineral signature | `survey.aerial` | 1,500 | 3 | ±25% ore density | 30-cell radius, top `SURVEY_DEPTH_BELOW_SURFACE.aerial` (2) layers only |
+| Long-range Prospection | Surveyor reads the far country from the base | `survey.prospection` | 12,000 | 12 | confidence `1 - 0.3 * (1 - (skill - 1) * 0.12)` | 400 m radius from the base, opens at G2 (`SURVEY_METHOD_UNLOCK_GRADE.prospection`); no per-voxel data |
 
 The Time (ticks) duration above starts once the assigned surveyor physically arrives at the target site, not when the survey is queued — walking there is separate travel time on top of it, arrival-gated per `dev-architecture`'s arrival-gated-actions convention.
+
+**Long-range prospection.** A coarse island map, not an ore read: `estimateSurveyResult` with `method: 'prospection'` returns `islands: ProspectedIsland[]` (`{x, z, radius, oreId}`), empty `estimates`, no `depthProfile`/`surfaceYs`. `prospectIslands` (`SurveyProspection.ts`) reports every `OreIsland` (`oreIslandsOf(state)` in `TerrainConfigOf.ts`, the lazy seeded placement) whose centre lies within `SURVEY_COVERAGE_RADIUS.prospection` (400, past the farthest island edge at 338). Radius is rounded to `PROSPECTION_RADIUS_STEP_M`; the dominant ore is `oreIds[0]`. Noise scales by `(PROSPECTION_TOP_SKILL - skill) / (PROSPECTION_TOP_SKILL - 1)`: at skill 5 positions and ores are exact with no false leads; below it the position jitters up to `PROSPECTION_POSITION_ERROR_M`, the ore is misread with `PROSPECTION_ORE_MISREAD_CHANCE`, and up to `PROSPECTION_FALSE_LEAD_MAX` false leads appear. It claims no site cells, never reads a column (`isColumnInSurveyDisc` is false for it) and never goes stale. Console: `survey prospection` (x:/z: default to the base centre), `survey islands` lists detected islands. The Survey panel runs it straight from `#bs-survey-run` (no point pick), its result card lists `[data-island]` rows that centre the camera, and the mini-map draws each island in its ore colour (`drawProspectedIslands`), its projection widened by `miniMapProjection` to hold them.
 
 Accuracy improves with surveyor skill level:
 ```
@@ -55,7 +58,7 @@ The Survey panel card lists up to 4 ores by estimated value (`summarizeSurveyOre
 4. **Depth window:** each method samples `SURVEY_DEPTH_BELOW_SURFACE[method]` layers from the surface down (aerial 2, seismic 25, core sample 40); the panel shows it as "N m deep". Depth vs rarity: aerial sees only the surface layer; seismic (25 m) goes past the common ores into the uncommon ones; core sample (40 m) reaches the deepest a drill can.
 5. **Seismic**: averages estimates over 3-voxel vertical groups (coarser vertical resolution; the trailing group may be smaller)
 
-**Grade gate.** On progression sites (`state.grade` defined) `SurveyGate.ts` (mirrors `VehicleTierGate.ts`) gates methods by mine grade: `SURVEY_METHOD_UNLOCK_GRADE` = aerial G0, seismic G0, core sample G1. `runSurvey` refuses a locked method with `error: 'method_locked'` and `neededGrade`, no mutation; the console refuses with `survey.method_locked` (names the current and needed grade); the Survey panel shows the card dimmed (`data-locked`, `aria-disabled`, not selectable) with `ui.survey.method_locked` ("opens at G1 - Depth"). Below `SURVEY_FULL_DEPTH_GRADE` (1) seismic reads only the surface band: `surveyDepthM` = `SURVEY_SURFACE_BAND_M` (5) + `SURVEY_SEISMIC_GROUP_SIZE` (3) = 8 m (default chosen: the band edge plus one seismic group, so the band shows); from G1 it reads its full 25 m and core sample opens with 40 m. `estimateSurveyResult` takes the grade the survey completed at (`params.grade`), so stored results keep the depth they were taken at. Grade `undefined` (non-progression site, the free sandbox starter survey) is unchanged: full depth, nothing locked.
+**Grade gate.** On progression sites (`state.grade` defined) `SurveyGate.ts` (mirrors `VehicleTierGate.ts`) gates methods by mine grade: `SURVEY_METHOD_UNLOCK_GRADE` = aerial G0, seismic G0, core sample G1, prospection G2. `runSurvey` refuses a locked method with `error: 'method_locked'` and `neededGrade`, no mutation; the console refuses with `survey.method_locked` (names the current and needed grade); the Survey panel shows the card dimmed (`data-locked`, `aria-disabled`, not selectable) with `ui.survey.method_locked` ("opens at G1 - Depth"). Below `SURVEY_FULL_DEPTH_GRADE` (1) seismic reads only the surface band: `surveyDepthM` = `SURVEY_SURFACE_BAND_M` (5) + `SURVEY_SEISMIC_GROUP_SIZE` (3) = 8 m (default chosen: the band edge plus one seismic group, so the band shows); from G1 it reads its full 25 m and core sample opens with 40 m. `estimateSurveyResult` takes the grade the survey completed at (`params.grade`), so stored results keep the depth they were taken at. Grade `undefined` (non-progression site, the free sandbox starter survey) is unchanged: full depth, nothing locked.
 
 Always use seeded PRNG (`src/core/math/Random.ts`) — never `Math.random()`.
 

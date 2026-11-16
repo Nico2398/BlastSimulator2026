@@ -21,6 +21,8 @@ import type { GameState } from '../../core/state/GameState.js';
 import { surveyCostFor, type SurveyMethod, type SurveyResult } from '../../core/mining/SurveyCalc.js';
 import { surveyMethodGate, surveyMethodLockLabel, surveyDepthM } from '../../core/mining/SurveyGate.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
+import type { ProspectedIsland } from '../../core/mining/SurveyProspection.js';
+import { getOre } from '../../core/world/OreCatalog.js';
 import {
   SURVEY_BASE_ERROR, SURVEY_COVERAGE_RADIUS, SURVEY_DURATION_TICKS,
   SEISMIC_SURVEY_DAMAGE_RADIUS, SEISMIC_SURVEY_DAMAGE_HP,
@@ -50,7 +52,7 @@ const MAX_RESULTS_SHOWN = 4;
 const MAX_ORES_SHOWN = 4;
 
 /** Methods offered, cheapest first so the tutorial's default is affordable. */
-const METHOD_ORDER: SurveyMethod[] = ['core_sample', 'seismic', 'aerial'];
+const METHOD_ORDER: SurveyMethod[] = ['core_sample', 'seismic', 'aerial', 'prospection'];
 
 export class SurveyPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -350,7 +352,7 @@ export class SurveyPanel extends PanelBase {
     meta.append(
       el('span', { text: t('ui.survey.method_accuracy', { pct: accuracy }) }),
       el('span', { text: radius > 0 ? t('ui.survey.radius_cells', { radius }) : t('ui.survey.radius_point') }),
-      el('span', { text: t('ui.survey.depth_metres', { depth: surveyDepthM(method, this.lastState?.grade?.grade) }) }),
+      ...(method === 'prospection' ? [] : [el('span', { text: t('ui.survey.depth_metres', { depth: surveyDepthM(method, this.lastState?.grade?.grade) }) })]),
       el('span', { text: t('ui.survey.duration_ticks', { ticks: SURVEY_DURATION_TICKS[method] }) }),
     );
 
@@ -377,6 +379,7 @@ export class SurveyPanel extends PanelBase {
       case 'core_sample': return t('ui.survey.note_core_sample');
       case 'seismic': return t('ui.survey.note_seismic', { radius: SEISMIC_SURVEY_DAMAGE_RADIUS, hp: SEISMIC_SURVEY_DAMAGE_HP });
       case 'aerial': return t('ui.survey.note_aerial');
+      case 'prospection': return t('ui.survey.note_prospection');
     }
   }
 
@@ -386,6 +389,8 @@ export class SurveyPanel extends PanelBase {
     this.buildMethodList();
     if (this.lastState) this.update(this.lastState);
 
+    // A prospection runs from the base: nothing to point at, the Run button sends it.
+    if (method === 'prospection') return;
     const kit = this.placementKit;
     if (!kit) return;
     const reason = this.lastState ? this.blockReason(this.lastState) : null;
@@ -415,8 +420,24 @@ export class SurveyPanel extends PanelBase {
 
   /** Run button: arms the pick, but leaves an already-armed pick alone (armPointPick would toggle it off). */
   private pickTargetAndRun(): void {
+    if (this.selectedMethod === 'prospection') {
+      this.runProspection();
+      return;
+    }
     if (this.placementKit?.controller.isArmed) return;
     this.armPick();
+  }
+
+  /** Prospection: no point to pick — it is queued straight from the base. */
+  private runProspection(): void {
+    const reason = this.lastState ? this.blockReason(this.lastState) : null;
+    if (reason !== null) {
+      this.notifyCb?.({ severity: 'warn', title: t('ui.survey.blocked_title'), body: reason });
+      this.showStatus(reason);
+      return;
+    }
+    const cmd = this.gameConsole?.('survey prospection');
+    this.setTransientStatus(cmd?.success ? t('ui.survey.queued') : (cmd?.output ?? ''));
   }
 
   /** Arm the point pick for the selected method. */
@@ -456,7 +477,8 @@ export class SurveyPanel extends PanelBase {
       choices: [...ores].sort((a, b) => richest(b) - richest(a) || a.localeCompare(b)).map(value => ({ value, label: t(`ore.${value}.name`) })),
       groups: [{
         id: 'method', label: t('ui.survey.filter_method'),
-        choices: METHOD_ORDER.map(value => ({ value, label: t(`survey.${value}`) })),
+        // Ore-reading methods only: a prospection holds islands, no ore estimates, so no ore filter selects it.
+        choices: METHOD_ORDER.filter(value => value !== 'prospection').map(value => ({ value, label: t(`survey.${value}`) })),
       }],
       sorts: [],
       onChange: () => {
@@ -511,6 +533,13 @@ export class SurveyPanel extends PanelBase {
 
     if (stale) rows.push(reasonLine(t('ui.survey.stale_warning'), true));
 
+    if (survey.method === 'prospection') {
+      rows.push(this.makeIslandRows(survey.islands ?? []), this.confidenceLine(survey));
+      const islandCard = card(rows);
+      islandCard.dataset['surveyId'] = String(survey.id);
+      return islandCard;
+    }
+
     const ores = summarizeSurveyOres(survey, marketId).slice(0, MAX_ORES_SHOWN);
     if (ores.length === 0) {
       rows.push(el('span', { text: t('ui.survey.no_ore'), attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }));
@@ -520,14 +549,42 @@ export class SurveyPanel extends PanelBase {
       if (depthLog) rows.push(depthLog);
     }
 
-    rows.push(el('span', {
-      text: t('ui.survey.confidence_pct', { pct: Math.round(survey.confidence * 100) }),
-      className: 'bsx-mono',
-      attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' },
-    }));
+    rows.push(this.confidenceLine(survey));
 
     const resultCard = card(rows);
     resultCard.dataset['surveyId'] = String(survey.id);
     return resultCard;
+  }
+
+  private confidenceLine(survey: SurveyResult): HTMLElement {
+    return el('span', {
+      text: t('ui.survey.confidence_pct', { pct: Math.round(survey.confidence * 100) }),
+      className: 'bsx-mono',
+      attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' },
+    });
+  }
+
+  /** One row per detected island: ore and position; a click (or the locate button) centres the camera on it. */
+  private makeIslandRows(islands: readonly ProspectedIsland[]): HTMLElement {
+    const list = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:4px' } });
+    if (islands.length === 0) {
+      list.appendChild(el('span', { text: t('ui.survey.islands_none'), attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }));
+      return list;
+    }
+    for (const island of islands) {
+      const row = el('div', {
+        attrs: { style: 'display:flex;align-items:center;gap:8px;cursor:pointer', 'data-island': `${island.x},${island.z}` },
+      });
+      row.append(
+        el('span', { text: t(`ore.${island.oreId}.name`), attrs: { style: `font:600 11px/1 var(--bsx-font-ui);color:${getOre(island.oreId)?.color ?? 'inherit'}` } }),
+        el('span', { text: t('ui.survey.island_at', { x: island.x, z: island.z, radius: island.radius }), className: 'bsx-mono', attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }),
+      );
+      row.appendChild(makeLocateButton({ title: t('ui.survey.locate'), size: 22, onClick: () => focusCameraOn(island.x, island.z) }));
+      row.addEventListener('click', e => {
+        if (!(e.target as Element).closest('button')) focusCameraOn(island.x, island.z);
+      });
+      list.appendChild(row);
+    }
+    return list;
   }
 }

@@ -9,6 +9,7 @@ import {
 } from '../../../src/core/mining/SurveyGate.js';
 import { SURVEY_METHODS, type SurveyMethod } from '../../../src/core/mining/SurveyCalc.js';
 import { SURVEY_DEPTH_BELOW_SURFACE } from '../../../src/core/config/balance.js';
+import { gradeName } from '../../../src/core/economy/MineGrade.js';
 import { setLocale } from '../../../src/core/i18n/I18n.js';
 import en from '../../../src/core/i18n/locales/en.json';
 import fr from '../../../src/core/i18n/locales/fr.json';
@@ -26,8 +27,20 @@ describe('SurveyGate (#2279)', () => {
       expect(surveyMethodGate(0, 'seismic')).toBeNull();
     });
 
-    it.each([1, 2, 3, 5])('opens every method at grade %i', (grade) => {
-      for (const method of SURVEY_METHODS) expect(surveyMethodGate(grade, method)).toBeNull();
+    it.each([1, 2, 3, 5])('opens every method but prospection at grade %i', (grade) => {
+      for (const method of SURVEY_METHODS.filter(m => m !== 'prospection')) expect(surveyMethodGate(grade, method)).toBeNull();
+    });
+
+    it.each([0, 1])('locks prospection at grade %i and names grade 2 as the opener (#2286)', (grade) => {
+      expect(surveyMethodGate(grade, 'prospection')).toEqual({ needed: 2 });
+    });
+
+    it.each([2, 3, 5])('opens prospection at grade %i (#2286)', (grade) => {
+      expect(surveyMethodGate(grade, 'prospection')).toBeNull();
+    });
+
+    it('prospection is open on a site with no grade (#2286)', () => {
+      expect(surveyMethodGate(undefined, 'prospection')).toBeNull();
     });
 
     it('opens every method on a site with no grade (non-progression)', () => {
@@ -47,6 +60,19 @@ describe('SurveyGate (#2279)', () => {
       const text = surveyMethodRefusal(0, 'core_sample');
       expect(text).not.toBeNull();
       expect(text).toContain('Depth');
+    });
+
+    it('prospection refusal below G2 names both the current and the opening grade (#2286)', () => {
+      const text = surveyMethodRefusal(1, 'prospection');
+      expect(text).not.toBeNull();
+      expect(text).toContain(gradeName(1));
+      expect(text).toContain(gradeName(2));
+      expect(gradeName(1)).not.toBe(gradeName(2));
+    });
+
+    it('prospection refusal is null at G2 and with no grade (#2286)', () => {
+      expect(surveyMethodRefusal(2, 'prospection')).toBeNull();
+      expect(surveyMethodRefusal(undefined, 'prospection')).toBeNull();
     });
 
     it('is non-empty text, not a locale key', () => {

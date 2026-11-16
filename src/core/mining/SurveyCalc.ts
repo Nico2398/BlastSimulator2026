@@ -19,13 +19,15 @@ import { buildDepthProfile, type SurveyDepthBand } from './SurveyDepthProfile.js
 import { surveyColumnKey } from './SurveyColumn.js';
 import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { surveyMethodGate, surveyDepthM } from './SurveyGate.js';
+import { prospectIslands, type ProspectedIsland } from './SurveyProspection.js';
+import type { OreIsland } from '../world/OreIslands.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
-/** The three supported methods for surveying a mining site. */
-export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial';
+/** The supported methods for surveying a mining site. */
+export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial' | 'prospection';
 
 /** Runtime array of every valid SurveyMethod value. */
-export const SURVEY_METHODS: SurveyMethod[] = ['seismic', 'core_sample', 'aerial'];
+export const SURVEY_METHODS: SurveyMethod[] = ['seismic', 'core_sample', 'aerial', 'prospection'];
 
 /**
  * The result produced when a survey is completed.
@@ -58,6 +60,8 @@ export interface SurveyResult {
   surfaceYs?: Record<string, number>;
   /** Metres below the surface this survey read. Absent in legacy saves: the method's full depth applies. */
   depthM?: number;
+  /** Prospection only: the coarse island map. Absent on every other method. */
+  islands?: ProspectedIsland[];
   /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
   stale?: boolean;
 }
@@ -74,6 +78,8 @@ export interface EstimateSurveyParams {
   completedTick: number;
   /** Mine grade of the site when the survey was taken; caps the depth read. Absent on a non-progression site (full depth). */
   grade?: number | undefined;
+  /** Prospection only: the world's ore islands to report from. */
+  islands?: readonly OreIsland[];
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -121,6 +127,11 @@ export function estimateSurveyResult(
   rng: Random,
 ): SurveyResult {
   const { id, method, centerX, centerZ, surveyorId, skillLevel, completedTick, grade } = params;
+  if (method === 'prospection') {
+    const confidence = clamp(1 - SURVEY_BASE_ERROR.prospection * (1 - (skillLevel - 1) * SURVEY_SKILL_BONUS_PER_LEVEL), 0, 1);
+    const found = prospectIslands(params.islands ?? [], { centerX, centerZ, skillLevel }, rng);
+    return { id, method, centerX, centerZ, surveyorId, completedTick, estimates: {}, confidence, islands: found };
+  }
   const depthM = surveyDepthM(method, grade);
 
   const skillBonus = (skillLevel - 1) * SURVEY_SKILL_BONUS_PER_LEVEL;

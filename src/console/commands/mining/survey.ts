@@ -63,6 +63,12 @@ export function surveyCommand(
     return { success: true, output: lines.join('\n') };
   }
 
+  if (sub === 'islands') {
+    const islands = ctx.state!.surveyResults.flatMap(r => r.islands ?? []);
+    const lines = islands.map(i => `  (${i.x}, ${i.z}) ${i.oreId} radius ${i.radius}m`);
+    return { success: true, output: [`Detected islands: ${islands.length}`, ...lines].join('\n') };
+  }
+
   if (!sub) {
     return { success: false, output: t('mining.survey.usage') };
   }
@@ -76,6 +82,12 @@ export function surveyCommand(
   // sub is a validated SurveyMethod from this point
   const method = sub as SurveyMethod;
 
+  // A prospection runs from the base: its point defaults to the base centre and it claims no site cells.
+  const world = ctx.state!.world;
+  if (method === 'prospection' && world) {
+    named['x'] ??= String(Math.floor(world.baseSizeX / 2));
+    named['z'] ??= String(Math.floor(world.baseSizeZ / 2));
+  }
   if (named['x'] === undefined || named['z'] === undefined) {
     return {
       success: false,
@@ -92,8 +104,10 @@ export function surveyCommand(
   const refusal = surveyMethodRefusal(ctx.state!.grade?.grade, method);
   if (refusal !== null) return { success: false, output: refusal };
 
-  const claim = claimForAction(ctx, cellsInDisc(x, z, SURVEY_COVERAGE_RADIUS[method]), 'survey');
-  if (!claim.ok) return { success: false, output: claim.output! };
+  if (method !== 'prospection') {
+    const claim = claimForAction(ctx, cellsInDisc(x, z, SURVEY_COVERAGE_RADIUS[method]), 'survey');
+    if (!claim.ok) return { success: false, output: claim.output! };
+  }
 
   const result = runSurvey(ctx.state!, { method, centerX: x, centerZ: z });
 

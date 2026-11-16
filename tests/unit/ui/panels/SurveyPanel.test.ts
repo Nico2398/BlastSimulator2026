@@ -6,7 +6,7 @@ import type { GameState } from '../../../../src/core/state/GameState.js';
 import type { Employee } from '../../../../src/core/entities/Employee.js';
 import { SURVEY_DEPTH_BELOW_SURFACE } from '../../../../src/core/config/balance.js';
 import type { SurveyResult } from '../../../../src/core/mining/SurveyCalc.js';
-import { SURVEY_COVERAGE_RADIUS } from '../../../../src/core/config/balance.js';
+import { SURVEY_COVERAGE_RADIUS, SURVEY_COSTS } from '../../../../src/core/config/balance.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import type { PlacementKit } from '../../../../src/ui/scene/PlacementKit.js';
 import type { NotifyInput } from '../../../../src/ui/notify/NotificationCenter.js';
@@ -72,14 +72,15 @@ describe('SurveyPanel', () => {
     liveContainers.length = 0;
   });
 
-  it('renders all three methods with real cost and accuracy', () => {
+  it('renders all four methods with real cost and accuracy', () => {
     const { panel } = makePanel();
     panel.update(makeState({ employees: { employees: [makeSurveyor()], nextId: 2 } as GameState['employees'] }));
     const text = panel.root.textContent!;
     expect(text).toContain('$3,000'); // seismic
     expect(text).toContain('$800'); // core_sample
     expect(text).toContain('$1,500'); // aerial
-    expect(panel.root.querySelectorAll('[data-method]').length).toBe(3);
+    expect(text).toContain(`$${SURVEY_COSTS.prospection.toLocaleString('en-US')}`); // prospection
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(4);
   });
 
   it('#1676: each method row shows its reach in metres, taken from SURVEY_DEPTH_BELOW_SURFACE', () => {
@@ -634,7 +635,7 @@ describe('SurveyPanel — method click arms the target pick (#1771)', () => {
     panel.update(surveyorState());
     expect(panel.root.querySelector('#bs-survey-run')).not.toBeNull();
     expect(panel.root.querySelector('.bs-survey-status')).not.toBeNull();
-    expect(panel.root.querySelectorAll('[data-method]').length).toBe(3);
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(4);
   });
 
   it('Pick Target in Scene while already armed leaves the pick armed (no toggle-cancel)', () => {
@@ -1098,10 +1099,10 @@ describe('SurveyPanel — grade-gated method cards (#2279)', () => {
     expect(method(panel, 'core_sample').textContent).not.toContain('opens at');
   });
 
-  it('a locked card is still one of the three method cards', () => {
+  it('a locked card is still one of the four method cards', () => {
     const { panel } = makePanel();
     panel.update(gradedState(0));
-    expect(panel.root.querySelectorAll('[data-method]').length).toBe(3);
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(4);
   });
 
   describe('depth shown per card follows the grade', () => {
@@ -1135,6 +1136,218 @@ describe('SurveyPanel — grade-gated method cards (#2279)', () => {
       expect(method(panel, 'seismic').textContent).toContain('8 m deep');
       panel.update(gradedState(1));
       expect(method(panel, 'seismic').textContent).toContain('25 m deep');
+    });
+  });
+});
+
+// ── Long-range prospection card, run and result (#2286) ─────────────────────
+
+describe('SurveyPanel — prospection (#2286)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (window as unknown as { __cameraFocus?: unknown }).__cameraFocus;
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  const runBtn = (panel: SurveyPanel): HTMLButtonElement => panel.root.querySelector<HTMLButtonElement>('#bs-survey-run')!;
+
+  describe('method card', () => {
+    it('exists as a method card with its cost', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(2));
+      const card = method(panel, 'prospection');
+      expect(card).not.toBeNull();
+      expect(card.textContent).toContain(`$${SURVEY_COSTS.prospection.toLocaleString('en-US')}`);
+    });
+
+    it.each([0, 1])('is locked below G2 (grade %i) and says G2 opens it', (grade) => {
+      const { panel } = makePanel();
+      panel.update(gradedState(grade));
+      const card = method(panel, 'prospection');
+      expect(card.getAttribute('data-locked')).toBe('true');
+      expect(card.getAttribute('aria-disabled')).toBe('true');
+      expect(card.querySelector('.bs-survey-method-lock')!.textContent).toContain('G2');
+    });
+
+    it('is open at G2, with no lock text', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(2));
+      const card = method(panel, 'prospection');
+      expect(card.getAttribute('data-locked')).not.toBe('true');
+      expect(card.getAttribute('aria-disabled')).not.toBe('true');
+      expect(card.querySelector('.bs-survey-method-lock')).toBeNull();
+    });
+
+    it('is open on a site with no grade', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(undefined));
+      expect(method(panel, 'prospection').getAttribute('data-locked')).not.toBe('true');
+    });
+
+    it('opens when the grade rises on the same panel', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(1));
+      expect(method(panel, 'prospection').getAttribute('data-locked')).toBe('true');
+      panel.update(gradedState(2));
+      expect(method(panel, 'prospection').getAttribute('data-locked')).not.toBe('true');
+    });
+
+    it('clicking it at G2 selects it', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(2));
+      method(panel, 'prospection').click();
+      expect(method(panel, 'prospection').classList.contains('selected')).toBe(true);
+    });
+
+    it('clicking it below G2 does not select it, run it or arm a pick', () => {
+      const { panel } = makePanel();
+      const { kit, controller } = makeKit();
+      const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+      panel.setGameConsole(gameConsole as never);
+      panel.setPlacementKit(kit);
+      panel.update(gradedState(1));
+      method(panel, 'prospection').click();
+      expect(method(panel, 'prospection').classList.contains('selected')).toBe(false);
+      expect(controller.arm).not.toHaveBeenCalled();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('running it', () => {
+    it('runs "survey prospection" straight through the game console, with no kit and no point pick', () => {
+      const { panel } = makePanel();
+      const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+      panel.setGameConsole(gameConsole as never);
+      panel.update(gradedState(2));
+      method(panel, 'prospection').click();
+      runBtn(panel).click();
+      expect(gameConsole).toHaveBeenCalledTimes(1);
+      expect(gameConsole).toHaveBeenCalledWith('survey prospection');
+    });
+
+    it('with a placement kit present, still arms no pick and still runs the command', () => {
+      const { panel } = makePanel();
+      const { kit, controller } = makeKit();
+      const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+      panel.setGameConsole(gameConsole as never);
+      panel.setPlacementKit(kit);
+      panel.update(gradedState(2));
+      method(panel, 'prospection').click();
+      runBtn(panel).click();
+      expect(controller.arm).not.toHaveBeenCalled();
+      expect(gameConsole).toHaveBeenCalledWith('survey prospection');
+    });
+
+    it('selecting another method afterwards puts the pick back', () => {
+      const { panel } = makePanel();
+      const { kit, controller } = makeKit();
+      panel.setGameConsole(vi.fn(() => ({ success: true, output: 'ok' })) as never);
+      panel.setPlacementKit(kit);
+      panel.update(gradedState(2));
+      method(panel, 'prospection').click();
+      method(panel, 'aerial').click();
+      expect(controller.arm).toHaveBeenCalledTimes(1);
+      runBtn(panel).click();
+      expect(controller.arm).toHaveBeenCalledTimes(1);
+    });
+
+    it('the Run button is disabled with no surveyor', () => {
+      const { panel } = makePanel();
+      const state = noSurveyorState();
+      state.grade = { ...createGradeState(), grade: 2 };
+      panel.update(state);
+      method(panel, 'prospection').click();
+      expect(runBtn(panel).disabled).toBe(true);
+    });
+
+    it('the Run button is disabled when prospection is unaffordable', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(2, SURVEY_COSTS.prospection - 1));
+      method(panel, 'prospection').click();
+      expect(runBtn(panel).disabled).toBe(true);
+    });
+
+    it('the Run button is enabled with a surveyor and the cash', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(2, SURVEY_COSTS.prospection));
+      method(panel, 'prospection').click();
+      expect(runBtn(panel).disabled).toBe(false);
+    });
+  });
+
+  describe('result card', () => {
+    const ISLANDS = [
+      { x: 301, z: 62, radius: 16, oreId: 'craktonite' },
+      { x: -247, z: 71, radius: 24, oreId: 'absurdium' },
+      { x: 18, z: -283, radius: 8, oreId: 'craktonite' },
+    ];
+    const prospectionResult = (islands = ISLANDS): SurveyResult => makeSurveyResult({
+      id: 9, method: 'prospection', centerX: 32, centerZ: 32, estimates: {}, islands, confidence: 0.8,
+    });
+    const cardOf = (panel: SurveyPanel): HTMLElement => panel.root.querySelector<HTMLElement>('[data-survey-id="9"]')!;
+    const rowsOf = (panel: SurveyPanel): HTMLElement[] => [...cardOf(panel).querySelectorAll<HTMLElement>('[data-island]')];
+
+    function panelWith(results: SurveyResult[]): SurveyPanel {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: results }));
+      return panel;
+    }
+
+    it('lists one row per island', () => {
+      expect(rowsOf(panelWith([prospectionResult()]))).toHaveLength(ISLANDS.length);
+    });
+
+    it('each row shows the ore name and the coordinates', () => {
+      const rows = rowsOf(panelWith([prospectionResult()]));
+      ISLANDS.forEach((island, i) => {
+        const text = rows[i]!.textContent!;
+        expect(text).toContain(t(`ore.${island.oreId}.name`));
+        expect(text).toContain(String(island.x));
+        expect(text).toContain(String(island.z));
+      });
+    });
+
+    it('shows no ore bars and no "no ore" message', () => {
+      const card = cardOf(panelWith([prospectionResult()]));
+      expect(card.querySelector('.bsx-progress')).toBeNull();
+      expect(card.textContent).not.toContain(t('ui.survey.no_ore'));
+    });
+
+    it('still shows the method and the confidence', () => {
+      const text = cardOf(panelWith([prospectionResult()])).textContent!;
+      expect(text).toContain(t('survey.prospection'));
+      expect(text).toContain('80%');
+    });
+
+    it('a result with no island has a card and no island row', () => {
+      const panel = panelWith([prospectionResult([])]);
+      expect(cardOf(panel)).not.toBeNull();
+      expect(rowsOf(panel)).toHaveLength(0);
+    });
+
+    it('other methods have no island rows', () => {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: [makeSurveyResult()] }));
+      expect(panel.root.querySelectorAll('[data-island]')).toHaveLength(0);
+    });
+
+    it('clicking a row focuses the camera on that island', () => {
+      const focus = vi.fn();
+      (window as unknown as { __cameraFocus: typeof focus }).__cameraFocus = focus;
+      const rows = rowsOf(panelWith([prospectionResult()]));
+      rows[1]!.click();
+      expect(focus).toHaveBeenCalledTimes(1);
+      expect(focus.mock.calls[0]![0]).toBe(ISLANDS[1]!.x);
+      expect(focus.mock.calls[0]![1]).toBe(ISLANDS[1]!.z);
+    });
+
+    it('each row focuses its own island', () => {
+      const focus = vi.fn();
+      (window as unknown as { __cameraFocus: typeof focus }).__cameraFocus = focus;
+      const rows = rowsOf(panelWith([prospectionResult()]));
+      for (const row of rows) row.click();
+      expect(focus.mock.calls.map(c => [c[0], c[1]])).toEqual(ISLANDS.map(i => [i.x, i.z]));
     });
   });
 });

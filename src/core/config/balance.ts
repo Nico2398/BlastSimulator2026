@@ -2276,6 +2276,7 @@ export const SURVEY_BASE_ERROR = {
   seismic:     0.15,
   core_sample: 0.05,
   aerial:      0.25,
+  prospection: 0.3,
 } as const;
 
 /** Survey disc radius (grid cells) around the centre point for each method. */
@@ -2283,6 +2284,8 @@ export const SURVEY_COVERAGE_RADIUS = {
   seismic:     20,
   core_sample:  0,
   aerial:      30,
+  /** Reaches every island from the base: ORE_ISLAND_MAX_DISTANCE_M + ORE_ISLAND_RADIUS_MAX_M = 338 (#2286). */
+  prospection: 400,
 } as const;
 
 /**
@@ -2299,6 +2302,8 @@ export const SURVEY_DEPTH_BELOW_SURFACE = {
   aerial:       2,
   seismic:     25,
   core_sample: 40,
+  /** Reads no voxel: a coarse island map only (#2286). */
+  prospection:  0,
 } as const;
 
 /** Mine grade at which each survey method opens on a progression site (#2279): surface methods at G0, depth methods from G1. */
@@ -2306,6 +2311,8 @@ export const SURVEY_METHOD_UNLOCK_GRADE = {
   aerial:      0,
   seismic:     0,
   core_sample: 1,
+  /** Long range opens at G2, where the ore islands are (#2286). */
+  prospection: 2,
 } as const;
 
 /** Thickness in metres of the G0 band: G0 ores sit within this depth of the surface (#2279). */
@@ -2340,6 +2347,7 @@ export const SURVEY_COSTS = {
   seismic:     3000,
   core_sample:  800,
   aerial:      1500,
+  prospection: 12000,
 } as const;
 
 /** Survey duration (ticks) for each method. 1 tick = 1 game-hour. */
@@ -2347,7 +2355,23 @@ export const SURVEY_DURATION_TICKS = {
   seismic:     8,
   core_sample: 4,
   aerial:      3,
+  prospection: 12,
 } as const;
+
+/** Prospection (#2286): metres a reported island centre may sit from the true one at skill 1; zero at the top skill. */
+export const PROSPECTION_POSITION_ERROR_M = 24;
+
+/** Prospection: most false leads a skill-1 survey adds; zero at the top skill. */
+export const PROSPECTION_FALSE_LEAD_MAX = 2;
+
+/** Prospection: chance a skill-1 survey names the wrong dominant ore for an island; zero at the top skill. */
+export const PROSPECTION_ORE_MISREAD_CHANCE = 0.35;
+
+/** Prospection: the skill level at which noise vanishes (skill 1 is the noisiest). */
+export const PROSPECTION_TOP_SKILL = 5;
+
+/** Prospection: reported island radius is the true one rounded to this step (metres), a coarse area. */
+export const PROSPECTION_RADIUS_STEP_M = 8;
 
 /** Assumed bulk density of ore-bearing rock used for mass calculations (kg/m³). */
 export const ORE_DENSITY_KG_M3 = 2500;
