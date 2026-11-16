@@ -541,8 +541,10 @@ describe('en.json / fr.json — key-set parity', () => {
     // #2277: +17 tier keys (grade names, tier labels and perks, refusal, console, notice), -7 keys of the old grades 4 and 5: 5032.
     // #2276: +1 (coming_soon badge).
     // #2278: +15 keys (ore stock lines, spoil send confirmation, console spoil, auto-sold ores line): 5049.
-    // #2279: +2 keys (survey method lock refusal and card label): 5051. #2287: +2 keys (meteoritic rock name, description): 5053.
-    expect(Object.keys(en).length).toBe(5053);
+    // #2279: +2 keys (survey method lock refusal and card label): 5051.
+    // #2287: +2 keys (meteoritic rock name, description).
+    // #2286: +4 keys (long-range prospection card, note, island row, empty list): 5057.
+    expect(Object.keys(en).length).toBe(5057);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {

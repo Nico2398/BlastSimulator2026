@@ -5,6 +5,8 @@
 
 import type { GameState } from '../core/state/GameState.js';
 import type { NavGrid, NavCellType } from '../core/nav/NavGrid.js';
+import type { ProspectedIsland } from '../core/mining/SurveyProspection.js';
+import { getOre } from '../core/world/OreCatalog.js';
 
 export const MAP_SIZE = 120; // px
 
@@ -296,5 +298,46 @@ export function drawNavGridOverlay(
         cellH,
       );
     }
+  }
+}
+
+/** Every island of every prospection result — the coarse map the player paid for. */
+export function prospectedIslandsOf(state: GameState): readonly ProspectedIsland[] {
+  return state.surveyResults.flatMap((r) => r.islands ?? []);
+}
+
+/** Projection of the mini-map: the site's box widened to hold every prospected island disc (#2286). */
+export function miniMapProjection(
+  world: { minX: number; minZ: number; sizeX: number; sizeZ: number },
+  islands: readonly { x: number; z: number; radius: number }[],
+): MapProjection {
+  let minX = world.minX;
+  let minZ = world.minZ;
+  let maxX = world.minX + world.sizeX;
+  let maxZ = world.minZ + world.sizeZ;
+  for (const i of islands) {
+    minX = Math.min(minX, i.x - i.radius);
+    maxX = Math.max(maxX, i.x + i.radius);
+    minZ = Math.min(minZ, i.z - i.radius);
+    maxZ = Math.max(maxZ, i.z + i.radius);
+  }
+  return { originX: minX, originZ: minZ, scaleX: MAP_SIZE / (maxX - minX), scaleZ: MAP_SIZE / (maxZ - minZ) };
+}
+
+/** Paint every island of every prospection result as a disc in its ore's colour (#2286). */
+export function drawProspectedIslands(
+  ctx: CanvasRenderingContext2D,
+  state: GameState,
+  proj: MapProjection,
+): void {
+  for (const island of prospectedIslandsOf(state)) {
+    const color = getOre(island.oreId)?.color;
+    if (!color) continue;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.65;
+    ctx.beginPath();
+    ctx.arc(projectX(proj, island.x), projectZ(proj, island.z), Math.max(2, island.radius * proj.scaleX), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
 }

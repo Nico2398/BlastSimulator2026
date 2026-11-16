@@ -449,7 +449,7 @@ The new UI keeps dispatching these exact commands (existing, tested):
 |---|---|
 | New game / start level | `new_game seed:N [mine_type:X] [size:N]` · `campaign start level:<id>` |
 | Speed / pause | `time speed <1|2|4|8>` · `time pause` / `time resume` (`pause`/`speed N` aliases used by shortcuts) |
-| Survey | `survey <seismic|core_sample|aerial> x:<X> z:<Z>` |
+| Survey | `survey <seismic|core_sample|aerial> x:<X> z:<Z> | survey prospection | survey islands` |
 | Drill grid / single | `drill_plan grid rows:R cols:C spacing:S depth:D start:x,z` · `drill_plan add x:X z:Z depth:D` · `drill_plan clear` |
 | Charge | `charge hole:<id|*> explosive:<id> amount:<kg> stemming:<m>` |
 | Sequence | `sequence auto [delay_step:ms]` · `sequence set hole:<id> delay:<ms>` |

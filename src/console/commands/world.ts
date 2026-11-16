@@ -3,12 +3,15 @@
 import type { CommandResult } from '../ConsoleRunner.js';
 import { refreshOrderReachability } from '../../core/engine/OrderReachability.js';
 import { backfillGhostBuildings } from '../../core/engine/TaskDispatch.js';
-import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState, type WorldState } from '../../core/state/GameState.js';
+import { createGame, buildGameNavGrid, snapAgentsToNavigableGround, syncWorldBounds, createWorldState, type GameState } from '../../core/state/GameState.js';
 import { placeStartingCrew, relocateVehiclesOffNarrowGround, meanPosition } from '../../core/state/SpawnPlacement.js';
 import { ensureRallyPoint, siteCentre, type RallyPointOptions } from '../../core/state/RallyPoint.js';
 import { placeStartingBuildings, drivableApproachFilter, allDrivableFrom } from '../../core/state/StartingBuildings.js';
 import { refreshLogisticsCapacity } from '../../core/engine/BuildingTaskHelpers.js';
 import { getBiome, getAllBiomes } from '../../core/world/BiomeCatalog.js';
+import { terrainConfigOf, worldGenerationFields, type GenerationFields } from '../../core/world/TerrainConfigOf.js';
+
+export { terrainConfigOf };
 import { generateTerrain, buildTerrainContext, TERRAIN_GENERATOR_VERSION, requireValidGenDimension, requireValidGenDatum, requireValidPitMask, requireValidOreGradeScale, MAX_TERRAIN_GEN_DIMENSION, type TerrainConfig } from '../../core/world/TerrainGen.js';
 import { PlayableArea } from '../../core/world/PlayableArea.js';
 import { buildStructureSet, type StructureSet } from '../../core/world/Structures.js';
@@ -21,7 +24,7 @@ import { getDominantRockId, computeVoxelColumnSurfaceY, computeColumnRangeY } fr
 import type { VoxelGrid } from '../../core/world/VoxelGrid.js';
 import { EventEmitter } from '../../core/state/EventEmitter.js';
 import { decodeVoxelGrid, encodeVoxelGrid, type SerializedVoxels, type SerializedTerrainGen } from '../../core/state/VoxelGridCodec.js';
-import { DEFAULT_GRID_SIZE, STARTER_DEPOSIT_KEEP_CLEAR_HALF_M, type StartingBuildingSlot, type PitMaskShape } from '../../core/config/balance.js';
+import { DEFAULT_GRID_SIZE, STARTER_DEPOSIT_KEEP_CLEAR_HALF_M, type StartingBuildingSlot } from '../../core/config/balance.js';
 import { sanitizeFiniteOverride, staffedSuffix, parseStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
 import { mergeCampaignIntoProfile, type CampaignProfile } from '../../persistence/CampaignProfile.js';
@@ -103,43 +106,6 @@ export function buildNavGridSyncTarget(ctx: GameContext): NavGridSyncTarget | nu
  */
 function defaultDatumForSize(size: number): number {
   return Math.floor(size * 0.55);
-}
-
-/** Size, hardness and ore-mode fields terrain generation reads off a world. */
-interface GenerationFields { sizeX: number; datum: number; sizeZ: number; mixedRockHardness?: boolean; oreDeposits?: boolean; pitMask?: PitMaskShape; oreGradeScale?: number; climateBias?: [number, number]; vehicleSlopeRatio?: number; mustReach?: { x: number; z: number } }
-
-/**
- * The base (level-original) size + hardness fields generation reads off a
- * `WorldState` — takes only the `WorldState` slice it reads, not the whole
- * `GameState`, since neither caller below needs anything else off it
- * (#1181 review). The one source of truth for "which WorldState fields feed
- * generation": `regenerateGridParams` layers its own dimension validation on
- * top for a no-voxels load fallback.
- */
-function worldGenerationFields(world: WorldState): GenerationFields {
-  return {
-    sizeX: world.baseSizeX,
-    datum: world.datum,
-    sizeZ: world.baseSizeZ,
-    ...(world.mixedRockHardness !== undefined ? { mixedRockHardness: world.mixedRockHardness } : {}),
-    ...(world.oreDeposits !== undefined ? { oreDeposits: world.oreDeposits } : {}),
-    ...(world.pitMask !== undefined ? { pitMask: world.pitMask } : {}),
-    ...(world.oreGradeScale !== undefined ? { oreGradeScale: world.oreGradeScale } : {}),
-    ...(world.climateBias ? { climateBias: world.climateBias } : {}),
-  };
-}
-
-/** The terrain config a game's grid was generated from — the datum every later chunk is generated against (#473 D3). */
-export function terrainConfigOf(state: GameState): TerrainConfig | null {
-  if (!state.world) return null;
-  const biome = getBiome(state.mineType);
-  if (!biome) return null;
-  const { climateBias, ...fields } = worldGenerationFields(state.world);
-  return {
-    seed: state.seed,
-    climateBias: climateBias ?? biome.climateCenter,
-    ...fields,
-  };
 }
 
 /**
