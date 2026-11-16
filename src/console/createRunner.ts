@@ -12,6 +12,7 @@ import {
   terrainInfoCommand,
   landscapeInfoCommand,
   oreIslandsCommand,
+  meteoriteCraterCommand,
   buildNavGridSyncTarget,
 } from './commands/world.js';
 import {
@@ -199,6 +200,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('ore_islands', 'List the G2 ore islands of this world: centre, ores, distance from spawn', (args, named) =>
     oreIslandsCommand(ctx, args, named),
+  );
+  runner.register('meteorite_crater', 'Show the meteorite crater of this world: centre, radius, distance from spawn (debug)', (args, named) =>
+    meteoriteCraterCommand(ctx, args, named),
   );
   runner.register('survey', 'Survey terrain (seismic|core_sample|aerial) x:<X> z:<Z>', (args, named) =>
     surveyCommand(ctx, args, named),

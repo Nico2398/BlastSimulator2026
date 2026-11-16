@@ -760,6 +760,23 @@ export function oreIslandsCommand(
   return { success: true, output: [`Ore islands: ${islands.length}`, ...lines].join('\n') };
 }
 
+/** Debug query (#2287): where the meteorite crater sits. Players never see it. */
+export function meteoriteCraterCommand(
+  ctx: GameContext,
+  _args: string[],
+  _named: Record<string, string>,
+): CommandResult {
+  if (!ctx.state) return { success: false, output: t('console.no_game_loaded') };
+  const config = terrainConfigOf(ctx.state);
+  if (!config) return { success: false, output: t('world.landscape_unknown_mine_type', { mineType: ctx.state.mineType }) };
+  const crater = buildTerrainContext(config).crater?.info ?? null;
+  if (!crater) return { success: true, output: 'Meteorite crater: none' };
+  return {
+    success: true,
+    output: `Meteorite crater: (${crater.x}, ${crater.z}) radius ${crater.radius}m, ${Math.round(crater.distance)}m from spawn`,
+  };
+}
+
 export function surveyCommand(
   ctx: GameContext,
   args: string[],

@@ -3,6 +3,7 @@ import { getOre, getAllOres, orePermitGrade, oresOfPermitGrade } from '../../../
 import { getAllRocks, getRock } from '../../../src/core/world/RockCatalog.js';
 import { getAllBiomes } from '../../../src/core/world/BiomeCatalog.js';
 import { ORE_RARITY_TIERS } from '../../helpers/oreRarity.js';
+import { METEORITE_ROCK_ID } from '../../../src/core/config/balance.js';
 
 describe('OreCatalog', () => {
   it('getOre returns valid data for treranium', () => {
@@ -154,5 +155,17 @@ describe('OreCatalog permit grades (#2278)', () => {
   it('oresOfPermitGrade drops unknown ids and handles an empty list', () => {
     expect(oresOfPermitGrade(['unobtainium', 'dirtite'], 0)).toEqual(['dirtite']);
     expect(oresOfPermitGrade([], 1)).toEqual([]);
+  });
+});
+
+describe('OreCatalog and the meteoritic rock (#2287)', () => {
+  it('treranium stays the one grade 3 ore', () => {
+    expect(oresOfPermitGrade(getAllOres().map(o => o.id), 3)).toEqual(['treranium']);
+  });
+
+  it('the meteoritic rock is in the rock catalog and hosts only ores that exist', () => {
+    const rock = getRock(METEORITE_ROCK_ID);
+    expect(rock).toBeDefined();
+    for (const oreId of Object.keys(rock!.oreProbabilities)) expect(getOre(oreId), oreId).toBeDefined();
   });
 });
