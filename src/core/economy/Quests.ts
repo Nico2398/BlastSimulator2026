@@ -7,11 +7,13 @@ import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { isSingleTierType, type BuildingType, type BuildingTier } from '../entities/Building.js';
 import { getBedCapacity } from '../entities/BuildingWellbeing.js';
-import { getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
+import type { VehicleTier } from '../entities/Vehicle.js';
+import { t } from '../i18n/I18n.js';
+import { explosivesOfTier, getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
 import { getAllQuests, getQuest } from './QuestCatalog.js';
 
 type QuestObjectiveKind =
-  'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'buildings_built' | 'crew_housed';
+  'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'fleet_size' | 'buildings_built' | 'crew_housed';
 
 interface QuestObjectiveDef {
   kind: QuestObjectiveKind;
@@ -19,8 +21,9 @@ interface QuestObjectiveDef {
 }
 
 /** What completing a quest makes purchasable. */
-export type QuestReward =
+type QuestReward =
   | { kind: 'explosive_tier'; tier: ExplosiveTier }
+  | { kind: 'vehicle_tier'; tier: VehicleTier }
   | { kind: 'building_tier'; tier: 2 | 3 };
 
 export interface QuestDef {
@@ -83,6 +86,7 @@ function objectiveProgress(state: GameState, kind: QuestObjectiveKind): number {
     case 'explosive_kg': return q?.explosiveKg ?? 0;
     case 'rock_kg': return q?.rockKg ?? 0;
     case 'safety_score': return state.scores.safety;
+    case 'fleet_size': return state.vehicles.vehicles.length;
     case 'buildings_built': return state.buildings.buildings.length;
     case 'crew_housed': return Math.min(state.employees.employees.length, getBedCapacity(state.buildings));
   }
@@ -190,4 +194,18 @@ export function isBuildingTierUnlocked(
   if (tier === 1) return true;
   if (isSingleTierType(type)) return false;
   return buildingTierLockedByQuest(state, type, tier) === null;
+}
+
+/** The quest whose reward opens vehicle `tier`, if any. */
+export function questForVehicleTier(tier: VehicleTier): QuestDef | undefined {
+  return getAllQuests().find(q => q.reward.kind === 'vehicle_tier' && q.reward.tier === tier);
+}
+
+/** Localized reward line of a quest, whatever its reward kind. */
+export function questRewardLine(def: QuestDef): string {
+  const { reward } = def;
+  if (reward.kind === 'vehicle_tier') return t('quest.reward.vehicle_tier', { tier: reward.tier });
+  if (reward.kind === 'building_tier') return t('quest.reward.building_tier', { tier: reward.tier });
+  const explosives = explosivesOfTier(reward.tier).map(e => t(e.nameKey)).join(', ');
+  return t('quest.reward', { tier: reward.tier, explosives });
 }

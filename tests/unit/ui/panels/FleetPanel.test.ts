@@ -12,6 +12,9 @@ import { NavGrid } from '../../../../src/core/nav/NavGrid.js';
 import { addBlastFragments } from '../../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js';
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest } from '../../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../../src/core/economy/QuestCatalog.js';
+import { vehicleTierLockLabel, vehicleTierRefusal } from '../../../../src/core/economy/VehicleTierGate.js';
 import { SELECTED_ROW_CLASS } from '../../../../src/ui/selectionRoute.js';
 import enLocaleJson from '../../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocaleJson from '../../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -689,22 +692,25 @@ describe('FleetPanel — one scroll area per window (#958, #2242)', () => {
   });
 });
 
-describe('FleetPanel dealership grade gate (#1928)', () => {
+describe('FleetPanel dealership quest gate (#2282)', () => {
   const tierBtn = (panel: FleetPanel, role: string, tier: number) =>
     [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
       .find(b => b.dataset['role'] === role && b.dataset['tier'] === String(tier))!;
+  const title = (id: string): string => t(getQuest(id)!.titleKey);
+  const lockLabel = (btn: HTMLButtonElement): string | undefined => btn.querySelector('.bs-fleet-tier-lock')?.textContent ?? undefined;
 
-  function progressionState(grade: number): GameState {
+  function questSiteState(grade = 0): GameState {
     const state = makeState([]);
     state.cash = 50_000_000;
     state.grade = createGradeState();
     state.grade.grade = grade;
+    state.quests = createQuestState();
     return state;
   }
 
-  it('at grade 0 tier-2 and tier-3 buttons are locked with a "Needs <grade>" line, tier 1 is open', () => {
+  it('tier-2 and tier-3 buttons are locked with a label naming their quest, tier 1 is open', () => {
     const { panel } = makePanel();
-    panel.update(progressionState(0));
+    panel.update(questSiteState());
     const t1 = tierBtn(panel, 'debris_hauler', 1);
     const t2 = tierBtn(panel, 'debris_hauler', 2);
     const t3 = tierBtn(panel, 'debris_hauler', 3);
@@ -712,18 +718,26 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     expect(t1.dataset['locked']).toBeUndefined();
     expect(t1.querySelector('.bs-fleet-tier-lock')).toBeNull();
     expect(t2.disabled).toBe(true);
-    expect(t2.dataset['locked']).toBe('grade');
-    expect(t2.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Depth');
+    expect(t2.dataset['locked']).toBeDefined();
+    expect(lockLabel(t2)).toBe(vehicleTierLockLabel(getQuest('quest_vehicle_t2')!));
+    expect(lockLabel(t2)).toContain(title('quest_vehicle_t2'));
     expect(t3.disabled).toBe(true);
-    expect(t3.dataset['locked']).toBe('grade');
-    expect(t3.querySelector('.bs-fleet-tier-lock')!.textContent).toBe('Needs Distance');
+    expect(t3.dataset['locked']).toBeDefined();
+    expect(lockLabel(t3)).toContain(title('quest_vehicle_t3'));
+  });
+
+  it('the tooltip of a locked button carries the dealer refusal naming the quest', () => {
+    const { panel } = makePanel();
+    const state = questSiteState();
+    panel.update(state);
+    expect(tierBtn(panel, 'debris_hauler', 2).title).toContain(vehicleTierRefusal(state, 2)!);
   });
 
   it('every role is locked the same way', () => {
     const { panel } = makePanel();
-    panel.update(progressionState(0));
+    panel.update(questSiteState());
     const locked = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
-      .filter(b => b.dataset['locked'] === 'grade');
+      .filter(b => b.dataset['locked'] !== undefined);
     expect(locked.length).toBe(6 * 2);
   });
 
@@ -731,35 +745,66 @@ describe('FleetPanel dealership grade gate (#1928)', () => {
     const { panel } = makePanel();
     const calls: string[] = [];
     panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    panel.update(progressionState(0));
+    panel.update(questSiteState());
     tierBtn(panel, 'debris_hauler', 2).click();
     expect(calls).toEqual([]);
   });
 
-  it('unlocks in place when the grade rises', () => {
+  it('the permit grade never unlocks a tier', () => {
+    const { panel } = makePanel();
+    panel.update(questSiteState(5));
+    expect(tierBtn(panel, 'debris_hauler', 2).disabled).toBe(true);
+    expect(tierBtn(panel, 'debris_hauler', 3).disabled).toBe(true);
+  });
+
+  it('a completed quest unlocks its tier in place, at the usual price', () => {
     const { panel } = makePanel();
     const calls: string[] = [];
     panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
-    const state = progressionState(0);
+    const state = questSiteState();
     panel.update(state);
-    state.grade!.grade = 1;
+    completeQuest(state, 'quest_vehicle_t2');
     panel.update(state);
     const t2 = tierBtn(panel, 'debris_hauler', 2);
     expect(t2.disabled).toBe(false);
     expect(t2.dataset['locked']).toBeUndefined();
     expect(t2.querySelector('.bs-fleet-tier-lock')).toBeNull();
-    expect(tierBtn(panel, 'debris_hauler', 3).dataset['locked']).toBe('grade');
+    expect(tierBtn(panel, 'debris_hauler', 3).dataset['locked']).toBeDefined();
     t2.click();
     expect(calls).toContain('vehicle buy debris_hauler tier:2');
   });
 
-  it('grade 2 unlocks tier 3', () => {
+  it('with both quests done, tier 3 is open too', () => {
     const { panel } = makePanel();
-    panel.update(progressionState(2));
+    const state = questSiteState();
+    completeQuest(state, 'quest_vehicle_t2');
+    completeQuest(state, 'quest_vehicle_t3');
+    panel.update(state);
     expect(tierBtn(panel, 'debris_hauler', 3).disabled).toBe(false);
+    expect(panel.root.querySelectorAll('.bs-fleet-tier-lock').length).toBe(0);
   });
 
-  it('a non-progression site shows no lock', () => {
+  it('a completed quest still leaves a button disabled when cash is short, without a lock label', () => {
+    const { panel } = makePanel();
+    const state = questSiteState();
+    state.cash = 0;
+    completeQuest(state, 'quest_vehicle_t2');
+    panel.update(state);
+    const t2 = tierBtn(panel, 'debris_hauler', 2);
+    expect(t2.disabled).toBe(true);
+    expect(t2.querySelector('.bs-fleet-tier-lock')).toBeNull();
+  });
+
+  it('the explosive quests unlock no vehicle tier', () => {
+    const { panel } = makePanel();
+    const state = questSiteState();
+    completeQuest(state, 'quest_explosive_t2');
+    completeQuest(state, 'quest_explosive_t3');
+    panel.update(state);
+    expect(tierBtn(panel, 'debris_hauler', 2).disabled).toBe(true);
+  });
+
+  it('a site without quests shows no lock', () => {
     const { panel } = makePanel();
     const state = makeState([]);
     state.cash = 50_000_000;

@@ -13,8 +13,7 @@ import { windowRoot, windowBody } from '../windowKit.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { getAllQuests } from '../../core/economy/QuestCatalog.js';
-import { isQuestCompleted, questObjectiveStatuses, questPrerequisitesMet, type QuestDef } from '../../core/economy/Quests.js';
-import { questRewardLine } from '../../core/economy/QuestRewardText.js';
+import { isQuestCompleted, questObjectiveStatuses, questPrerequisitesMet, questRewardLine, type QuestDef } from '../../core/economy/Quests.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import {
   gradeDef, gradeRung, nextGradeTargets, permitApplyBlocker, formatGradeAmount, tierDef, tierTargetStatuses,
@@ -214,7 +213,7 @@ export class PermitPanel extends PanelBase {
       row.querySelector('.bsx-progress-fill')!.setAttribute('data-role', 'quest-bar');
       block.append(row);
     }
-    block.append(el('span', { text: questRewardLine(quest.reward), attrs: { 'data-role': 'quest-reward', style: 'font:600 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' } }));
+    block.append(el('span', { text: questRewardLine(quest), attrs: { 'data-role': 'quest-reward', style: 'font:600 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' } }));
     const open = (quest.requires ?? []).filter(id => !isQuestCompleted(state, id));
     if (!questPrerequisitesMet(state, quest)) {
       const names = open.map(id => t(getAllQuests().find(q => q.id === id)?.titleKey ?? id)).join(', ');

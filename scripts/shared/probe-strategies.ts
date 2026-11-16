@@ -77,6 +77,7 @@ import { rampCutSlopeRatio } from '../../src/core/mining/Ramp.js';
 import { chargeColumnM, maxFittingChargeKg } from '../../src/core/mining/ChargePlan.js';
 import type { ExplosiveType } from '../../src/core/world/ExplosiveCatalog.js';
 import { getLevel } from '../../src/core/campaign/Level.js';
+import { vehicleTierGate } from '../../src/core/economy/VehicleTierGate.js';
 import { getEventById } from '../../src/core/events/EventPool.js';
 import { isActive } from '../../src/core/events/ActiveModifiers.js';
 import type { EventConsequence } from '../../src/core/events/EventPool.js';
@@ -1097,6 +1098,8 @@ const SOFTEST_SAFE_FACE_M = WALL_SAFE_FACE_HEIGHT_M_BY_TIER[1]!;
 const LADDER_UPGRADE_ROLES: readonly VehicleRole[] = ['drill_rig', 'debris_hauler', 'rock_digger'];
 /** Cash kept back after an upgrade or a licence course: a stalled income must outlast the payroll it grew. */
 const LADDER_UPGRADE_RESERVE = 150_000;
+/** Permit grade from which the ladder moves a vehicle to each tier: its own pacing, the dealer only asks for a quest (#2282). */
+const LADDER_VEHICLE_TIER_GRADE: Readonly<Record<VehicleTier, number>> = { 1: 0, 2: 1, 3: 2 };
 /** Ticks between hires made for a licence course: a fresh hire needs time to enrol and train before another is paid for. */
 const LADDER_HIRE_COOLDOWN_TICKS = 600;
 /** Employee role that holds (and so is trained for) each vehicle role's licence at hire. */
@@ -1473,14 +1476,21 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
   return false;
 }
 
+/** The scripted player does not play the dealer's quests: it takes the ones that open vehicle tiers up to `tier` (#2282). */
+function takeVehicleQuests(s: ProbeSession, tier: VehicleTier): void {
+  for (let t = 2; t <= tier; t++) {
+    const lock = vehicleTierGate(s.state, t as VehicleTier);
+    if (lock) s.run(`quest complete ${lock.id}`);
+  }
+}
+
 /**
- * Upgrade one vehicle in place (no new driver on payroll) when the dealer's grade gate allows its next tier,
+ * Upgrade one vehicle in place (no new driver on payroll) when its next tier's dealer quest is taken,
  * a licensed driver is left over for it and cash stays above LADDER_UPGRADE_RESERVE after it. One licence per
  * upgraded vehicle: a fleet upgraded past its licensed drivers parks (at t5000 on green_foothills, 11 of 12
  * tier-2 haulers stood driverless beside 300 t of ore waiting to be hauled).
  */
 function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
-  const grade = gradeOf(s);
   const rules: (BuyRule & { vehicleId: number; role: VehicleRole; tier: VehicleTier })[] = [];
   for (const role of LADDER_UPGRADE_ROLES) {
     // An unreserved vehicle whose driver (if any) already holds the next tier's licence: a mid-task swap would strand its holder.
@@ -1492,7 +1502,9 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
       })
       .sort((a, b) => a.tier - b.tier)[0];
     const next = lowest ? ((lowest.tier + 1) as VehicleTier) : null;
-    if (!lowest || next === null || next > 3 || !mayBuyVehicleTier(next, grade)) continue;
+    if (!lowest || next === null || next > 3 || gradeOf(s) < LADDER_VEHICLE_TIER_GRADE[next]) continue;
+    takeVehicleQuests(s, next);
+    if (!mayBuyVehicleTier(next, s.state)) continue;
     const cost = computeVehicleUpgradeCost(role, lowest.tier);
     if (cost !== null) rules.push({ id: `${lowest.id}`, vehicleId: lowest.id, role, tier: next, cost });
   }

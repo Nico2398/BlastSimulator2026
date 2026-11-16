@@ -188,6 +188,29 @@ describe('wireProgressionNotifications — quest:completed (#2280)', () => {
     expect(text(notified[0]!)).toContain(t(getQuest('quest_explosive_t2')!.titleKey));
   });
 
+  it.each([['quest_vehicle_t2', 2], ['quest_vehicle_t3', 3]] as const)('%s names the quest and the tier of machines now for sale (#2282)', (id, tier) => {
+    emitter.fire('quest:completed', { questId: id });
+    expect(notified).toHaveLength(1);
+    expect(notified[0]!.body).toBe(t('notification.quest.completed_vehicles', { title: t(getQuest(id)!.titleKey), tier }));
+    expect(text(notified[0]!)).toContain(t(getQuest(id)!.titleKey));
+    expect(text(notified[0]!)).not.toMatch(/\{\w+\}|notification\./);
+  });
+
+  it('a vehicle quest notice is not the explosives notice and lists no explosive names (#2282)', () => {
+    emitter.fire('quest:completed', { questId: 'quest_vehicle_t2' });
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
+    expect(notified[0]!.body).not.toBe(notified[1]!.body);
+    for (const e of explosivesOfTier(2)) expect(notified[0]!.body).not.toContain(t(e.nameKey));
+  });
+
+  it('a vehicle quest notice reads in French (#2282)', () => {
+    emitter.fire('quest:completed', { questId: 'quest_vehicle_t3' });
+    setLocale('fr');
+    emitter.fire('quest:completed', { questId: 'quest_vehicle_t3' });
+    expect(notified[1]!.body).not.toBe(notified[0]!.body);
+    expect(notified[1]!.body).not.toMatch(/\{\w+\}|notification\./);
+  });
+
   it('an unknown quest id raises nothing and does not throw', () => {
     expect(() => emitter.fire('quest:completed', { questId: 'quest_nope' })).not.toThrow();
     expect(notified).toHaveLength(0);
