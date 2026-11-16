@@ -4,7 +4,7 @@
   "steps": [
     {
       "command": "new_game seed:42 cash:210000",
-      "description": "40s is not enough headroom for a level load plus this file's 4 multi-angle `shots` on a GPU-less renderer (~6-10s/frame, #475) — pre-existing on main, not introduced by #1010, but it was blocking this scenario's own interaction-mode run so fixed here rather than filed separately.",
+      "description": "40s is not enough headroom for a level load plus this file's 4 multi-angle `shots` on a GPU-less renderer (~6-10s/frame, #475) \u2014 pre-existing on main, not introduced by #1010, but it was blocking this scenario's own interaction-mode run so fixed here rather than filed separately.",
       "timeout": 90,
       "interaction": [
         {
@@ -56,7 +56,7 @@
           "employeeCount": 1
         }
       },
-      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file\u2019s own hires as the builders \u2014 rather than reaching for staffed:true \u2014 is what leaves the roster and proficiency counts it asserts where they were."
     },
     {
       "command": "employee hire role:blaster",
@@ -79,7 +79,7 @@
           "employeeCount": 2
         }
       },
-      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file\u2019s own hires as the builders \u2014 rather than reaching for staffed:true \u2014 is what leaves the roster and proficiency counts it asserts where they were."
     },
     {
       "command": "employee hire role:driver",
@@ -102,11 +102,10 @@
           "employeeCount": 3
         }
       },
-      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file’s own hires as the builders — rather than reaching for staffed:true — is what leaves the roster and proficiency counts it asserts where they were."
+      "description": "Hired ahead of the orders below rather than after them (#556): a build order is queued work now, so the sites need someone on the roster to walk over and build them. Keeping this file\u2019s own hires as the builders \u2014 rather than reaching for staffed:true \u2014 is what leaves the roster and proficiency counts it asserts where they were."
     },
     {
-      "command": "build research_center at:30,3",
-      "description": "Placed before any research is queued — a placed research_center is a hard prerequisite (#442) to queue a research task at all.",
+      "command": "build living_quarters at:2,6 tier:1",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -116,64 +115,6 @@
         {
           "type": "clickSelector",
           "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 30,
-          "z": 3
-        },
-        {
-          "type": "screenshot"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -25000
-        },
-        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before the Queue Research click below depends on hasActiveResearchCenter seeing a real building."
-      }
-    },
-    {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
-      "description": "Drive the Research Center site to completion (#556).",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "buildingCount",
-          "equals": 1,
-          "maxTicks": 300,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "buildingCount": 1,
-          "orderedBuildingCount": 0
-        }
-      }
-    },
-    {
-      "command": "build living_quarters at:2,6 tier:1",
-      "interaction": [
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
         },
         {
           "type": "clickSelector",
@@ -200,7 +141,7 @@
       "expect": {
         "equals": {
           "orderedBuildingCount": 1,
-          "buildingCount": 1
+          "buildingCount": 0
         },
         "changedBy": {
           "cash": -10000
@@ -208,14 +149,14 @@
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
-      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first. #1010: the trailing focusTile+screenshot below frames the just-completed tier-1 living quarters at the camera distance the game actually plays at, for visual inspection of the model. Added as a step-scoped action here rather than as a global `shots` entry, since every `shots` entry re-captures on every step in the file (including step 0, before any building exists) and this file's per-step timeouts already run close to the per-frame cost of a GPU-less renderer (#475) — a 5th global shot would only add cost with nothing to show this early.",
+      "command": "wait_until field:buildingCount equals:1 max_ticks:400",
+      "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first. #1010: the trailing focusTile+screenshot below frames the just-completed tier-1 living quarters at the camera distance the game actually plays at, for visual inspection of the model. Added as a step-scoped action here rather than as a global `shots` entry, since every `shots` entry re-captures on every step in the file (including step 0, before any building exists) and this file's per-step timeouts already run close to the per-frame cost of a GPU-less renderer (#475) \u2014 a 5th global shot would only add cost with nothing to show this early.",
       "timeout": 130,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 2,
+          "equals": 1,
           "maxTicks": 400,
           "timeoutMs": 120000
         },
@@ -232,44 +173,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 2,
+          "buildingCount": 1,
           "orderedBuildingCount": 0
         }
       }
-    },
-    {
-      "command": "research queue type:living_quarters tier:2",
-      "interaction": [
-        {
-          "type": "set",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel",
-          "value": "2"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -5000
-        }
-      }
-    },
-    {
-      "command": "tick 50",
-      "interaction": [
-        {
-          "type": "command",
-          "command": "tick 50"
-        }
-      ],
-      "role": "setup"
     },
     {
       "command": "build living_quarters at:13,0 tier:2",
@@ -278,6 +185,11 @@
           "type": "clickIfPresent",
           "selector": "#bs-inspector [data-panel-close]",
           "timeoutMs": 0
+        },
+        {
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel",
+          "value": "2"
         },
         {
           "type": "clickSelector",
@@ -307,20 +219,20 @@
         ],
         "equals": {
           "orderedBuildingCount": 1,
-          "buildingCount": 2
+          "buildingCount": 1
         },
-        "note": "cash uses decreased, not equals, because this build follows a tick step — real browser interaction mode keeps ticking on wall-clock time (Finding #12), so the exact post-tick cash value can drift"
+        "note": "cash uses decreased, not equals, because the exact balance depends on wages paid while the crew built the earlier sites"
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
+      "command": "wait_until field:buildingCount equals:2 max_ticks:400",
       "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
       "timeout": 130,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 3,
+          "equals": 2,
           "maxTicks": 400,
           "timeoutMs": 120000
         }
@@ -328,49 +240,10 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 3,
+          "buildingCount": 2,
           "orderedBuildingCount": 0
         }
       }
-    },
-    {
-      "command": "research queue type:living_quarters tier:3",
-      "interaction": [
-        {
-          "type": "set",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel",
-          "value": "3"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-research-btn"
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:researchQueueLength equals:0 max_ticks:600",
-      "description": "#1379: waits on the tier-3 research task actually finishing instead of a fixed 50-tick pad; the research worker's pace now depends on the always-on default policy's rest cycles, so the pad no longer reliably covered it.",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "researchQueueLength",
-          "equals": 0,
-          "maxTicks": 600,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup"
     },
     {
       "command": "build living_quarters at:16,17 tier:3",
@@ -379,6 +252,11 @@
           "type": "clickIfPresent",
           "selector": "#bs-inspector [data-panel-close]",
           "timeoutMs": 0
+        },
+        {
+          "type": "set",
+          "selector": "#bs-build-panel [data-build-type=\"living_quarters\"] .bs-build-tier-sel",
+          "value": "3"
         },
         {
           "type": "clickSelector",
@@ -413,19 +291,19 @@
         ],
         "equals": {
           "orderedBuildingCount": 1,
-          "buildingCount": 3
+          "buildingCount": 2
         }
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:4 max_ticks:400",
+      "command": "wait_until field:buildingCount equals:3 max_ticks:400",
       "description": "Let the queued construction site(s) be walked to and built out (#556): ordering a building no longer places it, so everything below that needs a standing building waits here first.",
       "timeout": 130,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 4,
+          "equals": 3,
           "maxTicks": 400,
           "timeoutMs": 120000
         }
@@ -433,7 +311,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 4,
+          "buildingCount": 3,
           "orderedBuildingCount": 0
         }
       }
@@ -470,7 +348,7 @@
     },
     {
       "command": "tick 20",
-      "description": "#1384: fixed-duration actions (build, research) now scale by proficiency/fatigue/Living Quarters, so builds finish at different ticks and the fatigue trajectory shifted. At this step minFatigue starts at 23.9 (Stan, drained) and a rest/collapse-recovery in flight completes inside the 20-tick window, so minFatigue nets UPWARD (23.9 -> 74.5, re-derived live) rather than the earlier downward net. Direction is the claim: someone recovering in a living_quarters raises the minimum.",
+      "description": "#1384: fixed-duration actions (build) now scale by proficiency/fatigue/Living Quarters, so builds finish at different ticks and the fatigue trajectory shifted. At this step minFatigue starts at 23.9 (Stan, drained) and a rest/collapse-recovery in flight completes inside the 20-tick window, so minFatigue nets UPWARD (23.9 -> 74.5, re-derived live) rather than the earlier downward net. Direction is the claim: someone recovering in a living_quarters raises the minimum.",
       "interaction": [
         {
           "type": "command",

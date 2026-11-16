@@ -1,6 +1,6 @@
 {
   "name": "needs-shift-cycle-visual",
-  "description": "Visual check of shift cycle. Finding #27: this file's own next step (`build upgrade 1`) is genuinely rejected \u2014 Tier 2 living_quarters is not researched \u2014 so the living_quarters this scenario builds stays at Tier 1 for its whole run. processShiftCycle (GameLoop.ts) requires `living_quarters tier >= 2` and returns `{active: false}` otherwise, doing nothing at all: no employee ever accrues ticksWorked or enters a forced shift rest through this mechanism. Confirmed via a direct trace that ticksWorked stays 0 and restTicksRemaining stays null through the whole scenario. Assertions describe this real, verified behavior (ordinary idle/work need-drain, no shift cycle) rather than the originally-intended \"employees work 6 ticks then auto-enter 8-tick sleep rest\" claim.",
+  "description": "Visual check of shift cycle. Finding #27: this scenario never upgrades the living_quarters it builds, so it stays at Tier 1 for its whole run. processShiftCycle (GameLoop.ts) requires `living_quarters tier >= 2` and returns `{active: false}` otherwise, doing nothing at all: no employee ever accrues ticksWorked or enters a forced shift rest through this mechanism. Confirmed via a direct trace that ticksWorked stays 0 and restTicksRemaining stays null through the whole scenario. Assertions describe this real, verified behavior (ordinary idle/work need-drain, no shift cycle) rather than the originally-intended \"employees work 6 ticks then auto-enter 8-tick sleep rest\" claim.",
   "steps": [
     {
       "command": "new_game seed:42",
@@ -110,7 +110,7 @@
       }
     },
     {
-      "command": "build upgrade 1",
+      "command": "state",
       "interaction": [
         {
           "type": "clickSelector",
@@ -118,10 +118,10 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-inspector [data-action=\"research\"]"
+          "selector": "#bs-inspector [data-action=\"upgrade\"]"
         }
       ],
-      "description": "role: observe: open building #1's inspector from its Build panel row. Its next tier is not researched, so the action strip offers Research instead of Upgrade \u2014 the Upgrade action is absent, the same observable outcome (buildingCount/cash unchanged) as the console command's own rejection.",
+      "description": "role: observe: open building #1's inspector from its Build panel row. The Upgrade action is offered but this scenario deliberately does not use it, so the living_quarters stays at Tier 1 (buildingCount/cash unchanged).",
       "expect": {
         "changedBy": {
           "cash": 0
@@ -129,11 +129,9 @@
         "equals": {
           "buildingCount": 1
         },
-        "note": "rejected: Tier 2 living_quarters is not researched \u2014 this is Finding #27's root cause, confirmed here in state too",
-        "blocked": "#bs-inspector [data-action=\"research\"]"
+        "note": "the Upgrade action exists; nothing is bought, so the living_quarters stays Tier 1"
       },
-      "role": "observe",
-      "commandOutcome": "refused"
+      "role": "observe"
     },
     {
       "command": "set_policy mode:shift_8h",

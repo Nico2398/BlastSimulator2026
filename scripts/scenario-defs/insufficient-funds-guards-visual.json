@@ -339,7 +339,7 @@
     },
     {
       "command": "build upgrade 1",
-      "description": "$1,500 < upgradeCost $16,000 (constructionCost T2 $20,000 minus half of T1 $8,000) — refused, and, the next tier being research-locked, the inspector's Research action (the Upgrade slot, opened by clicking building #1's row) must be disabled.",
+      "description": "$1,500 < upgradeCost $16,000 (constructionCost T2 $20,000 minus half of T1 $8,000) — refused, and the inspector's Upgrade action (opened by clicking building #1's row) must be disabled with the cash reason.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -363,7 +363,7 @@
           "cash": 1500,
           "buildingCount": 1
         },
-        "blocked": "#bs-inspector [data-action=\"research\"]",
+        "blocked": "#bs-inspector [data-action=\"upgrade\"]",
         "note": "issue #511 — build upgrade funds guard"
       },
       "role": "guard",

@@ -1,6 +1,6 @@
 {
   "name": "building-tier-system-visual",
-  "description": "Visual check of building tier upgrade system from T1 to T3 and demolition, driven by clicking the real Build panel controls — placement, Queue Research, Upgrade, and Demolish — not console shortcuts. Upgrades are in-place construction needing no vehicle (#1875); only demolition needs a Building Destroyer (#1392).",
+  "description": "Visual check of building tier upgrade system from T1 to T3 and demolition, driven by clicking the real Build panel controls — placement, Upgrade, and Demolish — not console shortcuts. Upgrades are in-place construction needing no vehicle (#1875); only demolition needs a Building Destroyer (#1392).",
   "steps": [
     {
       "command": "new_game seed:42 cash:330000 staffed:true",
@@ -20,76 +20,8 @@
       }
     },
     {
-      "command": "build research_center at:26,14",
-      "description": "Placed first — a research_center is a hard prerequisite (#442) to queue any research task below.",
-      "interaction": [
-        {
-          "type": "clickIfPresent",
-          "selector": "#bs-inspector [data-panel-close]",
-          "timeoutMs": 0
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-toolbar [data-panel=\"build\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel [data-build-type=\"research_center\"] .bs-build-buy-btn"
-        },
-        {
-          "type": "waitForSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "pickTile",
-          "x": 26,
-          "z": 14
-        },
-        {
-          "type": "wait",
-          "durationMs": 200
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-tile-select-confirm"
-        },
-        {
-          "type": "wait",
-          "durationMs": 500
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -25000
-        },
-        "note": "Confirming placement only queues a construction site (#556) — the next step waits for both orders (this one and the living_quarters order below) to actually land before referring to their building ids."
-      }
-    },
-    {
-      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
-      "description": "Drive the research_center site to completion (#556) before the living_quarters order below is even placed. Building ids are assigned in construction-completion order, not order-placed order (#556-followup) — without this wait, closest-hire-wins dispatch can let living_quarters finish first and take id #1, which would make every hardcoded `data-building-id`/`build upgrade N` reference below (assuming living_quarters is #2) point at the wrong building. This synthetic wait forces research_center to land as #1 deterministically.",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "buildingCount",
-          "equals": 1,
-          "maxTicks": 300,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "buildingCount": 1,
-          "orderedBuildingCount": 0
-        }
-      }
-    },
-    {
       "command": "build living_quarters at:2,8 tier:1",
-      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. The Build panel is already open from the research_center step above — re-clicking the toolbar toggle here would close it (UIManager.togglePanel), so this step goes straight to the catalog row. #1008: relocated from (2,6) to (2,8) -- (2,6)'s tier 1 (3x3) footprint is flat, but the tier 2 (4x3) and tier 3 (5x4) footprints it grows into downstream are not, which fails the tier-3 upgrade step below with 'Uneven surface' (a grown-cells edge case, since a tier upgrade never moves the building). (2,8) is flat for the base footprint and every upgraded tier's larger footprint.",
+      "description": "Placed by clicking the Build panel's catalog row for living_quarters and picking the tile. #1008: relocated from (2,6) to (2,8) -- (2,6)'s tier 1 (3x3) footprint is flat, but the tier 2 (4x3) and tier 3 (5x4) footprints it grows into downstream are not, which fails the tier-3 upgrade step below with 'Uneven surface' (a grown-cells edge case, since a tier upgrade never moves the building). (2,8) is flat for the base footprint and every upgraded tier's larger footprint.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -131,12 +63,12 @@
         "changedBy": {
           "cash": -10000
         },
-        "note": "Confirming placement only queues a construction site (#556) — the next step waits for both orders above to actually land before referring to their building ids."
+        "note": "Confirming placement only queues a construction site (#556) — the next step waits for it to actually land before referring to its building id."
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
-      "description": "Drive both the research_center and living_quarters sites to completion (#556) before anything below depends on a real, numbered building. Speeds up via a real click on the HUD's 8x button (same real control the wait leans on, not a bare tick) before waiting.",
+      "command": "wait_until field:buildingCount equals:1 max_ticks:300",
+      "description": "Drive the living_quarters site to completion (#556) before anything below depends on a real, numbered building (it lands as #1). Speeds up via a real click on the HUD's 8x button before waiting.",
       "timeout": 95,
       "interaction": [
         {
@@ -150,7 +82,7 @@
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 2,
+          "equals": 1,
           "maxTicks": 300,
           "timeoutMs": 90000
         }
@@ -158,14 +90,14 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 2,
+          "buildingCount": 1,
           "orderedBuildingCount": 0
         }
       }
     },
     {
-      "command": "research queue type:living_quarters tier:2",
-      "description": "Queued by clicking the placed building's real 'Queue Research' button — the only in-game path to unlock tier 2, not a console shortcut. Building #2 (#556-followup: ids are assigned in construction-completion order, not order-placed order — but this test file's own `driveConstructionOrders` harness forces the research_center order above to finish and be waited on (a synthetic `wait_until buildingCount:1`) before the living_quarters order is even placed, so research_center always lands as #1 and living_quarters as #2, not the closest-hire-wins ordering a real, concurrently-staffed run would produce).",
+      "command": "build upgrade 1",
+      "description": "Upgraded by clicking the placed building's (living_quarters, #1) Upgrade button; plain sites have no quests, so every tier is purchasable at once. No Building Destroyer exists yet (#1875).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -173,59 +105,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-row-name"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-inspector [data-action=\"research\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"research\"]"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "changedBy": {
-          "cash": -5000
-        }
-      }
-    },
-    {
-      "command": "wait_until field:researchQueueLength equals:0 max_ticks:200",
-      "description": "Wait on the research queue draining instead of a hand-measured tick pad (#1392).",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "researchQueueLength",
-          "equals": 0,
-          "maxTicks": 200,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "researchQueueLength": 0
-        }
-      }
-    },
-    {
-      "command": "build upgrade 2",
-      "description": "Upgraded by clicking the placed building's (living_quarters, #2) Upgrade button, enabled because tier 2 finished researching. No Building Destroyer exists yet (#1875).",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-row-name"
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-row-name"
         },
         {
           "type": "awaitUsable",
@@ -246,14 +126,14 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 2
+          "buildingCount": 1
         },
-        "note": "An upgrade is in-place construction (#1875): charged now, no Building Destroyer, no demolition. The building keeps standing under the SAME id, so buildingCount stays 2."
+        "note": "An upgrade is in-place construction (#1875): charged now, no Building Destroyer, no demolition. The building keeps standing under the SAME id, so buildingCount stays 1."
       }
     },
     {
       "command": "wait_until field:maxBuildingTier equals:2 max_ticks:900",
-      "description": "Wait for the crew to upgrade living_quarters #2 in place to tier 2 under the same id (#1875).",
+      "description": "Wait for the crew to upgrade living_quarters #1 in place to tier 2 under the same id (#1875).",
       "timeout": 95,
       "interaction": [
         {
@@ -272,8 +152,8 @@
       }
     },
     {
-      "command": "research queue type:living_quarters tier:3",
-      "description": "Queued by clicking the upgraded building's (now #3) real 'Queue Research' button.",
+      "command": "build upgrade 1",
+      "description": "Upgraded by clicking the placed building's (living_quarters, #1) Upgrade button; plain sites have no quests, so every tier is purchasable at once. No Building Destroyer exists yet (#1875).",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -281,59 +161,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-row-name"
-        },
-        {
-          "type": "awaitUsable",
-          "selector": "#bs-inspector [data-action=\"research\"]"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-inspector [data-action=\"research\"]"
-        },
-        {
-          "type": "wait",
-          "durationMs": 300
-        }
-      ],
-      "role": "player",
-      "expect": {
-        "decreased": [
-          "cash"
-        ]
-      }
-    },
-    {
-      "command": "wait_until field:researchQueueLength equals:0 max_ticks:200",
-      "description": "Wait on the tier-3 research finishing instead of a hand-measured tick pad (#1392).",
-      "timeout": 95,
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "researchQueueLength",
-          "equals": 0,
-          "maxTicks": 200,
-          "timeoutMs": 90000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "researchQueueLength": 0
-        }
-      }
-    },
-    {
-      "command": "build upgrade 2",
-      "description": "Upgraded to tier 3 by clicking the Upgrade button on building #3, now enabled because tier 3 finished researching.",
-      "interaction": [
-        {
-          "type": "ensurePanel",
-          "panel": "build"
-        },
-        {
-          "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-row-name"
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(1) .bs-build-row-name"
         },
         {
           "type": "awaitUsable",
@@ -354,14 +182,14 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 2
+          "buildingCount": 1
         },
-        "note": "An upgrade is in-place construction (#1875): charged now, no Building Destroyer, no demolition. The building keeps standing under the SAME id, so buildingCount stays 2."
+        "note": "An upgrade is in-place construction (#1875): charged now, no Building Destroyer, no demolition. The building keeps standing under the SAME id, so buildingCount stays 1."
       }
     },
     {
       "command": "wait_until field:maxBuildingTier equals:3 max_ticks:1200",
-      "description": "Wait for the second in-place upgrade to land living_quarters #2 at tier 3 (#1875).",
+      "description": "Wait for the second in-place upgrade to land living_quarters #1 at tier 3 (#1875).",
       "timeout": 95,
       "interaction": [
         {
@@ -427,7 +255,7 @@
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:3 max_ticks:300",
+      "command": "wait_until field:buildingCount equals:2 max_ticks:300",
       "description": "Drive the management_office site to completion (#556) before demolishing it by id. Speeds up via a real click on the HUD's 8x button before waiting.",
       "timeout": 95,
       "interaction": [
@@ -442,7 +270,7 @@
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 3,
+          "equals": 2,
           "maxTicks": 300,
           "timeoutMs": 90000
         }
@@ -450,7 +278,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 3,
+          "buildingCount": 2,
           "orderedBuildingCount": 0
         }
       }
@@ -484,8 +312,8 @@
       }
     },
     {
-      "command": "build destroy 3",
-      "description": "Demolished by clicking building #3's (management_office) Demolish button; the Building Destroyer carries it out.",
+      "command": "build destroy 2",
+      "description": "Demolished by clicking building #2's (management_office) Demolish button; the Building Destroyer carries it out.",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -493,7 +321,7 @@
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(3) .bs-build-row-name"
+          "selector": "#bs-build-panel .bs-build-placed-row:nth-child(2) .bs-build-row-name"
         },
         {
           "type": "awaitUsable",
@@ -522,20 +350,20 @@
           "cash"
         ],
         "equals": {
-          "buildingCount": 3
+          "buildingCount": 2
         },
         "note": "demolishing has a $2,000 cost of its own, charged now; the building goes only when the Wrecking Rascal finishes"
       }
     },
     {
-      "command": "wait_until field:buildingCount equals:2 max_ticks:900",
-      "description": "Wait for the Wrecking Rascal to finish demolishing management_office #3.",
+      "command": "wait_until field:buildingCount equals:1 max_ticks:900",
+      "description": "Wait for the Wrecking Rascal to finish demolishing management_office #2.",
       "timeout": 95,
       "interaction": [
         {
           "type": "waitUntil",
           "field": "buildingCount",
-          "equals": 2,
+          "equals": 1,
           "maxTicks": 900,
           "timeoutMs": 90000
         }
@@ -543,7 +371,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "buildingCount": 2
+          "buildingCount": 1
         }
       }
     },

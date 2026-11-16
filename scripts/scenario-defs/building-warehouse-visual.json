@@ -1,20 +1,20 @@
 {
   "name": "building-warehouse-visual",
-  "description": "Visual check of warehouse buildings: a management office and a freight warehouse, with tier 2 locked",
+  "description": "Visual check of warehouse buildings: a management office and a freight warehouse, plus a tier 2 management office (tiers are unlocked on a plain site)",
   "steps": [
     {
-      "command": "new_game seed:42 staffed:true",
+      "command": "new_game seed:42 cash:100000 staffed:true",
       "timeout": 30,
       "interaction": [
         {
           "type": "command",
-          "command": "new_game seed:42 staffed:true"
+          "command": "new_game seed:42 cash:100000 staffed:true"
         }
       ],
       "role": "setup",
       "expect": {
         "equals": {
-          "cash": 50000,
+          "cash": 100000,
           "buildingCount": 0
         }
       }
@@ -124,49 +124,62 @@
     },
     {
       "command": "build management_office at:20,5 tier:2",
+      "description": "Tier 2 is unlocked on a plain new_game site (no quests): selecting it in the row's tier dropdown leaves the Place button usable, and the order goes through.",
       "interaction": [
         {
           "type": "set",
           "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-tier-sel",
           "value": "2"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "pickTile",
+          "x": 20,
+          "z": 5
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "role: guard (issue #515): selecting tier 2 in the catalog row's own tier dropdown is a real interaction; the Buy button is then genuinely disabled — `refreshCatalogButtons`'s `locked` check (BuildMenu.ts) is true since tier 2 is not researched.",
+      "role": "player",
       "expect": {
-        "changedBy": {
-          "cash": 0
-        },
+        "decreased": [
+          "cash"
+        ],
         "equals": {
-          "buildingCount": 2
+          "orderedBuildingCount": 1
         },
-        "blocked": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn",
-        "note": "rejected: tier 2 not researched"
-      },
-      "role": "guard",
-      "commandOutcome": "refused"
+        "usable": "#bs-build-panel [data-build-type=\"management_office\"] .bs-build-buy-btn"
+      }
     },
     {
-      "command": "build freight_warehouse at:25,5 tier:2",
+      "command": "wait_until field:buildingCount equals:3 max_ticks:600",
+      "description": "Let the tier-2 management office site be built out.",
+      "timeout": 130,
       "interaction": [
         {
-          "type": "set",
-          "selector": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-tier-sel",
-          "value": "2"
+          "type": "waitUntil",
+          "field": "buildingCount",
+          "equals": 3,
+          "maxTicks": 600,
+          "timeoutMs": 120000
         }
       ],
-      "description": "role: guard (issue #515) — same reasoning as the management_office tier:2 attempt above.",
+      "role": "setup",
       "expect": {
-        "changedBy": {
-          "cash": 0
-        },
         "equals": {
-          "buildingCount": 2
-        },
-        "blocked": "#bs-build-panel [data-build-type=\"freight_warehouse\"] .bs-build-buy-btn",
-        "note": "rejected: tier 2 not researched"
-      },
-      "role": "guard",
-      "commandOutcome": "refused"
+          "buildingCount": 3,
+          "orderedBuildingCount": 0
+        }
+      }
     },
     {
       "command": "build list",
