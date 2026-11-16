@@ -5710,6 +5710,233 @@
         }
       }
     },
+    "vehicle_travel_vehicle_t1": {
+      "builder": "vehicles_t1.py",
+      "triangles": 11428,
+      "glbKb": 292,
+      "size": [
+        2.54,
+        1.96,
+        1.29
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Lamp"
+      ],
+      "materials": [
+        "Chrome",
+        "Cream",
+        "Dark",
+        "DuctTape",
+        "Lamp",
+        "Plastic",
+        "Red",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Rust",
+        "RustDark",
+        "TintBody",
+        "White",
+        "Wood",
+        "WoodDark"
+      ],
+      "nodes": {
+        "Body": {
+          "triangles": 3624,
+          "parts": [
+            "BarsBar",
+            "BarsBell",
+            "BarsGrip",
+            "BarsStem",
+            "ChairLeg",
+            "ChairPost",
+            "ChairSeat",
+            "ChairSlat",
+            "EngineBlock",
+            "EngineElbow",
+            "EngineFin",
+            "EnginePipe",
+            "EnginePullHandle",
+            "EngineReel",
+            "EngineTank",
+            "EngineTankCap",
+            "EngineTip",
+            "FrameAxle",
+            "FrameCross",
+            "FrameDrop",
+            "FrameFloor",
+            "FrameNose",
+            "FrameRail",
+            "FrameShelf",
+            "TorchBody",
+            "TorchBracket",
+            "TorchHead",
+            "TorchLens",
+            "TorchTape"
+          ]
+        },
+        "Bed": {
+          "triangles": 4820,
+          "parts": [
+            "SkipDent",
+            "SkipForkPocket",
+            "SkipHinge",
+            "SkipLid",
+            "SkipLidGrip",
+            "SkipLidRib",
+            "SkipLip",
+            "SkipLoadRock",
+            "SkipPlate",
+            "SkipProp",
+            "SkipPropTape",
+            "SkipRail",
+            "SkipRib",
+            "SkipRust",
+            "SkipSpill",
+            "SkipTub"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 704,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 924,
+          "parts": [
+            "WheelFRHub",
+            "WheelFRRim",
+            "WheelFRSpoke",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 652,
+          "parts": [
+            "WheelRLCap",
+            "WheelRLDish",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 704,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        }
+      }
+    },
+    "vehicle_travel_vehicle_t2": {
+      "builder": "vehicles.py",
+      "triangles": 10288,
+      "glbKb": 231,
+      "size": [
+        3.05,
+        2.4,
+        1.9
+      ],
+      "groundY": 0,
+      "tints": [
+        "TintBody"
+      ],
+      "emissive": [
+        "Beacon",
+        "Lamp"
+      ],
+      "materials": [
+        "Beacon",
+        "Chrome",
+        "Dark",
+        "Glass",
+        "Hub",
+        "Lamp",
+        "Rock",
+        "RockDark",
+        "Rubber",
+        "Steel",
+        "TintBody"
+      ],
+      "nodes": {
+        "Bed": {
+          "triangles": 2992,
+          "parts": [
+            "BedCanopy",
+            "BedFloor",
+            "BedHeadboard",
+            "BedLoadRock",
+            "BedRib",
+            "BedSide",
+            "BedTailgate"
+          ]
+        },
+        "WheelFL": {
+          "triangles": 1148,
+          "parts": [
+            "WheelFLBolt",
+            "WheelFLCap",
+            "WheelFLHub",
+            "WheelFLTyre"
+          ]
+        },
+        "WheelFR": {
+          "triangles": 1148,
+          "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
+            "WheelFRHub",
+            "WheelFRTyre"
+          ]
+        },
+        "WheelRL": {
+          "triangles": 1148,
+          "parts": [
+            "WheelRLBolt",
+            "WheelRLCap",
+            "WheelRLHub",
+            "WheelRLTyre"
+          ]
+        },
+        "WheelRR": {
+          "triangles": 1148,
+          "parts": [
+            "WheelRRBolt",
+            "WheelRRCap",
+            "WheelRRHub",
+            "WheelRRTyre"
+          ]
+        },
+        "Body": {
+          "triangles": 2704,
+          "parts": [
+            "Bumper",
+            "CabBeacon",
+            "CabRoof",
+            "CabShell",
+            "CabSideWindow",
+            "CabWindshield",
+            "Chassis",
+            "ExhaustPipe",
+            "ExhaustTip",
+            "Fender",
+            "Grille",
+            "HeadLamp",
+            "HeadRim",
+            "Hood"
+          ]
+        }
+      }
+    },
     "worker_blaster": {
       "builder": "workers.py",
       "triangles": 14692,

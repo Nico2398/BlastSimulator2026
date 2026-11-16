@@ -516,7 +516,7 @@ describe('Vehicle fleet', () => {
 
   // ── getAllVehicleRoles ──
 
-  it('getAllVehicleRoles returns all six roles', () => {
+  it('getAllVehicleRoles returns all seven roles', () => {
     const roles = getAllVehicleRoles();
 
     expect(roles).toContain('debris_hauler');
@@ -525,7 +525,7 @@ describe('Vehicle fleet', () => {
     expect(roles).toContain('building_destroyer');
     expect(roles).toContain('rock_fragmenter');
     expect(roles).toContain('charging_truck');
-    expect(roles).toHaveLength(6);
+    expect(roles).toHaveLength(7);
   });
 
   it('buy charging_truck succeeds and lists it (#1645)', () => {
