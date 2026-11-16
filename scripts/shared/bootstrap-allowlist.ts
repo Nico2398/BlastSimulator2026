@@ -64,6 +64,8 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'board start',
   // #2280: a scenario about something else takes the tier 3 quest as done (earning it is quest-explosive-tier's own job; debug only, no UI).
   'quest complete quest_explosive_t3',
+  // #2282: the dealer-tier-gate scenario takes the tier 2 vehicle quest as done to test the purchase it opens (debug only, no UI).
+  'quest complete quest_vehicle_t2',
   'weather set',
   'weather',
   'event fire',

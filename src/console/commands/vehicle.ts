@@ -82,8 +82,8 @@ export function vehicleCommand(
       if (tier === null) {
         return { success: false, output: t('vehicle.buy_usage_tier') };
       }
-      // Dealer grade gate (progression sites only), before cash and before the mutation.
-      const refusal = vehicleTierRefusal(state.grade?.grade, tier);
+      // Dealer quest gate (quest sites only), before cash and before the mutation.
+      const refusal = vehicleTierRefusal(state, tier);
       if (refusal) return { success: false, output: refusal };
       // Checked before purchaseVehicle, which *mutates* — it pushes the
       // vehicle and bumps nextId before it can report a cost. Same predicate
@@ -185,7 +185,7 @@ export function vehicleCommand(
       const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
       const nextTier = nextVehicleTier(vehicle.tier);
       if (cost === null || nextTier === null) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
-      const refusal = vehicleTierRefusal(state.grade?.grade, nextTier);
+      const refusal = vehicleTierRefusal(state, nextTier);
       if (refusal) return { success: false, output: refusal };
       // Cash is checked before upgradeVehicle, which mutates tier and hp.
       if (!canAffordVehicleUpgrade(vehicle, state.cash)) {

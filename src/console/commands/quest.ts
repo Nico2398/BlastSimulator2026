@@ -8,9 +8,9 @@ import { getAllQuests, getQuest } from '../../core/economy/QuestCatalog.js';
 import {
   completeQuest, isQuestCompleted, unlockedExplosiveTier, questObjectiveStatuses, questPrerequisitesMet,
   type QuestDef, type QuestObjectiveStatus,
+  questRewardLine,
 } from '../../core/economy/Quests.js';
 import { formatGradeAmount } from '../../core/economy/MineGrade.js';
-import { explosivesOfTier } from '../../core/world/ExplosiveCatalog.js';
 import type { GameState } from '../../core/state/GameState.js';
 
 function objectiveLine(o: QuestObjectiveStatus): string {
@@ -23,8 +23,7 @@ function statusOf(state: GameState, def: QuestDef): string {
 }
 
 function rewardLine(def: QuestDef): string {
-  const names = explosivesOfTier(def.reward.tier).map(e => t(e.nameKey)).join(', ');
-  return t('quest.reward', { tier: def.reward.tier, explosives: names });
+  return questRewardLine(def);
 }
 
 function questList(state: GameState): CommandResult {

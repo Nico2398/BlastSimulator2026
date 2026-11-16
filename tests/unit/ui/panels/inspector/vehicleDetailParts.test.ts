@@ -70,6 +70,9 @@ import { computeScrapResidualValue } from '../../../../../src/core/entities/Vehi
 import type { PendingAction } from '../../../../../src/core/state/GameState.js';
 import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
 import { t } from '../../../../../src/core/i18n/I18n.js';
+import { createQuestState } from '../../../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../../../src/core/economy/QuestCatalog.js';
+import { vehicleTierRefusal } from '../../../../../src/core/economy/VehicleTierGate.js';
 
 function licensed(overrides: Partial<Employee> = {}, level: 1 | 2 | 3 = 1): Employee {
   return makeEmployee({ qualifications: [{ category: 'driving.truck', proficiencyLevel: 1, xp: 0, licenceLevel: level }], ...overrides });
@@ -78,28 +81,45 @@ function licensed(overrides: Partial<Employee> = {}, level: 1 | 2 | 3 = 1): Empl
 describe('vehicleDetailParts — upgradeState', () => {
   it('is available and affordable with enough cash, carrying the price difference', () => {
     const cost = computeVehicleUpgradeCost('debris_hauler', 1)!;
-    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, cost)).toEqual({ available: true, affordable: true, cost });
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, cost, {})).toEqual({ available: true, affordable: true, cost });
   });
 
   it('is available but unaffordable one dollar short', () => {
     const cost = computeVehicleUpgradeCost('debris_hauler', 1)!;
-    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, cost - 1)).toEqual({ available: true, affordable: false, cost });
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, cost - 1, {})).toEqual({ available: true, affordable: false, cost });
   });
 
   it('is unavailable at the maximum tier, with no cost', () => {
-    expect(upgradeState({ type: 'debris_hauler', tier: 3 }, 9_999_999)).toEqual({ available: false, affordable: false, cost: null });
+    expect(upgradeState({ type: 'debris_hauler', tier: 3 }, 9_999_999, {})).toEqual({ available: false, affordable: false, cost: null });
   });
 
-  it('is locked by the mine grade even when cash is ample (grade checked before affordability)', () => {
-    const s = upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, 0);
+  it('is locked by the tier-2 quest even when cash is ample (gate checked before affordability)', () => {
+    const site = { quests: createQuestState() };
+    const s = upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, site);
     expect(s.affordable).toBe(true);
-    expect(s.locked).toContain('dealer');
+    expect(s.locked).toBe(vehicleTierRefusal(site, 2));
+    expect(s.locked).toContain(t(getQuest('quest_vehicle_t2')!.titleKey));
     expect(upgradeDisabledReason(s)).toBe(s.locked);
   });
 
-  it('is not locked once the mine grade reaches the next tier, or on a non-progression site', () => {
-    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, 9).locked).toBeUndefined();
-    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, undefined).locked).toBeUndefined();
+  it('a tier-2 to tier-3 upgrade names the tier-3 quest', () => {
+    const site = { quests: { ...createQuestState(), completed: ['quest_vehicle_t2'] } };
+    expect(upgradeState({ type: 'debris_hauler', tier: 2 }, 9_999_999, site).locked)
+      .toContain(t(getQuest('quest_vehicle_t3')!.titleKey));
+  });
+
+  it('is not locked once the next tier quest is completed', () => {
+    const site = { quests: { ...createQuestState(), completed: ['quest_vehicle_t2'] } };
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, site).locked).toBeUndefined();
+  });
+
+  it('is never locked on a site without quests', () => {
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, {}).locked).toBeUndefined();
+  });
+
+  it('the permit grade does not lift the lock', () => {
+    const site = { quests: createQuestState(), grade: { grade: 9 } };
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, site).locked).toBeDefined();
   });
 });
 

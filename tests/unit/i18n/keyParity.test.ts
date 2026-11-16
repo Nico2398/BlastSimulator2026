@@ -545,7 +545,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #2287: +2 keys (meteoritic rock name, description).
     // #2286: +4 keys (long-range prospection card, note, island row, empty list): 5057.
     // #2280: +28 keys (quests, explosive tier locks, progression panel, notification): 5085.
-    expect(Object.keys(en).length).toBe(5085);
+    // #2282: +8 keys (dealer quests, fleet objective, vehicle reward and notification), -2 (vehicle tier unlock lines): 5091.
+    expect(Object.keys(en).length).toBe(5091);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {

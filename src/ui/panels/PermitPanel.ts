@@ -13,8 +13,7 @@ import { windowRoot, windowBody } from '../windowKit.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
 import { getAllQuests } from '../../core/economy/QuestCatalog.js';
-import { isQuestCompleted, questObjectiveStatuses, questPrerequisitesMet, type QuestDef } from '../../core/economy/Quests.js';
-import { explosivesOfTier } from '../../core/world/ExplosiveCatalog.js';
+import { isQuestCompleted, questObjectiveStatuses, questPrerequisitesMet, questRewardLine, type QuestDef } from '../../core/economy/Quests.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import {
   gradeDef, gradeRung, nextGradeTargets, permitApplyBlocker, formatGradeAmount, tierDef, tierTargetStatuses,
@@ -202,7 +201,6 @@ export class PermitPanel extends PanelBase {
     const block = el('div', { attrs: { 'data-role': 'quest', style: 'display:flex;flex-direction:column;gap:4px;padding:4px 0 4px 6px;border-left:2px solid var(--bsx-amber)' } });
     block.dataset['questId'] = quest.id;
     block.dataset['state'] = isQuestCompleted(state, quest.id) ? 'completed' : 'available';
-    const explosives = explosivesOfTier(quest.reward.tier).map(e => t(e.nameKey)).join(', ');
     block.append(
       el('span', { text: t(quest.titleKey), attrs: { style: 'font:700 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }),
       el('span', { text: t('quest.detail.giver', { giver: t(quest.giverKey) }), attrs: { 'data-role': 'quest-giver', style: MICRO_STYLE } }),
@@ -215,7 +213,7 @@ export class PermitPanel extends PanelBase {
       row.querySelector('.bsx-progress-fill')!.setAttribute('data-role', 'quest-bar');
       block.append(row);
     }
-    block.append(el('span', { text: t('quest.reward', { tier: quest.reward.tier, explosives }), attrs: { 'data-role': 'quest-reward', style: 'font:600 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' } }));
+    block.append(el('span', { text: questRewardLine(quest), attrs: { 'data-role': 'quest-reward', style: 'font:600 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' } }));
     const open = (quest.requires ?? []).filter(id => !isQuestCompleted(state, id));
     if (!questPrerequisitesMet(state, quest)) {
       const names = open.map(id => t(getAllQuests().find(q => q.id === id)?.titleKey ?? id)).join(', ');

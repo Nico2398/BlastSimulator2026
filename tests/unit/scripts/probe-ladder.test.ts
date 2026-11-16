@@ -17,8 +17,10 @@ import type { BuyRule, LadderShot } from '../../../scripts/shared/probe-ladder.j
 import {
   DRILL_HOLE_DIAMETER_OPTIONS_M,
   LEGACY_PERMIT_LIMITS,
-  VEHICLE_TIER_UNLOCK_GRADE,
 } from '../../../src/core/config/balance.js';
+import { createQuestState } from '../../../src/core/economy/Quests.js';
+import { vehicleTierGate } from '../../../src/core/economy/VehicleTierGate.js';
+import type { GameState } from '../../../src/core/state/GameState.js';
 import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
 import { patternAreaM2 } from '../../../src/core/mining/ChargePlan.js';
 
@@ -154,20 +156,34 @@ describe('pickDiameter', () => {
   });
 });
 
-describe('mayBuyVehicleTier (#2045: one slope limit, no ramp argument)', () => {
-  it('allows tier 1 at grade 0', () => {
-    expect(mayBuyVehicleTier(1, 0)).toBe(true);
+describe('mayBuyVehicleTier (#2282: the quest gate, never the grade)', () => {
+  const site = (completed: string[] = []): Pick<GameState, 'quests'> => ({ quests: { ...createQuestState(), completed } });
+
+  it('allows tier 1 on a fresh quest site', () => {
+    expect(mayBuyVehicleTier(1, site())).toBe(true);
   });
 
-  it('refuses a tier below its unlock grade', () => {
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2] - 1)).toBe(false);
-    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3] - 1)).toBe(false);
+  it('refuses a tier whose quest is open', () => {
+    expect(mayBuyVehicleTier(2, site())).toBe(false);
+    expect(mayBuyVehicleTier(3, site())).toBe(false);
   });
 
-  it('allows an unlocked tier whatever ramp exists: upgrading never makes a vehicle worse', () => {
-    expect(mayBuyVehicleTier(2, VEHICLE_TIER_UNLOCK_GRADE[2])).toBe(true);
-    expect(mayBuyVehicleTier(3, VEHICLE_TIER_UNLOCK_GRADE[3])).toBe(true);
-    expect(mayBuyVehicleTier(3, 5)).toBe(true);
+  it('allows a tier once its quest is completed, and only that tier', () => {
+    expect(mayBuyVehicleTier(2, site(['quest_vehicle_t2']))).toBe(true);
+    expect(mayBuyVehicleTier(3, site(['quest_vehicle_t2']))).toBe(false);
+    expect(mayBuyVehicleTier(3, site(['quest_vehicle_t2', 'quest_vehicle_t3']))).toBe(true);
+  });
+
+  it('allows every tier on a site without quests', () => {
+    for (const tier of [1, 2, 3] as const) expect(mayBuyVehicleTier(tier, {})).toBe(true);
+  });
+
+  it('agrees with the dealer gate for every tier', () => {
+    for (const state of [site(), site(['quest_vehicle_t2']), {}]) {
+      for (const tier of [1, 2, 3] as const) {
+        expect(mayBuyVehicleTier(tier, state)).toBe(vehicleTierGate(state, tier) === null);
+      }
+    }
   });
 
   it('takes exactly two parameters', () => {
