@@ -4,10 +4,15 @@
 // Real-world references: ANFO ~3.4 MJ/kg, dynamite ~7.5 MJ/kg,
 // emulsion ~3.8 MJ/kg, C4 ~5.9 MJ/kg, black powder ~0.3 MJ/kg.
 
+/** Explosive tier by energy (#2280): T1 200-400, T2 550-850, T3 1000-1300 per kg. T1 is available from the start; T2 and T3 open by quest. */
+export type ExplosiveTier = 1 | 2 | 3;
+
 export interface ExplosiveType {
   readonly id: string;
   readonly nameKey: string;
   readonly descKey: string;
+  /** Quest tier that gates purchase on progression sites. */
+  readonly tier: ExplosiveTier;
   /** Energy per kg in game units. Higher = more fracturing power. */
   readonly energyPerKg: number;
   /** Cost per kg in game dollars. */
@@ -29,6 +34,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'pop_rock',
     nameKey: 'explosive.pop_rock.name',
     descKey: 'explosive.pop_rock.desc',
+    tier: 1,
     energyPerKg: 200,        // Black powder basis: ~0.3 MJ/kg × 100, boosted for playability
     costPerKg: 5,
     waterSensitive: true,
@@ -39,6 +45,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'boomite',
     nameKey: 'explosive.boomite.name',
     descKey: 'explosive.boomite.desc',
+    tier: 1,
     energyPerKg: 340,        // ANFO basis: ~3.4 MJ/kg × 100
     costPerKg: 12,
     waterSensitive: true,
@@ -49,6 +56,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'krackle',
     nameKey: 'explosive.krackle.name',
     descKey: 'explosive.krackle.desc',
+    tier: 1,
     energyPerKg: 400,        // Emulsion basis: ~3.8 MJ/kg × 100, rounded
     costPerKg: 20,
     waterSensitive: false,    // Water-resistant emulsion
@@ -59,6 +67,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'big_bada_boom',
     nameKey: 'explosive.big_bada_boom.name',
     descKey: 'explosive.big_bada_boom.desc',
+    tier: 2,
     energyPerKg: 550,        // Dynamite basis: ~7.5 MJ/kg × 70 (game-scaled)
     costPerKg: 35,
     waterSensitive: true,
@@ -69,6 +78,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'shatternite',
     nameKey: 'explosive.shatternite.name',
     descKey: 'explosive.shatternite.desc',
+    tier: 2,
     energyPerKg: 700,        // C4-ish: ~5.9 MJ/kg × 120 (game-scaled)
     costPerKg: 55,
     waterSensitive: false,
@@ -79,6 +89,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'rumblox',
     nameKey: 'explosive.rumblox.name',
     descKey: 'explosive.rumblox.desc',
+    tier: 2,
     energyPerKg: 850,        // Heavy ANFO boosted: ~4.5 MJ/kg × 190
     costPerKg: 80,
     waterSensitive: false,
@@ -89,6 +100,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'obliviax',
     nameKey: 'explosive.obliviax.name',
     descKey: 'explosive.obliviax.desc',
+    tier: 3,
     energyPerKg: 1000,       // Military-grade shaped charge territory
     costPerKg: 120,
     waterSensitive: true,
@@ -99,6 +111,7 @@ const EXPLOSIVES: readonly ExplosiveType[] = [
     id: 'dynatomics',
     nameKey: 'explosive.dynatomics.name',
     descKey: 'explosive.dynatomics.desc',
+    tier: 3,
     energyPerKg: 1300,       // Fantasy endgame. Nuclear-adjacent.
     costPerKg: 200,
     waterSensitive: false,
@@ -119,4 +132,9 @@ export function getExplosive(id: string): ExplosiveType | undefined {
 /** Get all explosive types. */
 export function getAllExplosives(): readonly ExplosiveType[] {
   return EXPLOSIVES;
+}
+
+/** Every explosive of one tier. */
+export function explosivesOfTier(tier: ExplosiveTier): readonly ExplosiveType[] {
+  return EXPLOSIVES.filter(e => e.tier === tier);
 }

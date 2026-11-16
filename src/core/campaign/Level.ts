@@ -383,6 +383,19 @@ export function resolveAvailableExplosives(activeLevelId: string | null): readon
   return level.availableExplosives.filter(id => all.includes(id));
 }
 
+/**
+ * Explosive ids the site may buy. A progression site (quests, #2280) offers tier 1 plus the tiers its completed
+ * quests opened; any other site keeps its level's `availableExplosives`.
+ */
+export function resolveExplosivesFor(_state: GameState): readonly string[] {
+  throw new Error('not implemented');
+}
+
+/** True when the site may use `explosiveId` (`resolveExplosivesFor`). */
+export function isExplosiveAvailableFor(_state: GameState, _explosiveId: string): boolean {
+  throw new Error('not implemented');
+}
+
 /** True when `explosiveId` may be used at the given level. */
 export function isExplosiveAvailable(activeLevelId: string | null, explosiveId: string): boolean {
   return resolveAvailableExplosives(activeLevelId).includes(explosiveId);

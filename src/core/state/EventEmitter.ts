@@ -28,6 +28,9 @@ export interface GameEventMap {
   'progression:grade_applied': { toGrade: number; fee: number };
   'progression:blast_inspected': { overshoot: number; caught: boolean; fine: number; strikes: number; suspended: boolean };
 
+  /** A quest's objectives were met and its reward became purchasable (#2280). */
+  'quest:completed': { questId: string };
+
   // Phase 7 — Campaign events
   'level:complete': { levelId: string; totalProfit: number; blastsPerformed: number; casualties: number; finalWellBeing: number; finalEcology: number; finalSafety: number; stars: number };
   'bankruptcy:warning': { cash: number; ticksRemaining: number };

@@ -10,6 +10,7 @@ import {
 import type { RampFootprint } from '../mining/RampPath.js';
 import type { TutorialProgress } from './TutorialProgress.js';
 import type { GradeState } from '../economy/MineGrade.js';
+import type { QuestState } from '../economy/Quests.js';
 import type { BoardState } from '../economy/Board.js';
 import type { OreSaturationState } from '../economy/OreSaturation.js';
 import type { PendingDetonation } from '../engine/DetonationSequence.js';
@@ -403,6 +404,8 @@ export interface GameState {
   tutorialProgress?: TutorialProgress;
   /** Mine-grade permit state; present only on progression sites (#1921). */
   grade?: GradeState;
+  /** Quest progress; present only on progression sites (#2280). */
+  quests?: QuestState;
   /** Board of directors; present only when the level opts in (#1946). */
   board?: BoardState;
   /** Per-ore market saturation from the player's sales; absent until the first sale (#1930). */

@@ -53,6 +53,7 @@ import {
 import { researchCommand } from './commands/research.js';
 import { setPolicyCommand } from './commands/policy.js';
 import { permitCommand } from './commands/permit.js';
+import { questCommand } from './commands/quest.js';
 import { boardCommand } from './commands/board.js';
 import { vehicleCommand } from './commands/vehicle.js';
 import {
@@ -276,6 +277,9 @@ export function createRunner(): RunnerWithContext {
   );
   runner.register('board', 'Board of directors (status|start)', (args, named) =>
     boardCommand(ctx, args, named),
+  );
+  runner.register('quest', 'Quests (list|detail <id>|complete <id>, scenario-only)', (args, named) =>
+    questCommand(ctx, args, named),
   );
   runner.register('permit', 'Mine permit ladder (status|apply)', (args, named) =>
     permitCommand(ctx, args, named),
