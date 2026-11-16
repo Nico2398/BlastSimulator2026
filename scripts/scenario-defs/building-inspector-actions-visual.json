@@ -195,7 +195,11 @@
         }
       ],
       "expect": {
-        "note": "Demolish was usable with a wait note before the inspector closed."
+        "equals": {
+          "buildingCount": 1,
+          "orderedBuildingCount": 0
+        },
+        "note": "Demolish was usable with a wait note before the inspector closed (awaitUsable); viewing the inspector orders nothing."
       }
     },
     {
