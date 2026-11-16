@@ -2,7 +2,8 @@
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
 import type { GameState } from '../state/GameState.js';
 import { t } from '../i18n/I18n.js';
-import { isQuestCompleted, questForVehicleTier, type QuestDef } from './Quests.js';
+import { MINE_GRADES, TRAVEL_VEHICLE_UNLOCK_GRADE } from '../config/balance.js';
+import { isQuestCompleted, questForTravelTier, questForVehicleTier, type QuestDef } from './Quests.js';
 
 /** Null when allowed (or the site has no quests); else the quest to complete. */
 export function vehicleTierGate(state: Pick<GameState, 'quests'>, tier: VehicleTier): QuestDef | null {
@@ -11,25 +12,43 @@ export function vehicleTierGate(state: Pick<GameState, 'quests'>, tier: VehicleT
   return quest && !isQuestCompleted(state, quest.id) ? quest : null;
 }
 
+/** The slice of a site the dealer locks read: its quests and (progression sites) its current grade. */
+export interface TierGateSite extends Pick<GameState, 'quests'> {
+  grade?: { grade: number };
+}
+
 /** What keeps a vehicle tier from being bought: a dealer quest, or (the shuttle) the mine grade. */
 export type VehicleLock = { kind: 'quest'; quest: QuestDef } | { kind: 'grade'; grade: number };
 
 /** The lock on `tier` of `role` (#2285): work roles by quest tier; the travel role by grade (T1) or its quest (T2). Null when allowed. */
-export function vehicleLock(state: Pick<GameState, 'quests' | 'grade'>, role: VehicleRole, tier: VehicleTier): VehicleLock | null {
-  void state; void role; void tier;
-  throw new Error('not implemented');
+export function vehicleLock(state: TierGateSite, role: VehicleRole, tier: VehicleTier): VehicleLock | null {
+  if (role !== 'travel_vehicle') {
+    const quest = vehicleTierGate(state, tier);
+    return quest ? { kind: 'quest', quest } : null;
+  }
+  if (tier === 1) {
+    return state.grade !== undefined && state.grade.grade < TRAVEL_VEHICLE_UNLOCK_GRADE
+      ? { kind: 'grade', grade: TRAVEL_VEHICLE_UNLOCK_GRADE }
+      : null;
+  }
+  if (!state.quests) return null;
+  const quest = questForTravelTier(2);
+  return quest && !isQuestCompleted(state, quest.id) ? { kind: 'quest', quest } : null;
 }
 
 /** Dealer refusal text for a gated purchase or upgrade; null when allowed. `role` defaults to a work role. */
-export function vehicleTierRefusal(state: Pick<GameState, 'quests' | 'grade'>, tier: VehicleTier, role?: VehicleRole): string | null {
-  void state; void tier; void role;
-  throw new Error('not implemented');
+export function vehicleTierRefusal(state: TierGateSite, tier: VehicleTier, role: VehicleRole = 'debris_hauler'): string | null {
+  const lock = vehicleLock(state, role, tier);
+  if (lock === null) return null;
+  if (lock.kind === 'grade') return t('vehicle.travel_grade_locked', { grade: lock.grade, name: t(MINE_GRADES[lock.grade]!.nameKey) });
+  return t('vehicle.tier_locked', { quest: t(lock.quest.titleKey) });
 }
 
-/** Short lock label for any lock kind (grade lock names G2; quest lock is `vehicleTierLockLabel`). */
+/** Short lock label for any lock kind: the grade lock names the permit grade, the quest lock the quest. */
 export function vehicleLockLabel(lock: VehicleLock): string {
-  void lock;
-  throw new Error('not implemented');
+  return lock.kind === 'grade'
+    ? t('ui.fleet.grade_locked', { grade: lock.grade, name: t(MINE_GRADES[lock.grade]!.nameKey) })
+    : vehicleTierLockLabel(lock.quest);
 }
 
 /** Short lock label shown on gated UI controls. */

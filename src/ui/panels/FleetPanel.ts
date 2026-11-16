@@ -23,8 +23,8 @@ import { LocaleTextRegistry } from '../localeText.js';
 import type { GameState } from '../../core/state/GameState.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import type { Employee } from '../../core/entities/Employee.js';
-import { vehicleTierGate, vehicleTierRefusal, vehicleTierLockLabel } from '../../core/economy/VehicleTierGate.js';
-import { getAllVehicleRoles, getVehicleDefByTier, vehicleDriverId, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
+import { vehicleLock, vehicleTierRefusal, vehicleLockLabel } from '../../core/economy/VehicleTierGate.js';
+import { getAllVehicleRoles, getVehicleDefByTier, vehicleRoleMaxTier, vehicleDriverId, ROLE_LICENCE_REQUIRED } from '../../core/entities/Vehicle.js';
 import { countLicenceHolders } from '../../core/entities/VehicleDriverAssignment.js';
 import { formatDollars, formatMoney } from '../../core/economy/formatMoney.js';
 import { vehicleCardLine, vehicleCardTooltip } from '../catalogCardText.js';
@@ -55,10 +55,16 @@ type RowParts = Record<Exclude<keyof typeof ROW_PART_CLASS, 'load'>, HTMLElement
 /** Dealer quest lock on a tier button: tooltip refusal plus the short badge label. */
 interface TierLock { refusal: string; label: string }
 
-function tierLock(state: GameState, tier: VehicleTier): TierLock | null {
-  const quest = vehicleTierGate(state, tier);
-  const refusal = vehicleTierRefusal(state, tier);
-  return quest && refusal ? { refusal, label: vehicleTierLockLabel(quest) } : null;
+function tierLock(state: GameState, role: VehicleRole, tier: VehicleTier): TierLock | null {
+  const lock = vehicleLock(state, role, tier);
+  const refusal = vehicleTierRefusal(state, tier, role);
+  return lock && refusal ? { refusal, label: vehicleLockLabel(lock) } : null;
+}
+
+/** Licence name of a role for the dealership lines; null for a role anyone may drive. */
+function licenceNameOf(role: VehicleRole): string | null {
+  const skill = ROLE_LICENCE_REQUIRED[role];
+  return skill === null ? null : t(`skill.${skill}`);
 }
 
 const TIER_BTN_BASE_STYLE = 'display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px;border:1px solid var(--bsx-hairline);border-radius:9px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left;width:100%;min-width:0;font:inherit'
@@ -303,9 +309,9 @@ export class FleetPanel extends PanelBase {
     return getAllVehicleRoles().map(role => {
       const head = el('div', { className: 'bs-dealer-head', children: [
         el('span', { className: 'bs-dealer-role', text: t(`vehicle_type.${role}`) }),
-        el('span', { className: 'bs-dealer-licence', text: t('ui.fleet.dealer_licence', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[role]}`) }) }),
+        el('span', { className: 'bs-dealer-licence', text: this.dealerLicenceText(role) }),
       ] });
-      const tiers: VehicleTier[] = [1, 2, 3];
+      const tiers = ([1, 2, 3] as const).filter(n => n <= vehicleRoleMaxTier(role));
       const grid = el('div', { className: 'bs-dealer-tiers', children: tiers.map(tier => this.makeTierButton(role, tier, state)) });
       return el('div', { className: 'bs-dealer-group', attrs: { 'data-dealer-role': role }, children: [head, grid] });
     });
@@ -340,7 +346,7 @@ export class FleetPanel extends PanelBase {
     btn.append(top, el('div', { attrs: { style: 'display:flex;align-items:center;justify-content:space-between;gap:8px' }, children: [
       el('span', { className: 'bs-fleet-tier-buy', text: t('ui.fleet.buy') }), cost,
     ] }));
-    this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state, tier));
+    this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state, role, tier));
     btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
     return btn;
   }
@@ -371,7 +377,14 @@ export class FleetPanel extends PanelBase {
 
   /** "Licence <name> level N — M hold it" for a dealership tier row. */
   private licenceLineText(role: VehicleRole, tier: VehicleTier, holders: number): string {
-    return t('ui.fleet.licence_line', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[role]}`), level: tier, count: holders });
+    const licence = licenceNameOf(role);
+    return licence === null ? t('ui.fleet.licence_line_none') : t('ui.fleet.licence_line', { licence, level: tier, count: holders });
+  }
+
+  /** Dealership head line: the licence a role needs, or that none is. */
+  private dealerLicenceText(role: VehicleRole): string {
+    const licence = licenceNameOf(role);
+    return licence === null ? t('ui.fleet.dealer_licence_none') : t('ui.fleet.dealer_licence', { licence });
   }
 
   private refreshDealershipAffordability(state: GameState): void {
@@ -381,7 +394,7 @@ export class FleetPanel extends PanelBase {
       const role = btn.dataset['role'] as VehicleRole;
       const tier = Number(btn.dataset['tier']) as VehicleTier;
       const def = getVehicleDefByTier(role, tier);
-      this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state, tier));
+      this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state, role, tier));
       const line = btn.querySelector<HTMLElement>('.bs-fleet-tier-licence');
       if (line) line.textContent = this.licenceLineText(role, tier, countLicenceHolders(employees, role, tier));
     });

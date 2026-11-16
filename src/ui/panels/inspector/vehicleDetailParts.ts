@@ -9,7 +9,7 @@ import { ROLE_LICENCE_REQUIRED, vehicleDriverId, computeScrapResidualValue } fro
 import type { GameState, PendingAction } from '../../../core/state/GameState.js';
 import type { Employee } from '../../../core/entities/Employee.js';
 import type { ConfirmModalConfig } from '../ConfirmModal.js';
-import { vehicleTierRefusal } from '../../../core/economy/VehicleTierGate.js';
+import { vehicleTierRefusal, type TierGateSite } from '../../../core/economy/VehicleTierGate.js';
 import { rosterCanDriveVehicleTier, canAffordVehicleUpgrade, computeVehicleUpgradeCost, nextVehicleTier } from '../../../core/entities/VehicleUpgrade.js';
 import { missingHp } from '../../../core/entities/VehicleRepair.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
@@ -75,7 +75,7 @@ export function makeNoDriverRow(v: Vehicle, state: GameState, onGoToCrew: () => 
   const licence = ROLE_LICENCE_REQUIRED[v.type];
   const anyLicensed = rosterCanDriveVehicleTier(state.employees.employees, v.type, v.tier);
 
-  if (!anyLicensed) {
+  if (!anyLicensed && licence !== null) {
     const warn = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:5px;padding:9px;border-radius:4px;background:var(--bsx-well)' } });
     const line = el('div', { attrs: { style: 'display:flex;gap:6px;align-items:center;color:var(--bsx-amber)' } });
     line.append(iconEl('warn', 11), el('span', { text: t('ui.fleet.no_licensed', { licence: t(`skill.${licence}`), level: v.tier }), attrs: { style: 'font:500 10px/1.3 var(--bsx-font-ui)' } }));
@@ -99,11 +99,11 @@ interface UpgradeState {
 }
 
 /** Next-tier upgrade availability and price; the single source for the Inspector. */
-export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number, site: Pick<GameState, 'quests'>): UpgradeState {
+export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number, site: TierGateSite): UpgradeState {
   const cost = computeVehicleUpgradeCost(v.type, v.tier);
   const next = nextVehicleTier(v.tier, v.type);
   const available = next !== null && cost !== null;
-  const refusal = next === null ? null : vehicleTierRefusal(site, next);
+  const refusal = next === null ? null : vehicleTierRefusal(site, next, v.type);
   return {
     available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null,
     ...(refusal ? { locked: refusal } : {}),

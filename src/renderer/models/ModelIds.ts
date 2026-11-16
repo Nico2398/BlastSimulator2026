@@ -80,7 +80,14 @@ export function workerModelId(role: EmployeeRole): string {
 /** Each tier is its own model: tier 1 a junk caricature, tier 2 the plain machine, tier 3 the corporate monster. */
 export const VEHICLE_TIERS: readonly VehicleTier[] = [1, 2, 3];
 
+/** Roles that own no model yet and borrow the debris hauler's (#2285). */
+export function usesPlaceholderModel(role: VehicleRole): boolean {
+  return role === 'travel_vehicle';
+}
+
 export function vehicleModelId(role: VehicleRole, tier: VehicleTier): string {
+  // TODO(#2289): the travel vehicles get their own models; until then they borrow the debris hauler's.
+  if (usesPlaceholderModel(role)) return `vehicle_debris_hauler_t${tier}`;
   return `vehicle_${role}_t${tier}`;
 }
 
@@ -93,6 +100,7 @@ export function allModelIds(): string[] {
   const ids: string[] = [];
   for (const role of EMPLOYEE_ROLES) ids.push(workerModelId(role));
   for (const role of getAllVehicleRoles()) {
+    if (usesPlaceholderModel(role)) continue; // shares another role's asset
     for (const tier of VEHICLE_TIERS) ids.push(vehicleModelId(role, tier));
   }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {

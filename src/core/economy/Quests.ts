@@ -125,8 +125,7 @@ export function recordQuestBlast(
 
 /** Book `cells` driven by a travel vehicle. No-op without quest state. */
 export function recordTravelCells(quests: QuestState | undefined, cells: number): void {
-  void quests; void cells;
-  throw new Error('not implemented');
+  if (quests && cells > 0) quests.travelCells += cells;
 }
 
 /** Complete every quest whose prerequisites and objectives are met; emits `quest:completed` per quest; returns their ids. */
@@ -214,8 +213,7 @@ export function questForVehicleTier(tier: VehicleTier): QuestDef | undefined {
 
 /** The quest whose reward opens travel-vehicle `tier` (the race car), if any. */
 export function questForTravelTier(tier: 2): QuestDef | undefined {
-  void tier;
-  throw new Error('not implemented');
+  return getAllQuests().find(q => q.reward.kind === 'travel_tier' && q.reward.tier === tier);
 }
 
 /** Localized reward line of a quest, whatever its reward kind. */

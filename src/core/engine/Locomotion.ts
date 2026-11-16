@@ -45,6 +45,7 @@ import { applyArrivalEffect } from './ArrivalEffects.js';
 import { moveTo, syncItineraryMirrors } from './MoveTo.js';
 import { dismountVehicleDriver, releaseVehicleReservation } from './VehicleReservation.js';
 import { completeIfOwnedRestAction } from './TaskLifecycleCore.js';
+import { recordTravelCells } from '../economy/Quests.js';
 import { appendToTrail, openMovementTrail, type TrailPoint } from '../entities/MovementTrail.js';
 
 /** Reads `emp`'s carried route-commitment (#1129) into the shape `advanceAlongPath` takes. */
@@ -1557,6 +1558,8 @@ export function respreadLegDestination(state: GameState, emp: Employee): void {
 function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: number, isStationaryNow: boolean): void {
   const prevX = Math.round(vehicle.x);
   const prevZ = Math.round(vehicle.z);
+
+  if (vehicle.type === 'travel_vehicle') recordTravelCells(state.quests, Math.hypot(x - vehicle.x, z - vehicle.z));
 
   vehicle.x = x;
   vehicle.z = z;

@@ -122,8 +122,11 @@ function driverLineContent(v: Vehicle, employees: readonly Employee[]): { text: 
     case 'no_licensed':
       if (seatedId !== null) return { text: `#${seatedId}`, color: 'var(--bsx-text-micro)' }; // seated but off the roster
       if (driver.kind === 'unmanned') return { text: t('ui.fleet.unmanned'), color: 'var(--bsx-text-micro)' };
+      const licence = ROLE_LICENCE_REQUIRED[v.type];
       return {
-        text: t('ui.fleet.row_no_licensed', { licence: t(`skill.${ROLE_LICENCE_REQUIRED[v.type]}`), level: v.tier }),
+        text: licence === null
+          ? t('ui.fleet.row_anyone')
+          : t('ui.fleet.row_no_licensed', { licence: t(`skill.${licence}`), level: v.tier }),
         color: 'var(--bsx-amber)',
       };
   }
