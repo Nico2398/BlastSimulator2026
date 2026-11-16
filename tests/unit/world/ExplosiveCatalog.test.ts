@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getExplosive, getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
+import { getExplosive, getAllExplosives, explosivesOfTier } from '../../../src/core/world/ExplosiveCatalog.js';
 import { CHARGE_REFERENCE_DENSITY } from '../../../src/core/config/balance.js';
 
 describe('ExplosiveCatalog', () => {
@@ -19,9 +19,9 @@ describe('ExplosiveCatalog', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('carries exactly the fields id, nameKey, descKey, energyPerKg, costPerKg, waterSensitive, density, vibrationMod (#2197)', () => {
+  it('carries exactly the fields id, nameKey, descKey, tier, energyPerKg, costPerKg, waterSensitive, density, vibrationMod (#2197, #2280)', () => {
     const expected = [
-      'costPerKg', 'density', 'descKey', 'energyPerKg', 'id', 'nameKey', 'vibrationMod', 'waterSensitive',
+      'costPerKg', 'density', 'descKey', 'energyPerKg', 'id', 'nameKey', 'tier', 'vibrationMod', 'waterSensitive',
     ];
     for (const e of getAllExplosives()) {
       expect(Object.keys(e).sort(), e.id).toEqual(expected);
@@ -91,5 +91,52 @@ describe('ExplosiveCatalog', () => {
     const pricier = getAllExplosives().filter(e => e.costPerKg > boomite.costPerKg);
     expect(pricier.length).toBeGreaterThan(0);
     for (const e of pricier) expect(e.density, e.id).toBeGreaterThan(boomite.density);
+  });
+});
+
+describe('explosive tiers (#2280)', () => {
+  const TIERS: Record<string, 1 | 2 | 3> = {
+    pop_rock: 1, boomite: 1, krackle: 1,
+    big_bada_boom: 2, shatternite: 2, rumblox: 2,
+    obliviax: 3, dynatomics: 3,
+  };
+
+  it.each(Object.entries(TIERS))('%s is tier %i', (id, tier) => {
+    expect(getExplosive(id)!.tier).toBe(tier);
+  });
+
+  it('every explosive has a tier of 1, 2 or 3, and the table covers the whole catalog', () => {
+    for (const e of getAllExplosives()) expect([1, 2, 3], e.id).toContain(e.tier);
+    expect(getAllExplosives().map(e => e.id).sort()).toEqual(Object.keys(TIERS).sort());
+  });
+
+  it('explosivesOfTier lists each tier\'s explosives in catalog order', () => {
+    expect(explosivesOfTier(1).map(e => e.id)).toEqual(['pop_rock', 'boomite', 'krackle']);
+    expect(explosivesOfTier(2).map(e => e.id)).toEqual(['big_bada_boom', 'shatternite', 'rumblox']);
+    expect(explosivesOfTier(3).map(e => e.id)).toEqual(['obliviax', 'dynatomics']);
+  });
+
+  it('the three tiers partition the catalog', () => {
+    const all = [1, 2, 3].flatMap(t => explosivesOfTier(t as 1 | 2 | 3).map(e => e.id));
+    expect(all.sort()).toEqual(getAllExplosives().map(e => e.id).sort());
+  });
+
+  it('a higher tier carries more energy per kg than any explosive of a lower tier', () => {
+    for (const hi of getAllExplosives()) {
+      for (const lo of getAllExplosives().filter(e => e.tier < hi.tier)) {
+        expect(hi.energyPerKg, `${hi.id} vs ${lo.id}`).toBeGreaterThan(lo.energyPerKg);
+      }
+    }
+  });
+
+  it.each([
+    [1, 200, 400],
+    [2, 550, 850],
+    [3, 1000, 1300],
+  ] as const)('tier %i energy stays within %i-%i per kg', (tier, lo, hi) => {
+    for (const e of explosivesOfTier(tier)) {
+      expect(e.energyPerKg, e.id).toBeGreaterThanOrEqual(lo);
+      expect(e.energyPerKg, e.id).toBeLessThanOrEqual(hi);
+    }
   });
 });

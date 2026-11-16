@@ -17,6 +17,8 @@ import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js
 import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
 import { setLocale } from '../../../../../src/core/i18n/I18n.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest } from '../../../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../../../src/core/economy/QuestCatalog.js';
 import { chargeKgLimitWarning, permitPreview } from '../../../../../src/ui/panels/permitPreview.js';
 import { stemmingExplain } from '../../../../../src/ui/blastWorkshopExplain.js';
 import { pinnedDryCycle, pinnedCycle, rainAfterCycle, dryForCycle } from '../../../../helpers/weatherCycles.js';
@@ -2468,5 +2470,142 @@ describe('ChargeStep — water block leads while water matters (#2268)', () => {
 
       expect(() => step.revealWater()).not.toThrow();
     });
+  });
+});
+
+describe('ChargeStep — locked explosives on a progression site (#2280)', () => {
+  const T2 = 'quest_explosive_t2';
+  const T3 = 'quest_explosive_t3';
+  const TIER2 = ['big_bada_boom', 'shatternite', 'rumblox'];
+  const TIER3 = ['obliviax', 'dynatomics'];
+
+  function questState() {
+    const state = makeState();
+    state.grade = createGradeState();
+    state.quests = createQuestState();
+    return state;
+  }
+
+  const lockedEls = (step: ChargeStep): HTMLElement[] =>
+    Array.from(step.root.querySelectorAll<HTMLElement>('[data-role="explosive-locked"]'));
+  const selectable = (step: ChargeStep): string[] =>
+    Array.from(step.root.querySelectorAll<HTMLElement>('[data-action="select-explosive"]')).map(c => c.dataset['explosive']!);
+  const locked = (step: ChargeStep, id: string): HTMLElement | null =>
+    step.root.querySelector<HTMLElement>(`[data-role="explosive-locked"][data-explosive="${id}"]`);
+
+  it('offers tier 1 as selectable cards and locks every tier-2 and tier-3 explosive', () => {
+    const { step } = makeStep();
+    step.update(questState(), 'sunny');
+    expect(selectable(step).sort()).toEqual(['boomite', 'krackle', 'pop_rock']);
+    expect(lockedEls(step).map(e => e.dataset['explosive']).sort()).toEqual([...TIER2, ...TIER3].sort());
+  });
+
+  it.each([...TIER2.map(id => [id, T2]), ...TIER3.map(id => [id, T3])])('%s is locked behind %s', (id, questId) => {
+    const { step } = makeStep();
+    step.update(questState(), 'sunny');
+    const el = locked(step, id)!;
+    expect(el).not.toBeNull();
+    expect(el.dataset['quest']).toBe(questId);
+    expect(el.textContent).toContain(t(getQuest(questId)!.titleKey));
+  });
+
+  it('a locked card is not selectable: no select-explosive action', () => {
+    const { step } = makeStep();
+    step.update(questState(), 'sunny');
+    for (const el of lockedEls(step)) {
+      expect(el.dataset['action']).not.toBe('select-explosive');
+      expect(el.querySelector('[data-action="select-explosive"]')).toBeNull();
+    }
+    expect(step.root.querySelector('[data-action="select-explosive"][data-explosive="big_bada_boom"]')).toBeNull();
+  });
+
+  it('clicking a locked card selects nothing and dispatches no command', () => {
+    const { step, gameConsole } = makeStep();
+    const state = questState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    step.update(state, 'sunny');
+    const before = Array.from(step.root.querySelectorAll('[data-action="select-explosive"][data-selected="true"]')).map(c => (c as HTMLElement).dataset['explosive']);
+    locked(step, 'big_bada_boom')!.click();
+    step.update(state, 'sunny');
+    const after = Array.from(step.root.querySelectorAll('[data-action="select-explosive"][data-selected="true"]')).map(c => (c as HTMLElement).dataset['explosive']);
+    expect(after).toEqual(before);
+    expect(gameConsole).not.toHaveBeenCalled();
+  });
+
+  it('Charge All never orders a locked explosive', () => {
+    const { step, gameConsole } = makeStep();
+    const state = questState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    step.update(state, 'sunny');
+    locked(step, 'dynatomics')!.click();
+    (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
+    const cmd = gameConsole.mock.calls[0]![0] as string;
+    for (const id of [...TIER2, ...TIER3]) expect(cmd).not.toContain(id);
+  });
+
+  it('completing T2 turns its three cards into selectable ones on the next update, tier 3 stays locked', () => {
+    const { step } = makeStep();
+    const state = questState();
+    step.update(state, 'sunny');
+    completeQuest(state, T2);
+    step.update(state, 'sunny');
+    expect(selectable(step).sort()).toEqual(['big_bada_boom', 'boomite', 'krackle', 'pop_rock', 'rumblox', 'shatternite']);
+    expect(lockedEls(step).map(e => e.dataset['explosive']).sort()).toEqual([...TIER3].sort());
+    for (const el of lockedEls(step)) expect(el.dataset['quest']).toBe(T3);
+  });
+
+  it('after T2 completes, the big_bada_boom card selects and Charge All orders it', () => {
+    const { step, gameConsole } = makeStep();
+    const state = questState();
+    addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
+    step.update(state, 'sunny');
+    completeQuest(state, T2);
+    step.update(state, 'sunny');
+    card(step, 'big_bada_boom').click();
+    expect(card(step, 'big_bada_boom').dataset['selected']).toBe('true');
+    (step.root.querySelector('[data-action="charge-all"]') as HTMLButtonElement).click();
+    expect(gameConsole.mock.calls[0]![0]).toContain('explosive:big_bada_boom');
+  });
+
+  it('with both quests completed nothing is locked and every explosive is selectable', () => {
+    const { step } = makeStep();
+    const state = questState();
+    completeQuest(state, T2);
+    completeQuest(state, T3);
+    step.update(state, 'sunny');
+    expect(lockedEls(step)).toHaveLength(0);
+    expect(selectable(step)).toHaveLength(getAllExplosives().length);
+  });
+
+  it('the locked card is in the French quest title after a locale change', () => {
+    const { step } = makeStep();
+    const state = questState();
+    step.update(state, 'sunny');
+    setLocale('fr');
+    try {
+      step.refreshLocale();
+      step.update(state, 'sunny');
+      expect(locked(step, 'big_bada_boom')!.textContent).toContain(t(getQuest(T2)!.titleKey));
+    } finally {
+      setLocale('en');
+    }
+  });
+
+  it('a site without quests shows no locked card, whatever its level list', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.campaign.activeLevelId = null;
+    step.update(state, 'sunny');
+    expect(lockedEls(step)).toHaveLength(0);
+    expect(selectable(step)).toHaveLength(getAllExplosives().length);
+  });
+
+  it('a site without quests keeps a level list as it is: no locked card for an explosive outside it', () => {
+    const { step } = makeStep();
+    const state = makeState();
+    state.campaign.activeLevelId = 'dusty_hollow';
+    step.update(state, 'sunny');
+    expect(lockedEls(step)).toHaveLength(0);
+    expect(selectable(step)).toEqual(['pop_rock', 'boomite', 'krackle']);
   });
 });

@@ -19,7 +19,7 @@
 // closes that; this step feeds it the panel's current product / stemming
 // values and dispatches for the one hole whose row was clicked.
 //
-// Only the active level's explosives are offered (resolveAvailableExplosives);
+// Only the site's explosives are offered (resolveExplosivesFor); on a quest site the rest show as locked cards naming their quest (#2280);
 // the water-sensitivity badge still surfaces (that data is real and per-hole
 // derivable via wetHoles()).
 
@@ -33,7 +33,8 @@ import { ChargeHoleList, holeChargeSignature, drainReasonText, drainRainReasonTe
 import { fillChargeKg } from '../../../core/mining/ChargePlan.js';
 import { quoteChargeLoad } from '../../../core/mining/ChargeLoad.js';
 import { getAllExplosives, getExplosive, type ExplosiveType } from '../../../core/world/ExplosiveCatalog.js';
-import { resolveAvailableExplosives } from '../../../core/campaign/Level.js';
+import { resolveExplosivesFor } from '../../../core/campaign/Level.js';
+import { explosiveLockedByQuest } from '../../../core/economy/Quests.js';
 import { chargeKgPerMetre } from '../../../core/mining/HoleDiameter.js';
 import { rainWithinTicks } from '../../../core/weather/WeatherCycle.js';
 import { rainExposedHoles, wetHoles } from '../../../core/mining/WetHoles.js';
@@ -96,7 +97,9 @@ export class ChargeStep {
   private selectedExplosiveId = DEFAULT_EXPLOSIVE;
   /** Set by a card click; stops the pattern from overriding the player's choice. */
   private playerPickedExplosive = false;
-  private allowedIds: readonly string[] = resolveAvailableExplosives(null);
+  private allowedIds: readonly string[] = [];
+  /** Explosive id -> id and title key of the quest that opens it; empty off a quest site (#2280). */
+  private lockedByQuest = new Map<string, { id: string; titleKey: string }>();
   private stemmingM = CHARGE_DEFAULT_STEMMING_M;
   /** False until the player steps the stemming: until then it follows the permit (#2101). */
   private playerAdjustedStemming = false;
@@ -217,7 +220,12 @@ export class ChargeStep {
     const holes = state.drillHoles;
     this.narrowestM = holes.length > 0 ? Math.min(...holes.map(h => h.diameter)) : DRILL_HOLE_DEFAULT_DIAMETER_M;
 
-    this.allowedIds = resolveAvailableExplosives(state.campaign.activeLevelId);
+    this.allowedIds = resolveExplosivesFor(state);
+    this.lockedByQuest = new Map();
+    for (const e of getAllExplosives()) {
+      const quest = explosiveLockedByQuest(state, e.id);
+      if (quest) this.lockedByQuest.set(e.id, { id: quest.id, titleKey: quest.titleKey });
+    }
     if (this.playerPickedExplosive && !this.allowedIds.includes(this.selectedExplosiveId)) this.playerPickedExplosive = false;
     // Deliberately re-run on every update until the player clicks: the step instance outlives Continue/load, so the preselection follows the live pattern.
     if (!this.playerPickedExplosive) {
@@ -254,6 +262,7 @@ export class ChargeStep {
       grid: this.readouts.revision,
       holeGeometry: holes.map(h => [h.x, h.z, h.depth, h.diameter]),
       level: state.campaign.activeLevelId,
+      questLocks: [...this.lockedByQuest.keys()],
       selected: this.selectedExplosiveId, stem: this.stemmingM,
       permitGrade: state.grade ? gradeRung(state.grade) : null,
       tier: state.softwareTier,
@@ -305,7 +314,21 @@ export class ChargeStep {
 
   private renderProductList(anyWet: boolean): void {
     const offered = getAllExplosives().filter(e => this.allowedIds.includes(e.id));
-    this.productListEl.replaceChildren(...offered.map(e => this.makeProductCard(e, anyWet)));
+    const locked = getAllExplosives().filter(e => this.lockedByQuest.has(e.id));
+    this.productListEl.replaceChildren(...offered.map(e => this.makeProductCard(e, anyWet)), ...locked.map(e => this.makeLockedCard(e)));
+  }
+
+  /** A card for an explosive a quest still holds back: not selectable, names the quest (#2280). */
+  private makeLockedCard(explosive: ExplosiveType): HTMLElement {
+    const quest = this.lockedByQuest.get(explosive.id)!;
+    const card = el('div', { attrs: { 'data-role': 'explosive-locked', style: 'display:flex;flex-direction:column;gap:4px;padding:9px 11px;border:1px dashed var(--bsx-hairline);border-radius:5px;opacity:.6' } });
+    card.dataset['explosive'] = explosive.id;
+    card.dataset['quest'] = quest.id;
+    card.append(
+      el('span', { text: t(explosive.nameKey), attrs: { style: 'font:600 12px/1 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }),
+      el('span', { text: t('ui.blast_workshop.charge.locked_by_quest', { quest: t(quest.titleKey) }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-muted)' } }),
+    );
+    return card;
   }
 
   private makeProductCard(explosive: ExplosiveType, anyWet: boolean): HTMLElement {

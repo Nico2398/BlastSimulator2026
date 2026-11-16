@@ -55,6 +55,7 @@ import { syncRepairDispatch } from '../economy/RepairDispatch.js';
 import { detectUnqualifiedTask, detectTrafficJam } from '../events/EventEngine.js';
 import { isHiringPoolDue, refreshHiringPool } from '../entities/HiringPool.js';
 import { checkDeadlines, ensureScriptedOreSale, generateContracts } from '../economy/Contract.js';
+import { advanceQuests } from '../economy/Quests.js';
 import { advanceGradeApplication, advanceGradeTier, extraContractOffers } from '../economy/MineGrade.js';
 import { saturationReader } from '../economy/OreSaturation.js';
 import { autoAcceptRubbleClearances, autoDeliverContracts, autoSellUnclaimedOre, settleDelivery } from '../economy/ContractFulfilment.js';
@@ -227,6 +228,7 @@ export function runTick(
   // 3b. Pending mine-grade application (#1921)
   advanceGradeApplication(state, emitter);
   advanceGradeTier(state, emitter);
+  advanceQuests(state, emitter);
   // Expire overdue contracts and apply penalties
   const expired = checkDeadlines(state.contracts, state.tickCount);
   for (const { penalty } of expired) {

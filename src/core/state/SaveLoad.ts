@@ -21,6 +21,7 @@ import type { FinanceState } from '../economy/Finance.js';
 import { maxHoleNumericId } from '../mining/DrillPlan.js';
 import { sanitizeTutorialProgress } from './TutorialProgress.js';
 import { sanitizeGradeState } from '../economy/MineGrade.js';
+import { createQuestState, sanitizeQuestState } from '../economy/Quests.js';
 import { sanitizeBoardState } from '../economy/Board.js';
 
 /**
@@ -1059,6 +1060,10 @@ export function deserialize(json: string): GameState {
   const grade = sanitizeGradeState(obj['grade']);
   if (grade) obj['grade'] = grade;
   else delete obj['grade'];
+  // #2280: quest state exists only on a progression site; a grade save from before quests starts with a fresh one.
+  const quests = obj['grade'] ? (sanitizeQuestState(obj['quests']) ?? createQuestState()) : undefined;
+  if (quests) obj['quests'] = quests;
+  else delete obj['quests'];
   // #1946: board-of-directors state, same treatment.
   const board = sanitizeBoardState(obj['board']);
   if (board) obj['board'] = board;

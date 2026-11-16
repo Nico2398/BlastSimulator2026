@@ -10,6 +10,7 @@ import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
 import { getFinancialReport } from '../economy/Finance.js';
 import { createBoardState } from '../economy/Board.js';
 import { createGradeState } from '../economy/MineGrade.js';
+import { createQuestState } from '../economy/Quests.js';
 import { closingAudit, settleTaxAudit, taxAuditRng } from '../events/TaxAudit.js';
 
 // ── Types ──
@@ -166,7 +167,10 @@ export function createGameForLevel(
   newState.world = createWorldState(level.gridX, level.datum, level.gridZ, false);
   if (level.board) newState.board = createBoardState(level.board);
   if (level.market) newState.contracts.market = level.market;
-  if (level.progression) newState.grade = createGradeState();
+  if (level.progression) {
+    newState.grade = createGradeState();
+    newState.quests = createQuestState();
+  }
 
   return newState;
 }

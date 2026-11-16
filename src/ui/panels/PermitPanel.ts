@@ -12,6 +12,9 @@ import { el, explainable, card, button, sectionHeader, progressBar, panelHeader,
 import { windowRoot, windowBody } from '../windowKit.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatGameDuration } from '../formatGameDuration.js';
+import { getAllQuests } from '../../core/economy/QuestCatalog.js';
+import { isQuestCompleted, questObjectiveStatuses, questPrerequisitesMet, type QuestDef } from '../../core/economy/Quests.js';
+import { explosivesOfTier } from '../../core/world/ExplosiveCatalog.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import {
   gradeDef, gradeRung, nextGradeTargets, permitApplyBlocker, formatGradeAmount, tierDef, tierTargetStatuses,
@@ -101,8 +104,9 @@ export class PermitPanel extends PanelBase {
     const next = gradeDef(g.grade + 1);
     const targetFlags = targets.map(s => `${s.kind}:${s.met ? 1 : 0}`).join(',');
     const { limits, strikes } = permitLimitTexts(gradeRung(g), g.strikeTicks ?? [], state.tickCount);
+    const questFlags = state.quests ? getAllQuests().map(q => `${q.id}:${isQuestCompleted(state, q.id) ? 1 : 0}`).join(',') : '';
     const tierFlags = this.tierIndices(g.grade).map(n => tierTargetStatuses(state, n).map(x => (x.met ? 1 : 0)).join('')).join('/');
-    return [g.grade, g.tier, tierFlags, g.pending ? g.pending.toGrade : '-', targetFlags, state.cash >= next.fee ? 1 : 0, limits, strikes].join('|');
+    return [g.grade, g.tier, tierFlags, g.pending ? g.pending.toGrade : '-', targetFlags, state.cash >= next.fee ? 1 : 0, limits, strikes, questFlags].join('|');
   }
 
   private render(state: GameState, targets: readonly GradeTargetStatus[]): void {
@@ -139,7 +143,8 @@ export class PermitPanel extends PanelBase {
     nextChildren.push(g.pending ? this.pendingBlock() : this.applyBlock(state));
 
     const ladder = [this.gradesCard(g.grade), ...(g.grade <= LAST_NAMED_GRADE ? [this.tiersCard(state)] : [])];
-    this.contentEl.replaceChildren(currentCard, ...ladder, card(nextChildren));
+    const questCards = state.quests ? [this.questsCard(state)] : [];
+    this.contentEl.replaceChildren(currentCard, ...ladder, card(nextChildren), ...questCards);
   }
 
   private tierIndices(grade: number): number[] {
@@ -183,6 +188,40 @@ export class PermitPanel extends PanelBase {
       return block;
     });
     return card([el('span', { text: t('ui.permit.tiers_label', { name: t(grade.nameKey, grade.nameParams) }), attrs: { style: LABEL_STYLE } }), ...blocks]);
+  }
+
+  /** Every quest from the start, completed ones kept visible (#2280). */
+  private questsCard(state: GameState): HTMLElement {
+    return card([
+      el('span', { text: t('ui.progression.quests_label'), attrs: { style: LABEL_STYLE } }),
+      ...getAllQuests().map(q => this.questBlock(state, q)),
+    ]);
+  }
+
+  private questBlock(state: GameState, quest: QuestDef): HTMLElement {
+    const block = el('div', { attrs: { 'data-role': 'quest', style: 'display:flex;flex-direction:column;gap:4px;padding:4px 0 4px 6px;border-left:2px solid var(--bsx-amber)' } });
+    block.dataset['questId'] = quest.id;
+    block.dataset['state'] = isQuestCompleted(state, quest.id) ? 'completed' : 'available';
+    const explosives = explosivesOfTier(quest.reward.tier).map(e => t(e.nameKey)).join(', ');
+    block.append(
+      el('span', { text: t(quest.titleKey), attrs: { style: 'font:700 11px/1.3 var(--bsx-font-ui);color:var(--bsx-text-primary)' } }),
+      el('span', { text: t('quest.detail.giver', { giver: t(quest.giverKey) }), attrs: { 'data-role': 'quest-giver', style: MICRO_STYLE } }),
+      el('span', { text: t(quest.pitchKey), attrs: { style: MICRO_STYLE + ';font-style:italic' } }),
+    );
+    for (const o of quest.objectives) {
+      const row = el('div', { attrs: { 'data-role': 'quest-objective', style: 'display:flex;flex-direction:column;gap:4px' } });
+      row.dataset['kind'] = o.kind;
+      row.append(el('span', { attrs: { 'data-role': 'quest-objective-text', style: 'font:500 11px/1.3 var(--bsx-font-ui)' } }), progressBar(0, 'var(--bsx-amber)'));
+      row.querySelector('.bsx-progress-fill')!.setAttribute('data-role', 'quest-bar');
+      block.append(row);
+    }
+    block.append(el('span', { text: t('quest.reward', { tier: quest.reward.tier, explosives }), attrs: { 'data-role': 'quest-reward', style: 'font:600 10px/1.3 var(--bsx-font-ui);color:var(--bsx-amber)' } }));
+    const open = (quest.requires ?? []).filter(id => !isQuestCompleted(state, id));
+    if (!questPrerequisitesMet(state, quest)) {
+      const names = open.map(id => t(getAllQuests().find(q => q.id === id)?.titleKey ?? id)).join(', ');
+      block.append(el('span', { text: t('quest.detail.requires', { quests: names }), attrs: { 'data-role': 'quest-requires', style: MICRO_STYLE } }));
+    }
+    return block;
   }
 
   private targetRow(s: GradeTargetStatus): HTMLElement {
@@ -238,6 +277,20 @@ export class PermitPanel extends PanelBase {
         if (!line) return;
         line.dataset['met'] = String(s.met);
         line.textContent = `${s.met ? '[x]' : '[ ]'} ${t(`permit.target.${s.kind}`, { current: formatGradeAmount(s.current), needed: formatGradeAmount(s.needed) })}`;
+      });
+    }
+
+    for (const block of Array.from(this.contentEl.querySelectorAll<HTMLElement>('[data-role="quest"]'))) {
+      const quest = getAllQuests().find(q => q.id === block.dataset['questId']);
+      if (!quest) continue;
+      questObjectiveStatuses(state, quest).forEach(s => {
+        const row = block.querySelector<HTMLElement>(`[data-role="quest-objective"][data-kind="${s.kind}"]`);
+        if (!row) return;
+        row.dataset['met'] = String(s.met);
+        row.querySelector<HTMLElement>('[data-role="quest-objective-text"]')!.textContent =
+          t(`quest.objective.${s.kind}`, { current: formatGradeAmount(s.current), needed: formatGradeAmount(s.needed) });
+        const pct = s.needed > 0 ? Math.min(100, (s.current / s.needed) * 100) : 100;
+        row.querySelector<HTMLElement>('[data-role="quest-bar"]')!.style.width = `${pct}%`;
       });
     }
 

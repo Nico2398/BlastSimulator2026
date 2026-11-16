@@ -101,7 +101,7 @@ export const KNOWN_COMMANDS = [
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'optimize_charges', 'preview', 'blast_preview', 'install_tubing', 'tube_on_drill', 'drain_hole',
   'build_ramp', 'ramp', 'widen_ramp', 'repair_ramp', 'ramp_flow', 'level_ground', 'set_policy', 'terrain_info', 'help',
-  'blast_plan', 'needs', 'save', 'load', 'sandbox', 'board',
+  'blast_plan', 'needs', 'save', 'load', 'sandbox', 'board', 'quest',
 ];
 
 /** Commands that inspect state — valid as a final playthrough step */

@@ -62,6 +62,8 @@ export const BOOTSTRAP_COMMAND_ALLOWLIST: readonly string[] = [
   'permit ack',
   // #1946: the board of directors is a level option; `board start` attaches one for a scenario (debug only, no UI).
   'board start',
+  // #2280: a scenario about something else takes the tier 3 quest as done (earning it is quest-explosive-tier's own job; debug only, no UI).
+  'quest complete quest_explosive_t3',
   'weather set',
   'weather',
   'event fire',

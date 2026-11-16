@@ -7,7 +7,7 @@ import {
   type HoleCharge, type ChargeError, type PatternCharge,
 } from './ChargePlan.js';
 import { dispatchPendingAction, cancelAction } from '../engine/TaskDispatch.js';
-import { isExplosiveAvailable } from '../campaign/Level.js';
+import { isExplosiveAvailableFor } from '../campaign/Level.js';
 
 type AutoChargeOutcome = 'ordered' | 'invalid' | 'skipped';
 
@@ -116,7 +116,7 @@ export function planReplacementLoss(
 function takePatternOrClearIfUnavailable(state: GameState): PatternCharge | null {
   const pattern = state.patternCharge;
   if (pattern == null) return null;
-  if (!isExplosiveAvailable(state.campaign.activeLevelId, pattern.explosiveId)) {
+  if (!isExplosiveAvailableFor(state, pattern.explosiveId)) {
     state.patternCharge = null;
     return null;
   }

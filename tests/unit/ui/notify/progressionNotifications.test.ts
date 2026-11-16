@@ -4,6 +4,8 @@ import { wireProgressionNotifications } from '../../../../src/ui/notify/progress
 import { gradeDef } from '../../../../src/core/economy/MineGrade.js';
 import type { NotifyInput } from '../../../../src/ui/notify/NotificationCenter.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
+import { explosivesOfTier } from '../../../../src/core/world/ExplosiveCatalog.js';
+import { getQuest } from '../../../../src/core/economy/QuestCatalog.js';
 
 type Handler = (payload: never) => void;
 
@@ -143,5 +145,65 @@ describe('wireProgressionNotifications (#1926)', () => {
     setLocale('fr');
     emitter.fire('progression:ore_glut', { oreId: 'dirtite', saturation: 0.5 });
     expect(notified[1]!.body).not.toBe(notified[0]!.body);
+  });
+});
+
+describe('wireProgressionNotifications — quest:completed (#2280)', () => {
+  let emitter: ReturnType<typeof makeEmitter>;
+  let notified: NotifyInput[];
+
+  beforeEach(() => {
+    setLocale('en');
+    emitter = makeEmitter();
+    notified = [];
+    wireProgressionNotifications(emitter, n => notified.push(n));
+  });
+  afterEach(() => setLocale('en'));
+
+  const text = (n: NotifyInput) => `${n.title} ${n.body}`;
+
+  it('subscribes to quest:completed', () => {
+    expect(emitter.has('quest:completed')).toBe(true);
+  });
+
+  it('a completed T2 quest raises one notice naming the tier-2 explosives now purchasable', () => {
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
+    expect(notified).toHaveLength(1);
+    const body = text(notified[0]!);
+    expect(explosivesOfTier(2).some(e => body.includes(t(e.nameKey)))).toBe(true);
+    expect(explosivesOfTier(3).some(e => body.includes(t(e.nameKey)))).toBe(false);
+    expect(body).not.toMatch(/\{\w+\}|notification\./);
+  });
+
+  it('a completed T3 quest names the tier-3 explosives', () => {
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t3' });
+    expect(notified).toHaveLength(1);
+    const body = text(notified[0]!);
+    expect(explosivesOfTier(3).some(e => body.includes(t(e.nameKey)))).toBe(true);
+    expect(explosivesOfTier(2).some(e => body.includes(t(e.nameKey)))).toBe(false);
+  });
+
+  it('the notice names the quest it completed', () => {
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
+    expect(text(notified[0]!)).toContain(t(getQuest('quest_explosive_t2')!.titleKey));
+  });
+
+  it('an unknown quest id raises nothing and does not throw', () => {
+    expect(() => emitter.fire('quest:completed', { questId: 'quest_nope' })).not.toThrow();
+    expect(notified).toHaveLength(0);
+  });
+
+  it('each completion raises its own notice', () => {
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t3' });
+    expect(notified).toHaveLength(2);
+    expect(text(notified[0]!)).not.toBe(text(notified[1]!));
+  });
+
+  it('follows the active locale', () => {
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
+    setLocale('fr');
+    emitter.fire('quest:completed', { questId: 'quest_explosive_t2' });
+    expect(text(notified[1]!)).not.toBe(text(notified[0]!));
   });
 });
