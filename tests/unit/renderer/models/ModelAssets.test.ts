@@ -11,7 +11,7 @@ import {
   allModelIds, buildingModelId, vehicleModelId, workerModelId, BUILDING_RUIN_MODEL_ID, EMPLOYEE_ROLES, VEHICLE_TIERS, GRASS_VARIANTS, FLOWER_VARIANTS, TWISTER_MODEL_ID, grassModelId, flowerModelId,
   bushModelId, houseModelId, treeFarModelId, treeModelId, TREE_FAMILIES, TREE_VARIANTS, BUSH_VARIANTS, HOUSE_VARIANTS,
 } from '../../../../src/renderer/models/ModelIds.js';
-import { getAllVehicleRoles } from '../../../../src/core/entities/Vehicle.js';
+import { getAllVehicleRoles, vehicleRoleMaxTier } from '../../../../src/core/entities/Vehicle.js';
 import { BUILDING_DEFS } from '../../../../src/core/entities/BuildingDefs.js';
 import { getFootprintSize, isSingleTierType } from '../../../../src/core/entities/Building.js';
 import type { BuildingTier, BuildingType } from '../../../../src/core/entities/Building.js';
@@ -102,7 +102,7 @@ describe('public/models', () => {
 
   it('every vehicle tier has a Body node and paint tint and stands on the ground; haulers roll on wheel nodes, crushers spin a flywheel', () => {
     for (const role of getAllVehicleRoles()) {
-      for (const tier of VEHICLE_TIERS) {
+      for (const tier of VEHICLE_TIERS.filter(tr => tr <= vehicleRoleMaxTier(role))) {
         const inst = library.instantiate(vehicleModelId(role, tier), { size: [1, 1, 1] });
         expect(inst.node('Body'), `${role} t${tier}`).not.toBeNull();
         expect(inst.tints.has('TintBody'), `${role} t${tier}`).toBe(true);

@@ -741,7 +741,7 @@ describe('Vehicle fleet', () => {
         const v = ctx.state!.vehicles.vehicles[ctx.state!.vehicles.vehicles.length - 1]!;
         const rng = new Random(200 + roles.indexOf(role));
         const { employee } = hireEmployee(ctx.state!.employees, 'driver', rng, v.x, v.z);
-        assignSkill(ctx.state!.employees, employee.id, ROLE_LICENCE_REQUIRED[role], 1);
+        assignSkill(ctx.state!.employees, employee.id, ROLE_LICENCE_REQUIRED[role]!, 1);
         v.occupantIds = [employee.id];
         employee.locomotion = { kind: 'mounted', vehicleId: v.id };
         employee.taskTicksRemaining = 5;

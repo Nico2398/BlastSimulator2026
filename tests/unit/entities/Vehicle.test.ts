@@ -9,6 +9,7 @@ import {
   getVehicleMaintenanceCostPerTick,
   getVehicleFuelCostPerTick,
   getAllVehicleRoles,
+  vehicleRoleMaxTier,
   getVehicleDefByTier,
   computeScrapResidualValue,
   canReleaseDriver,
@@ -19,12 +20,16 @@ import {
   vehicleCargoMassKg,
 } from '../../../src/core/entities/Vehicle.js';
 import {
+  ROLE_LICENCE_REQUIRED,
+  licenceLevelOf,
+  canDriveTier,
+  countLicenceHolders,
   findBestEvacuationDriver,
   type EvacuationDriverReachabilityCheck,
 } from '../../../src/core/entities/VehicleDriverAssignment.js';
-import { VEHICLE_TIER_MULTIPLIERS, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_ROLE_ARRIVAL_TASK, VEHICLE_SEAT_COUNT } from '../../../src/core/config/balance.js';
+import { VEHICLE_TIER_MULTIPLIERS, NAV_CLEARANCE_VEHICLE_CELLS, VEHICLE_ROLE_ARRIVAL_TASK, VEHICLE_SEAT_COUNT, AGENT_WALK_SPEED } from '../../../src/core/config/balance.js';
 import { board, alight } from '../../../src/core/engine/Mount.js';
-import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
+import { reserveVehicle, findFreeVehicleForRole, isLicensedForRole } from '../../../src/core/engine/VehicleReservation.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -39,10 +44,11 @@ import type { SkillCategory } from '../../../src/core/entities/Employee.js';
 // ── Role catalogue ────────────────────────────────────────────────────────────
 
 describe('VehicleRole catalogue', () => {
-  it('getAllVehicleRoles() returns all 6 defined roles', () => {
+  it('getAllVehicleRoles() returns all 7 defined roles', () => {
     const roles = getAllVehicleRoles();
     expect(roles).toContain('charging_truck');
-    expect(roles).toHaveLength(6);
+    expect(roles).toContain('travel_vehicle' satisfies VehicleRole);
+    expect(roles).toHaveLength(7);
   });
 
   it('getAllVehicleRoles() contains debris_hauler', () => {
@@ -70,8 +76,9 @@ describe('VehicleRole catalogue', () => {
     expect(roles).toContain('rock_fragmenter' satisfies VehicleRole);
   });
 
-  it('getAllVehicleRoles() has six roles (#1645)', () => {
-    expect(getAllVehicleRoles()).toHaveLength(6);
+  it('getAllVehicleRoles() has six work roles plus the travel role (#1645, #2285)', () => {
+    expect(getAllVehicleRoles().filter(r => r !== 'travel_vehicle')).toHaveLength(6);
+    expect(getAllVehicleRoles()).toHaveLength(7);
   });
 });
 
@@ -520,8 +527,8 @@ describe('VehicleDef.workRate', () => {
     expect(getVehicleDefByTier('rock_fragmenter', 1).workRate).toBeGreaterThan(0);
   });
 
-  it('every role def has a workRate that is a finite positive number', () => {
-    const roles: VehicleRole[] = getAllVehicleRoles();
+  it('every work role def has a workRate that is a finite positive number (the travel role does no work, #2285)', () => {
+    const roles: VehicleRole[] = getAllVehicleRoles().filter(r => r !== 'travel_vehicle');
     for (const role of roles) {
       const { workRate } = getVehicleDefByTier(role, 1);
       expect(Number.isFinite(workRate)).toBe(true);
@@ -1918,5 +1925,147 @@ describe('purchaseVehicle stays ungated (#1928)', () => {
       const { vehicle } = purchaseVehicle(createVehicleState(), role, 0, 0, 3);
       expect(vehicle.tier).toBe(3);
     }
+  });
+});
+
+// ── Travel role (#2285) ───────────────────────────────────────────────────────
+
+const WORK_ROLES = (): VehicleRole[] => getAllVehicleRoles().filter(r => r !== 'travel_vehicle');
+
+describe('travel vehicle role: two tiers (#2285 C1)', () => {
+  it('vehicleRoleMaxTier is 2 for the travel role and 3 for every work role', () => {
+    expect(vehicleRoleMaxTier('travel_vehicle')).toBe(2);
+    for (const role of WORK_ROLES()) expect(vehicleRoleMaxTier(role), role).toBe(3);
+  });
+
+  it('getVehicleDefByTier returns a travel def for tier 1 (shuttle) and tier 2 (race car), typed travel_vehicle', () => {
+    for (const tier of [1, 2] as const) {
+      const def = getVehicleDefByTier('travel_vehicle', tier);
+      expect(def.type).toBe('travel_vehicle');
+      expect(def.tier).toBe(tier);
+      expect(def.purchaseCost).toBeGreaterThan(0);
+      expect(def.maxHp).toBeGreaterThan(0);
+    }
+  });
+
+  it('the two tiers have distinct, localized names', () => {
+    const one = t(getVehicleDefByTier('travel_vehicle', 1).nameKey);
+    const two = t(getVehicleDefByTier('travel_vehicle', 2).nameKey);
+    expect(one).not.toBe(two);
+    expect(one).not.toMatch(/^vehicle\./);
+    expect(two).not.toMatch(/^vehicle\./);
+  });
+
+  it('the race car is faster than the shuttle, which is faster than walking and every work role at tier 1', () => {
+    const shuttle = getVehicleDefByTier('travel_vehicle', 1).speed;
+    const race = getVehicleDefByTier('travel_vehicle', 2).speed;
+    expect(race).toBeGreaterThan(shuttle);
+    expect(shuttle).toBeGreaterThan(AGENT_WALK_SPEED);
+    for (const role of WORK_ROLES()) expect(shuttle, role).toBeGreaterThan(getVehicleDefByTier(role, 1).speed);
+  });
+
+  it('the race car costs more than the shuttle', () => {
+    expect(getVehicleDefByTier('travel_vehicle', 2).purchaseCost).toBeGreaterThan(getVehicleDefByTier('travel_vehicle', 1).purchaseCost);
+  });
+
+  it('work roles keep all three tiers with rising speed (unchanged)', () => {
+    for (const role of WORK_ROLES()) {
+      const speeds = ([1, 2, 3] as const).map(tier => getVehicleDefByTier(role, tier).speed);
+      expect(speeds[2]!, role).toBeGreaterThanOrEqual(speeds[0]!);
+      expect(getVehicleDefByTier(role, 3).tier, role).toBe(3);
+    }
+  });
+
+  it('purchaseVehicle buys a shuttle at tier 1 and a race car at tier 2 for the def cost', () => {
+    const state = createVehicleState();
+    const a = purchaseVehicle(state, 'travel_vehicle', 3, 4);
+    const b = purchaseVehicle(state, 'travel_vehicle', 5, 6, 2);
+    expect(a.vehicle.tier).toBe(1);
+    expect(a.cost).toBe(getVehicleDefByTier('travel_vehicle', 1).purchaseCost);
+    expect(b.vehicle.tier).toBe(2);
+    expect(b.cost).toBe(getVehicleDefByTier('travel_vehicle', 2).purchaseCost);
+    expect(b.vehicle.hp).toBe(getVehicleDefByTier('travel_vehicle', 2).maxHp);
+  });
+});
+
+describe('travel vehicle role: no site work, one seat (#2285 C2)', () => {
+  it('does no work: workRate and capacity are 0 at both tiers', () => {
+    for (const tier of [1, 2] as const) {
+      const def = getVehicleDefByTier('travel_vehicle', tier);
+      expect(def.workRate).toBe(0);
+      expect(def.capacity).toBe(0);
+    }
+  });
+
+  it('has one seat', () => {
+    expect(VEHICLE_SEAT_COUNT.travel_vehicle).toBe(1);
+  });
+
+  it('a second employee cannot board a taken shuttle', () => {
+    const state = createGame({ seed: 42 });
+    const rng = new Random(42);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 5, 5);
+    const a = hireEmployee(state.employees, 'driller', rng, 5, 5).employee;
+    const b = hireEmployee(state.employees, 'driller', rng, 5, 5).employee;
+    expect(board(state, vehicle.id, a.id).success).toBe(true);
+    expect(board(state, vehicle.id, b.id).success).toBe(false);
+    expect(vehicle.occupantIds).toEqual([a.id]);
+  });
+
+  it('no work role ever picks a travel vehicle: with only a shuttle in the fleet, findFreeVehicleForRole is null for every work role', () => {
+    const state = createGame({ seed: 42 });
+    purchaseVehicle(state.vehicles, 'travel_vehicle', 1, 1);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 1, 1);
+    for (const role of WORK_ROLES()) {
+      assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED[role]!, 3);
+      expect(findFreeVehicleForRole(state, role, employee), role).toBeNull();
+    }
+  });
+});
+
+describe('travel vehicle role: needs no licence (#2285 C2)', () => {
+  it('ROLE_LICENCE_REQUIRED.travel_vehicle is null; every work role still names a skill', () => {
+    expect(ROLE_LICENCE_REQUIRED.travel_vehicle).toBeNull();
+    for (const role of WORK_ROLES()) expect(ROLE_LICENCE_REQUIRED[role], role).toEqual(expect.stringMatching(/^driving\./));
+  });
+
+  it('an employee with no qualifications at all can drive both tiers', () => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'driller', new Random(42), 0, 0);
+    employee.qualifications = [];
+    expect(licenceLevelOf(employee, 'travel_vehicle')).toBeGreaterThanOrEqual(2);
+    expect(canDriveTier(employee, 'travel_vehicle', 1)).toBe(true);
+    expect(canDriveTier(employee, 'travel_vehicle', 2)).toBe(true);
+    expect(isLicensedForRole(employee, 'travel_vehicle')).toBe(true);
+  });
+
+  it('the same employee is still refused a work role (rejection)', () => {
+    const state = createEmployeeState();
+    const { employee } = hireEmployee(state, 'driller', new Random(42), 0, 0);
+    employee.qualifications = [];
+    for (const role of WORK_ROLES()) {
+      expect(canDriveTier(employee, role, 1), role).toBe(false);
+      expect(isLicensedForRole(employee, role), role).toBe(false);
+    }
+  });
+
+  it('countLicenceHolders counts every living employee and skips the dead', () => {
+    const state = createEmployeeState();
+    const rng = new Random(42);
+    const ids = [0, 1, 2, 3].map(i => hireEmployee(state, 'driller', rng, i, 0).employee.id);
+    for (const e of state.employees) e.qualifications = [];
+    expect(countLicenceHolders(state.employees, 'travel_vehicle', 1)).toBe(4);
+    expect(countLicenceHolders(state.employees, 'travel_vehicle', 2)).toBe(4);
+    killEmployee(state, ids[0]!);
+    expect(countLicenceHolders(state.employees, 'travel_vehicle', 2)).toBe(3);
+  });
+
+  it('an unlicensed employee boards a shuttle and becomes its driver', () => {
+    const state = createGame({ seed: 42 });
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 5, 5);
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(42), 5, 5);
+    employee.qualifications = [];
+    expect(board(state, vehicle.id, employee.id).success).toBe(true);
+    expect(vehicle.occupantIds[0]).toBe(employee.id);
   });
 });

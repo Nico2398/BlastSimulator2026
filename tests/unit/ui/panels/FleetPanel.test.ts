@@ -14,7 +14,7 @@ import type { FragmentData } from '../../../../src/core/mining/BlastExecution.js
 import { createGradeState } from '../../../../src/core/economy/MineGrade.js';
 import { createQuestState, completeQuest } from '../../../../src/core/economy/Quests.js';
 import { getQuest } from '../../../../src/core/economy/QuestCatalog.js';
-import { vehicleTierLockLabel, vehicleTierRefusal } from '../../../../src/core/economy/VehicleTierGate.js';
+import { vehicleTierLockLabel, vehicleTierRefusal, vehicleLockLabel } from '../../../../src/core/economy/VehicleTierGate.js';
 import { SELECTED_ROW_CLASS } from '../../../../src/ui/selectionRoute.js';
 import enLocaleJson from '../../../../src/core/i18n/locales/en.json' assert { type: 'json' };
 import frLocaleJson from '../../../../src/core/i18n/locales/fr.json' assert { type: 'json' };
@@ -267,11 +267,11 @@ describe('FleetPanel', () => {
 
   // ── DEALERSHIP ──
 
-  it('dealership lists every real role with all three tiers', () => {
+  it('dealership lists every real role: three tiers per work role, two for the travel role (#2285)', () => {
     const { panel } = makePanel();
     panel.update(makeState([]));
     const buttons = panel.root.querySelectorAll('.bs-fleet-tier-btn');
-    expect(buttons.length).toBe(6 * 3);
+    expect(buttons.length).toBe(6 * 3 + 2);
     expect(panel.root.textContent).toContain('DEALERSHIP');
     expect(panel.root.textContent).toContain('Dumpster on Wheels');
     expect(panel.root.textContent).toContain('Pour-Bucket Pete');
@@ -300,7 +300,7 @@ describe('FleetPanel', () => {
     state.cash = 5_000_000;
     panel.update(state);
     const buttons = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')];
-    expect(buttons.length).toBe(18);
+    expect(buttons.length).toBe(6 * 3 + 2);
     for (const btn of buttons) {
       const def = getVehicleDefByTier(btn.dataset['role'] as VehicleRole, Number(btn.dataset['tier']) as VehicleTier);
       const desc = btn.querySelector('.bs-fleet-tier-desc');
@@ -676,8 +676,8 @@ describe('FleetPanel — one scroll area per window (#958, #2242)', () => {
     const grid = bodyEl.querySelector<HTMLElement>('.bs-fleet-grid')!;
     const dealership = bodyEl.querySelector<HTMLElement>(':scope > .bs-fleet-dealership')!;
     expect(grid.contains(dealership)).toBe(false);
-    // 6 roles × 3 tiers of dealership buttons still resolve.
-    expect(dealership.querySelectorAll('.bs-fleet-tier-btn').length).toBe(6 * 3);
+    // 6 work roles × 3 tiers plus the travel role's 2 dealership buttons still resolve.
+    expect(dealership.querySelectorAll('.bs-fleet-tier-btn').length).toBe(6 * 3 + 2);
   });
 
   it('keeps bodyEl itself scrollable (overflow-y:auto) regardless of fleet size', () => {
@@ -733,11 +733,11 @@ describe('FleetPanel dealership quest gate (#2282)', () => {
     expect(tierBtn(panel, 'debris_hauler', 2).title).toContain(vehicleTierRefusal(state, 2)!);
   });
 
-  it('every role is locked the same way', () => {
+  it('every work role is locked the same way', () => {
     const { panel } = makePanel();
     panel.update(questSiteState());
     const locked = [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
-      .filter(b => b.dataset['locked'] !== undefined);
+      .filter(b => b.dataset['locked'] !== undefined && b.dataset['role'] !== 'travel_vehicle');
     expect(locked.length).toBe(6 * 2);
   });
 
@@ -781,7 +781,7 @@ describe('FleetPanel dealership quest gate (#2282)', () => {
     completeQuest(state, 'quest_vehicle_t3');
     panel.update(state);
     expect(tierBtn(panel, 'debris_hauler', 3).disabled).toBe(false);
-    expect(panel.root.querySelectorAll('.bs-fleet-tier-lock').length).toBe(0);
+    expect(panel.root.querySelectorAll('[data-dealer-role]:not([data-dealer-role="travel_vehicle"]) .bs-fleet-tier-lock').length).toBe(0);
   });
 
   it('a completed quest still leaves a button disabled when cash is short, without a lock label', () => {
@@ -865,11 +865,11 @@ describe('FleetPanel — vehicle filter and sort bar (#2161)', () => {
     expect(bar(panel).compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('offers every vehicle role in the main filter row', () => {
+  it('offers every vehicle role, the travel role included (#2285), in the main filter row', () => {
     const { panel } = setup();
     const roles = [...bar(panel).querySelectorAll<HTMLElement>('.bs-filter-row:not([data-filter-group]) [data-filter-value]')]
       .map(b => b.dataset['filterValue']).sort();
-    expect(roles).toEqual(['building_destroyer', 'charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger', 'rock_fragmenter']);
+    expect(roles).toEqual(['building_destroyer', 'charging_truck', 'debris_hauler', 'drill_rig', 'rock_digger', 'rock_fragmenter', 'travel_vehicle']);
     expect(bar(panel).querySelector('[data-filter-all]')).not.toBeNull();
   });
 
@@ -1179,5 +1179,197 @@ describe('FleetPanel — traffic banner coordinate link (#2165)', () => {
     const banner = panel.root.querySelector('.bs-fleet-traffic')!;
     expect(banner.textContent).toContain(t('ui.fleet.traffic_advisory', { count: 3, x: 8, z: 8 }));
     expect(banner.querySelector('button')).toBeNull();
+  });
+});
+
+// ── Travel vehicles (#2285 C8) ───────────────────────────────────────────────
+
+describe('FleetPanel travel vehicles (#2285)', () => {
+  const tierBtn = (panel: FleetPanel, role: string, tier: number) =>
+    [...panel.root.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')]
+      .find(b => b.dataset['role'] === role && b.dataset['tier'] === String(tier));
+  const travelGroup = (panel: FleetPanel) => panel.root.querySelector<HTMLElement>('[data-dealer-role="travel_vehicle"]');
+  const lockLabel = (btn: HTMLButtonElement | undefined): string | undefined => btn?.querySelector('.bs-fleet-tier-lock')?.textContent ?? undefined;
+  const raceCarTitle = (): string => t(getQuest('quest_race_car')!.titleKey);
+
+  function progressionState(grade: number): GameState {
+    const state = makeState([]);
+    state.cash = 50_000_000;
+    state.grade = createGradeState();
+    state.grade.grade = grade;
+    state.quests = createQuestState();
+    return state;
+  }
+
+  it('the dealership lists a travel group with exactly two tier buttons: tier 1 and tier 2, no tier 3', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([]));
+    const group = travelGroup(panel);
+    expect(group).not.toBeNull();
+    const buttons = [...group!.querySelectorAll<HTMLButtonElement>('.bs-fleet-tier-btn')];
+    expect(buttons.map(b => b.dataset['tier'])).toEqual(['1', '2']);
+    expect(buttons.every(b => b.dataset['role'] === 'travel_vehicle')).toBe(true);
+    expect(tierBtn(panel, 'travel_vehicle', 3)).toBeUndefined();
+  });
+
+  it('the group is named with the localized role and each button carries the real tier name, card line, tooltip and price', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([]));
+    expect(travelGroup(panel)!.textContent).toContain(t('vehicle_type.travel_vehicle'));
+    for (const tier of [1, 2] as const) {
+      const btn = tierBtn(panel, 'travel_vehicle', tier)!;
+      const def = getVehicleDefByTier('travel_vehicle', tier);
+      expect(btn.textContent).toContain(t(def.nameKey));
+      expect(btn.querySelector('.bs-fleet-tier-desc')!.textContent).toBe(vehicleCardLine(def));
+      expect(btn.title).toBe(vehicleCardTooltip(def));
+      expect(btn.textContent).toContain(def.purchaseCost.toLocaleString('en-US'));
+    }
+  });
+
+  it('the dealer-licence line says no licence is needed, with no raw skill key or null', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([]));
+    const line = travelGroup(panel)!.querySelector('.bs-dealer-licence')!.textContent!;
+    expect(line).toBe(t('ui.fleet.dealer_licence_none'));
+    expect(line).not.toMatch(/skill\.|null|undefined|\{\w+\}/);
+    for (const tier of [1, 2] as const) {
+      const tierLine = tierBtn(panel, 'travel_vehicle', tier)!.querySelector('.bs-fleet-tier-licence')?.textContent ?? '';
+      expect(tierLine).not.toMatch(/skill\.|null|undefined|\{\w+\}/);
+    }
+  });
+
+  it('a work role keeps its licence line (unchanged)', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([]));
+    const line = panel.root.querySelector('[data-dealer-role="debris_hauler"] .bs-dealer-licence')!.textContent!;
+    expect(line).toBe(t('ui.fleet.dealer_licence', { licence: t('skill.driving.truck') }));
+  });
+
+  it('on a site without grade or quests neither button is locked', () => {
+    const { panel } = makePanel();
+    const state = makeState([]);
+    state.cash = 50_000_000;
+    panel.update(state);
+    for (const tier of [1, 2] as const) {
+      const btn = tierBtn(panel, 'travel_vehicle', tier)!;
+      expect(btn.disabled).toBe(false);
+      expect(btn.dataset['locked']).toBeUndefined();
+      expect(btn.querySelector('.bs-fleet-tier-lock')).toBeNull();
+    }
+  });
+
+  it('below grade 2 the shuttle button is disabled, data-locked, and its badge and title name G2', () => {
+    const { panel } = makePanel();
+    const state = progressionState(1);
+    panel.update(state);
+    const btn = tierBtn(panel, 'travel_vehicle', 1)!;
+    expect(btn.disabled).toBe(true);
+    expect(btn.dataset['locked']).toBeDefined();
+    expect(lockLabel(btn)).toBe(vehicleLockLabel({ kind: 'grade', grade: 2 }));
+    expect(lockLabel(btn)).toContain('G2');
+    expect(btn.title).toContain('G2');
+    expect(btn.title).toContain(vehicleTierRefusal(state, 1, 'travel_vehicle')!);
+  });
+
+  it('at grade 2 the shuttle button opens in place', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    const state = progressionState(1);
+    panel.update(state);
+    state.grade!.grade = 2;
+    panel.update(state);
+    const btn = tierBtn(panel, 'travel_vehicle', 1)!;
+    expect(btn.disabled).toBe(false);
+    expect(btn.dataset['locked']).toBeUndefined();
+    expect(btn.querySelector('.bs-fleet-tier-lock')).toBeNull();
+    btn.click();
+    expect(calls).toEqual(['vehicle buy travel_vehicle tier:1']);
+  });
+
+  it('the race car button is locked with a badge and title naming the race-car quest, even at a high grade', () => {
+    const { panel } = makePanel();
+    const state = progressionState(9);
+    panel.update(state);
+    const btn = tierBtn(panel, 'travel_vehicle', 2)!;
+    expect(btn.disabled).toBe(true);
+    expect(btn.dataset['locked']).toBeDefined();
+    expect(lockLabel(btn)).toBe(vehicleTierLockLabel(getQuest('quest_race_car')!));
+    expect(lockLabel(btn)).toContain(raceCarTitle());
+    expect(btn.title).toContain(raceCarTitle());
+    expect(tierBtn(panel, 'travel_vehicle', 1)!.dataset['locked']).toBeUndefined();
+  });
+
+  it('completing the race-car quest opens the race car in place, dispatching a tier-2 purchase', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    const state = progressionState(0);
+    panel.update(state);
+    expect(tierBtn(panel, 'travel_vehicle', 2)!.disabled).toBe(true);
+    completeQuest(state, 'quest_race_car');
+    panel.update(state);
+    const btn = tierBtn(panel, 'travel_vehicle', 2)!;
+    expect(btn.disabled).toBe(false);
+    expect(btn.querySelector('.bs-fleet-tier-lock')).toBeNull();
+    btn.click();
+    expect(calls).toEqual(['vehicle buy travel_vehicle tier:2']);
+  });
+
+  it('the shuttle lock never reads the quest, the race car lock never reads the grade', () => {
+    const { panel } = makePanel();
+    const state = progressionState(0);
+    completeQuest(state, 'quest_race_car');
+    panel.update(state);
+    expect(tierBtn(panel, 'travel_vehicle', 1)!.dataset['locked']).toBeDefined();
+    expect(tierBtn(panel, 'travel_vehicle', 2)!.dataset['locked']).toBeUndefined();
+  });
+
+  it('clicking a locked travel button dispatches nothing', () => {
+    const { panel } = makePanel();
+    const calls: string[] = [];
+    panel.setGameConsole(cmd => { calls.push(cmd); return { success: true, output: '' }; });
+    panel.update(progressionState(0));
+    tierBtn(panel, 'travel_vehicle', 1)!.click();
+    tierBtn(panel, 'travel_vehicle', 2)!.click();
+    expect(calls).toEqual([]);
+  });
+
+  it('the work-role buttons are unaffected by the grade: still quest-locked at grade 9', () => {
+    const { panel } = makePanel();
+    panel.update(progressionState(9));
+    expect(tierBtn(panel, 'debris_hauler', 2)!.dataset['locked']).toBeDefined();
+    expect(tierBtn(panel, 'debris_hauler', 1)!.dataset['locked']).toBeUndefined();
+  });
+
+  it('an owned travel vehicle gets a fleet card with its tier name, role, id and a locate button', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 7, type: 'travel_vehicle', tier: 1, hp: getVehicleDefByTier('travel_vehicle', 1).maxHp })]));
+    const row = panel.root.querySelector<HTMLElement>('[data-vehicle-id="7"]')!;
+    expect(row).not.toBeNull();
+    expect(row.textContent).toContain(t(getVehicleDefByTier('travel_vehicle', 1).nameKey));
+    expect(row.textContent).toContain(t('vehicle_type.travel_vehicle'));
+    expect(row.textContent).toContain('#7');
+    expect(row.textContent).not.toMatch(/vehicle_type\.|skill\.null|undefined/);
+    expect(row.textContent).toContain(t('ui.fleet.row_anyone'));
+    const buttons = [...row.querySelectorAll('button')];
+    expect(buttons.length).toBe(1);
+    expect(buttons[0]!.getAttribute('data-action')).toBe('locate');
+  });
+
+  it('a race car card shows the race car name', () => {
+    const { panel } = makePanel();
+    panel.update(makeState([makeVehicle({ id: 8, type: 'travel_vehicle', tier: 2, hp: getVehicleDefByTier('travel_vehicle', 2).maxHp })]));
+    expect(panel.root.querySelector('[data-vehicle-id="8"]')!.textContent).toContain(t(getVehicleDefByTier('travel_vehicle', 2).nameKey));
+  });
+
+  it('the group and button labels read differently in French', () => {
+    const { panel: enPanel } = makePanel();
+    enPanel.update(progressionState(0));
+    const enText = travelGroup(enPanel)!.textContent;
+    const prev = (frLocaleJson as Record<string, string>)['vehicle_type.travel_vehicle'];
+    expect(prev).toBeTruthy();
+    expect(prev).not.toBe((enLocaleJson as Record<string, string>)['vehicle_type.travel_vehicle']);
+    expect(enText).toContain(t('vehicle_type.travel_vehicle'));
   });
 });

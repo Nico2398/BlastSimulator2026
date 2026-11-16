@@ -290,3 +290,56 @@ describe('vehicleDetailParts — makeNoDriverRow warning names the level (#1850)
     expect(row.textContent).toContain('Nobody holds Drill Rig Operation level 3');
   });
 });
+
+describe('vehicleDetailParts — travel vehicles (#2285)', () => {
+  const RACE_TITLE = (): string => t(getQuest('quest_race_car')!.titleKey);
+
+  it('a shuttle upgrade is available and priced at the shuttle to race-car difference', () => {
+    const cost = computeVehicleUpgradeCost('travel_vehicle', 1)!;
+    expect(cost).toBeGreaterThan(0);
+    expect(upgradeState({ type: 'travel_vehicle', tier: 1 }, cost, {})).toEqual({ available: true, affordable: true, cost });
+    expect(upgradeState({ type: 'travel_vehicle', tier: 1 }, cost - 1, {}).affordable).toBe(false);
+  });
+
+  it('a race car has no upgrade: tier 2 is the travel maximum', () => {
+    expect(upgradeState({ type: 'travel_vehicle', tier: 2 }, 9_999_999, {})).toEqual({ available: false, affordable: false, cost: null });
+    expect(upgradeDisabledReason(upgradeState({ type: 'travel_vehicle', tier: 2 }, 9_999_999, {}))).toBe(t('ui.fleet.upgrade_max'));
+  });
+
+  it('the shuttle upgrade is locked by the race-car quest, not the work-fleet tier-2 quest', () => {
+    const site = { quests: createQuestState() };
+    const s = upgradeState({ type: 'travel_vehicle', tier: 1 }, 9_999_999, site);
+    expect(s.locked).toBe(vehicleTierRefusal(site, 2, 'travel_vehicle'));
+    expect(s.locked).toContain(RACE_TITLE());
+    expect(s.locked).not.toContain(t(getQuest('quest_vehicle_t2')!.titleKey));
+  });
+
+  it('the shuttle upgrade unlocks with the race-car quest alone, and the work-fleet quest does not unlock it', () => {
+    const done = { quests: { ...createQuestState(), completed: ['quest_race_car'] } };
+    expect(upgradeState({ type: 'travel_vehicle', tier: 1 }, 9_999_999, done).locked).toBeUndefined();
+    const other = { quests: { ...createQuestState(), completed: ['quest_vehicle_t2'] } };
+    expect(upgradeState({ type: 'travel_vehicle', tier: 1 }, 9_999_999, other).locked).toBeDefined();
+  });
+
+  it('a work role upgrade is still locked by its own quest after the race-car quest', () => {
+    const site = { quests: { ...createQuestState(), completed: ['quest_race_car'] } };
+    expect(upgradeState({ type: 'debris_hauler', tier: 1 }, 9_999_999, site).locked).toContain(t(getQuest('quest_vehicle_t2')!.titleKey));
+  });
+
+  it('licenceWarning never fires for a travel vehicle: anyone can drive the next tier', () => {
+    expect(licenceWarning({ type: 'travel_vehicle', tier: 1 }, [makeEmployee()])).toBeNull();
+  });
+
+  it('the no-driver row of an unlicensed-crew travel vehicle is the neutral unmanned label, no licence warning', () => {
+    const state = makeState([], [makeEmployee()]);
+    const row = makeNoDriverRow(makeVehicle({ type: 'travel_vehicle' }), state, () => {});
+    expect(row.textContent).toContain(t('ui.fleet.unmanned'));
+    expect(row.textContent).not.toMatch(/skill\.null|null|Nobody holds/);
+    expect(row.querySelector('button')).toBeNull();
+  });
+
+  it('even with an empty roster the row never prints a raw skill.null', () => {
+    const row = makeNoDriverRow(makeVehicle({ type: 'travel_vehicle' }), makeState([], []), () => {});
+    expect(row.textContent).not.toMatch(/skill\.null|null|undefined/);
+  });
+});

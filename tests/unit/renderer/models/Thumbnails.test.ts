@@ -4,7 +4,7 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { thumbnailShots, thumbnailUrl } from '../../../../src/renderer/models/Thumbnails.js';
 import { allModelIds, EMPLOYEE_ROLES, VEHICLE_TIERS, vehicleModelId, workerModelId } from '../../../../src/renderer/models/ModelIds.js';
-import { getAllVehicleRoles } from '../../../../src/core/entities/Vehicle.js';
+import { getAllVehicleRoles, vehicleRoleMaxTier } from '../../../../src/core/entities/Vehicle.js';
 
 const THUMB_DIR = resolve(import.meta.dirname, '../../../../public/thumbs');
 /** One thumbnail above this is a framing or export mistake (measured 5–20 KB). */
@@ -19,8 +19,12 @@ describe('thumbnail catalogue', () => {
     const ids = new Set(shots.map(s => s.id));
     for (const role of EMPLOYEE_ROLES) expect(ids.has(workerModelId(role)), role).toBe(true);
     for (const role of getAllVehicleRoles()) {
-      for (const tier of VEHICLE_TIERS) expect(ids.has(vehicleModelId(role, tier)), `${role} t${tier}`).toBe(true);
+      for (const tier of VEHICLE_TIERS.filter(tr => tr <= vehicleRoleMaxTier(role))) expect(ids.has(vehicleModelId(role, tier)), `${role} t${tier}`).toBe(true);
     }
+  });
+
+  it('has no thumbnail for a travel vehicle tier 3, which does not exist (#2285)', () => {
+    expect(shots.some(s => s.id === vehicleModelId('travel_vehicle', 3))).toBe(false);
   });
 
   it('names only models the game ships, each once', () => {

@@ -8,7 +8,7 @@ import {
   rosterCanDriveVehicleTier,
   canAffordVehicleUpgrade,
 } from '../../../src/core/entities/VehicleUpgrade.js';
-import { purchaseVehicle, createVehicleState, getVehicleDefByTier, getAllVehicleRoles } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, createVehicleState, getVehicleDefByTier, getAllVehicleRoles, vehicleRoleMaxTier } from '../../../src/core/entities/Vehicle.js';
 import type { Employee } from '../../../src/core/entities/Employee.js';
 import { VEHICLE_MAX_TIER } from '../../../src/core/config/balance.js';
 
@@ -39,6 +39,55 @@ describe('nextVehicleTier', () => {
   it('returns null at max tier', () => expect(nextVehicleTier(3)).toBeNull());
 });
 
+describe('nextVehicleTier by role (#2285)', () => {
+  it('a work role climbs 1 -> 2 -> 3 -> null', () => {
+    expect(nextVehicleTier(1, 'debris_hauler')).toBe(2);
+    expect(nextVehicleTier(2, 'debris_hauler')).toBe(3);
+    expect(nextVehicleTier(3, 'debris_hauler')).toBeNull();
+  });
+
+  it('the travel role climbs 1 -> 2 and stops: tier 2 is its top', () => {
+    expect(nextVehicleTier(1, 'travel_vehicle')).toBe(2);
+    expect(nextVehicleTier(2, 'travel_vehicle')).toBeNull();
+  });
+
+  it('every role stops at its own vehicleRoleMaxTier', () => {
+    for (const role of getAllVehicleRoles()) {
+      expect(nextVehicleTier(vehicleRoleMaxTier(role), role), role).toBeNull();
+    }
+  });
+});
+
+describe('computeVehicleUpgradeCost for the travel role (#2285)', () => {
+  it('shuttle to race car costs the purchase-price difference', () => {
+    const diff = getVehicleDefByTier('travel_vehicle', 2).purchaseCost - getVehicleDefByTier('travel_vehicle', 1).purchaseCost;
+    expect(diff).toBeGreaterThan(0);
+    expect(computeVehicleUpgradeCost('travel_vehicle', 1)).toBe(diff);
+  });
+
+  it('the race car has no upgrade (null)', () => {
+    expect(computeVehicleUpgradeCost('travel_vehicle', 2)).toBeNull();
+  });
+});
+
+describe('upgradeVehicle for the travel role (#2285)', () => {
+  it('upgrades a shuttle to a race car and sets hp to the race car maxHp', () => {
+    const { vehicle } = purchaseVehicle(createVehicleState(), 'travel_vehicle', 1, 1);
+    const result = upgradeVehicle(vehicle);
+    expect(result.success).toBe(true);
+    expect(vehicle.tier).toBe(2);
+    expect(vehicle.hp).toBe(getVehicleDefByTier('travel_vehicle', 2).maxHp);
+  });
+
+  it('refuses a race car: max_tier, tier and hp untouched', () => {
+    const { vehicle } = purchaseVehicle(createVehicleState(), 'travel_vehicle', 1, 1, 2);
+    const hp = vehicle.hp;
+    expect(upgradeVehicle(vehicle)).toEqual({ success: false, reason: 'max_tier' });
+    expect(vehicle.tier).toBe(2);
+    expect(vehicle.hp).toBe(hp);
+  });
+});
+
 describe('computeVehicleUpgradeCost', () => {
   it('is the purchase-cost difference tier 1 -> 2', () => {
     expect(computeVehicleUpgradeCost('debris_hauler', 1)).toBe(25_000);
@@ -50,7 +99,7 @@ describe('computeVehicleUpgradeCost', () => {
 
   it('matches the catalog difference for every role and non-max tier', () => {
     for (const role of getAllVehicleRoles()) {
-      for (const tier of [1, 2] as const) {
+      for (const tier of ([1, 2] as const).filter(tr => tr < vehicleRoleMaxTier(role))) {
         const expected = getVehicleDefByTier(role, (tier + 1) as 2 | 3).purchaseCost
           - getVehicleDefByTier(role, tier).purchaseCost;
         expect(computeVehicleUpgradeCost(role, tier)).toBe(expected);

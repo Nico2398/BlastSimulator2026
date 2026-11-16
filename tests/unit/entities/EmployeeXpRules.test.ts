@@ -338,3 +338,14 @@ describe('computeTaskXpAwards — driving licence XP for vehicle-gated actions (
     expect(second).toEqual(first);
   });
 });
+
+describe('computeTaskXpAwards — the licence-free travel role earns no driving XP (#2285)', () => {
+  it('an action naming the travel role (and no skill) awards nothing, never a null-category award', () => {
+    const { employee } = hireEmployee(createEmployeeState(), 'driller', new Random(42));
+    const action: PendingAction = {
+      id: 1, type: 'general_work', requiredSkill: null, requiredVehicleRole: 'travel_vehicle',
+      targetX: 0, targetZ: 0, targetY: 0, payload: {}, targetEmployeeId: null, status: 'in_progress', holderId: null, queuedAtTick: 0,
+    };
+    expect(computeTaskXpAwards(employee, action)).toEqual([]);
+  });
+});

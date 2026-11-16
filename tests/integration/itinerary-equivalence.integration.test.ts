@@ -131,7 +131,7 @@ function measureItineraryEquivalence(seed: number, c: ItineraryEquivalenceCase):
 
   const rng = new Random(seed);
   const { employee } = hireEmployee(state.employees, 'driller', rng, c.employeeStart.x, c.employeeStart.z);
-  assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED[c.role], 1);
+  assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED[c.role]!, 1);
 
   const { vehicle } = purchaseVehicle(state.vehicles, c.role, c.vehicleStart.x, c.vehicleStart.z);
 
