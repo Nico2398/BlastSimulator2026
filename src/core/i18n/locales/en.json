@@ -1316,7 +1316,7 @@
   "event.politics_tax_reform.opt0": "Comply Reform",
   "event.politics_tax_reform.opt1": "Offshore Shell",
   "event.politics_tax_reform.opt2": "Lobby Against Reform",
-  "event.politics_tax_reform.res0": "The mine complies fully with the new tax reform. Expensive, transparent, and unexpectedly good for the ecology score. Explosives cost 25% less for 7 days.",
+  "event.politics_tax_reform.res0": "The mine complies fully with the new tax reform. Expensive, transparent, and unexpectedly good for the ecology score. Explosives cost 15% less for 7 days.",
   "event.politics_tax_reform.res1": "Profits get routed through a freshly opened offshore shell. The reform, on paper, barely applies anymore.",
   "event.politics_tax_reform.res2": "A lobbying campaign against the reform launches. Expensive, and its success is far from guaranteed. $250 leaves the account every day for 14 days.",
   "event.politics_tax_reform.title": "Tax Reform",

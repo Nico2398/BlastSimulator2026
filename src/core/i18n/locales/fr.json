@@ -1316,7 +1316,7 @@
   "event.politics_tax_reform.opt0": "Se Conformer à la Réforme",
   "event.politics_tax_reform.opt1": "Société-Écran Offshore",
   "event.politics_tax_reform.opt2": "Faire du Lobbying Contre",
-  "event.politics_tax_reform.res0": "La mine se conforme entièrement à la réforme fiscale. Coûteux, transparent, et étonnamment bon pour le score écologique. Les explosifs coûtent 25 % de moins pendant 7 jours.",
+  "event.politics_tax_reform.res0": "La mine se conforme entièrement à la réforme fiscale. Coûteux, transparent, et étonnamment bon pour le score écologique. Les explosifs coûtent 15 % de moins pendant 7 jours.",
   "event.politics_tax_reform.res1": "Les profits sont acheminés via une société-écran offshore fraîchement ouverte. La réforme, sur le papier, ne s'applique presque plus.",
   "event.politics_tax_reform.res2": "Une campagne de lobbying contre la réforme est lancée. Coûteuse, et son succès est loin d'être garanti. 250 $ quittent la caisse chaque jour pendant 14 jours.",
   "event.politics_tax_reform.title": "Réforme Fiscale",
