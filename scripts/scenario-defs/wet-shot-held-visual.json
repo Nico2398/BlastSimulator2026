@@ -50,7 +50,7 @@
           "command": "quest complete quest_explosive_t3"
         }
       ],
-      "role": "setup"
+      "role": "bootstrap"
     },
     {
       "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:42,15 diameter:0.089",
