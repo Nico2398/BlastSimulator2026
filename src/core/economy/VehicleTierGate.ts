@@ -18,7 +18,7 @@ export interface TierGateSite extends Pick<GameState, 'quests'> {
 }
 
 /** What keeps a vehicle tier from being bought: a dealer quest, or (the shuttle) the mine grade. */
-export type VehicleLock = { kind: 'quest'; quest: QuestDef } | { kind: 'grade'; grade: number };
+type VehicleLock = { kind: 'quest'; quest: QuestDef } | { kind: 'grade'; grade: number };
 
 /** The lock on `tier` of `role` (#2285): work roles by quest tier; the travel role by grade (T1) or its quest (T2). Null when allowed. */
 export function vehicleLock(state: TierGateSite, role: VehicleRole, tier: VehicleTier): VehicleLock | null {

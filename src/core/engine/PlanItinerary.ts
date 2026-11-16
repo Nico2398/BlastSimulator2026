@@ -827,7 +827,7 @@ export function findCheapestTransportItinerary(
 
   for (const role of getAllVehicleRoles()) {
     // A short trip is walked: no one fetches a travel vehicle for it (#2285).
-    if (role === 'travel_vehicle' && distToTarget < TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS) continue;
+    if (role === 'travel_vehicle' && distToTarget <= TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS) continue;
     const vehicle = findFreeVehicleForRole(state, role, employee);
     if (!vehicle) continue;
 

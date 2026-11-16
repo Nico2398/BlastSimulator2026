@@ -10,7 +10,7 @@ import type { EmployeeRole } from '../../core/entities/Employee.js';
 import { getAllVehicleRoles } from '../../core/entities/Vehicle.js';
 import { BUILDING_TIERS, isSingleTierType, type BuildingType } from '../../core/entities/Building.js';
 import { BUILDING_DEFS } from '../../core/entities/BuildingDefs.js';
-import { buildingModelId, EMPLOYEE_ROLES, usesPlaceholderModel, VEHICLE_TIERS, vehicleModelId, workerModelId } from './ModelIds.js';
+import { buildingModelId, EMPLOYEE_ROLES, vehicleModelId, vehicleModelTiers, workerModelId } from './ModelIds.js';
 
 /** Edge of every thumbnail, in px: 2× the largest size a card shows it at. */
 export const THUMB_SIZE_PX = 256;
@@ -46,8 +46,7 @@ export function thumbnailShots(): ThumbShot[] {
   const shots: ThumbShot[] = [];
   for (const role of EMPLOYEE_ROLES) shots.push({ id: workerModelId(role), family: 'worker', role, ...FRAMING.worker });
   for (const role of getAllVehicleRoles()) {
-    if (usesPlaceholderModel(role)) continue; // shares another role's thumbnail
-    for (const tier of VEHICLE_TIERS) shots.push({ id: vehicleModelId(role, tier), family: 'vehicle', ...FRAMING.vehicle });
+    for (const tier of vehicleModelTiers(role)) shots.push({ id: vehicleModelId(role, tier), family: 'vehicle', ...FRAMING.vehicle });
   }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
     const tiers = isSingleTierType(type) ? [BUILDING_TIERS[0]!] : BUILDING_TIERS;
