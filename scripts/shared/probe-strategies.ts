@@ -21,8 +21,7 @@
 //               on the ground has fallen under RELOAD_FRACTION of the last blast's yield
 //               (shouldReload); the drill is idle
 //                and cash covers the shot; footprints keep SHOT_SPAN clear of earlier shots
-//            c. buy a Research Center
-//            d. research and order the tier-2 Freight Warehouse upgrade
+//            d. order the tier-2 Freight Warehouse upgrade once its quest is done
 //            e. buy a second hauler and hire its driver
 //            f. `permit apply` once `permit status` shows every target met
 //               (nextGradeTargets in src/core/economy/MineGrade.ts)
@@ -37,7 +36,7 @@
 //               column (deepestBreakoutDiameter), as many holes as the permit allows (fullHoleSide), spaced by
 //               the charge (holeSpacingForChargeM); while a depth target is open it deepens the crater,
 //               insetting the footprint by a berm once the pit is taller than the stability limit
-//            c. Research Center, tier-2 Freight Warehouse, second hauler (as reinvest); a replacement for any
+//            c. tier-2 Freight Warehouse, second hauler (as reinvest); a replacement for any
 //               core role nobody alive holds; another spoil heap while ecology sags
 //            d. frugal equipment: `vehicle upgrade` in place (rig, hauler, digger; no new driver on payroll) once the
 //               dealer's grade gate allows, cash stays above LADDER_UPGRADE_RESERVE and a
@@ -50,7 +49,7 @@
 //            A buy rule that cannot act (unaffordable, cooling down, failed) falls through to the
 //            next. Deposits are ranked on ground-truth ore, not a survey.
 
-import { explosiveLockedByQuest } from '../../src/core/economy/Quests.js';
+import { explosiveLockedByQuest, isBuildingTierUnlocked } from '../../src/core/economy/Quests.js';
 import { terrainStrandedDebris } from '../../src/core/engine/TerrainStrandedDebris.js';
 import { createGameEngine } from './command-runner.js';
 import { runCommand } from '../../src/console/createRunner.js';
@@ -707,7 +706,6 @@ interface ReinvestMemory {
    * moved ore. The initial lastYieldKg is approximate for the same reason.
    */
   yieldPending: boolean;
-  researchOrdered: boolean;
   retryAt: Record<string, number>;
   /** Tick at which the current unfinished, unordered pattern was first seen; unset while none stands. */
   stalePatternSinceTick?: number;
@@ -727,10 +725,6 @@ interface ReinvestMemory {
 
 function spendable(s: ProbeSession): number {
   return s.state.cash - REINVEST_CASH_RESERVE;
-}
-
-function countOf(s: ProbeSession, type: string): number {
-  return s.state.buildings.buildings.filter(b => b.type === type).length;
 }
 
 /** Try `attempt` unless it failed recently; remembers the failure for PLACEMENT_RETRY_TICKS. */
@@ -977,16 +971,10 @@ function abandonPattern(s: ProbeSession): void {
 /** Each rule returns only when it acted; an unaffordable, cooling-down or failed rule falls through. */
 function reinvestBuy(s: ProbeSession, m: ReinvestMemory): void {
   const { state } = s;
-  if (countOf(s, 'research_center') === 0 && !state.plannedBuildings.some(p => p.type === 'research_center')
-    && spendable(s) >= getBuildingDef('research_center', 1).constructionCost
-    && tryOnce(s, m, 'research_center', () => placeBuilding(s, 'research_center', rallyOf(s), null, depotSites(s), DEPOT_APPROACH_CLEAR_M) !== null)) {
-    return;
-  }
   const warehouse = state.buildings.buildings.find(b => b.type === 'freight_warehouse');
-  if (warehouse && warehouse.tier < 2 && countOf(s, 'research_center') > 0
+  if (warehouse && warehouse.tier < 2 && isBuildingTierUnlocked(state, 'freight_warehouse', 2)
     && !state.plannedBuildings.some(p => p.buildingId === warehouse.id)
     && spendable(s) >= getUpgradeCost('freight_warehouse', 2)) {
-    if (!m.researchOrdered) m.researchOrdered = s.run('research queue type:freight_warehouse tier:2').success;
     if (tryOnce(s, m, 'warehouse', () => s.run(`build upgrade ${warehouse.id}`).success)) return;
   }
   const haulers = state.vehicles.vehicles.filter(v => v.type === 'debris_hauler').length;
@@ -1032,7 +1020,7 @@ function runReinvest(s: ProbeSession): void {
   const first = runOpening(s).at;
   const m: ReinvestMemory = {
     shot: null, origins: [first], lastYieldKg: reachableHaulableOreKg(s.state), yieldPending: false,
-    researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(), keptRoles: kit, reloadOnReachableOre: true,
+    retryAt: {}, access: newCraterAccessMemory(), keptRoles: kit, reloadOnReachableOre: true,
   };
   playOut(s, () => {
     playPitLogistics(s.run, s.state, s.grid, m.access);
@@ -1436,13 +1424,12 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   };
 }
 
-/** Research (once) and order the next tier of the first `type` building. */
+/** Order the next tier of the first `type` building. */
 function upgradeBuilding(s: ProbeSession, m: ReinvestMemory, type: string): boolean {
   const b = s.state.buildings.buildings.find(x => x.type === type);
   if (!b || b.tier >= 3 || s.state.plannedBuildings.some(p => p.buildingId === b.id)) return false;
-  if (!s.state.buildings.buildings.some(x => x.type === 'research_center')) return false;
-  const tier = b.tier + 1;
-  if (!s.run(`research queue type:${type} tier:${tier}`).success && tier > 2) return false;
+  const tier = (b.tier + 1) as BuildingTier;
+  if (!isBuildingTierUnlocked(s.state, b.type, tier)) return false;
   return tryOnce(s, m, `upgrade_${type}`, () => s.run(`build upgrade ${b.id}`).success);
 }
 
@@ -1647,9 +1634,8 @@ function keepStorageFlowing(s: ProbeSession, m: ReinvestMemory): void {
   if (oreKg <= 0) return;
   const warehouses = s.state.buildings.buildings.filter(b => b.type === 'freight_warehouse');
   const upgradable = warehouses.find(b => b.tier < 3 && !s.state.plannedBuildings.some(p => p.buildingId === b.id));
-  if (upgradable && countOf(s, 'research_center') > 0
+  if (upgradable && isBuildingTierUnlocked(s.state, 'freight_warehouse', (upgradable.tier + 1) as BuildingTier)
     && spendable(s) >= getUpgradeCost('freight_warehouse', (upgradable.tier + 1) as BuildingTier)) {
-    s.run(`research queue type:freight_warehouse tier:${upgradable.tier + 1}`);
     if (tryOnce(s, m, `warehouse_upgrade_${upgradable.id}`, () => s.run(`build upgrade ${upgradable.id}`).success)) return;
   }
   const plannedWarehouses = s.state.plannedBuildings.filter(p => p.type === 'freight_warehouse').length;
@@ -1797,7 +1783,7 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   s.run(LADDER_SHIFT_POLICY);
   const m: LadderMemory = {
     shot: null, origins: [opened.at], lastYieldKg: haulableOreOnGroundKg(s.state), yieldPending: false,
-    researchOrdered: false, retryAt: {}, access: newCraterAccessMemory(),
+    retryAt: {}, access: newCraterAccessMemory(),
     crater: { ...opened.at, span: SHOT_SPAN }, ramps: {}, rampedFloorM: 0, maxGrade, barred: [], buriedSinceTick: null,
     holeCapM: LADDER_HOLE_DEPTH_M, lastShotFailed: false, dudStreak: 0, judgedShots: 1,
     before: { pitM: 0, oreKg: 0 },

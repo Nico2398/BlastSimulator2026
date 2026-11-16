@@ -35,7 +35,7 @@ const HEADERS = [
   ...CASH_SAMPLE_TICKS.map(t => `cash@${t}`),
   'low cash', 'low tick', 'bankrupt', 'firstBlastSold@6000', 'blasts',
   'warehouseFull tick', 'haulWait ticks', 'boulderSold', 'boulderOreSold', 'grades', 'grade cash', 'catalog bought',
-  'affordable warehouseT2', 'affordable researchCenter', 'affordable secondHauler',
+  'affordable warehouseT2', 'affordable secondHauler',
   'first sale', 'sales/costs', 'sales/costs p10', ...SALES_COST_WINDOW_STARTS.map(t => `sales/costs@${t}`), 'end',
 ];
 
@@ -47,7 +47,7 @@ function row(r: RunResult): string[] {
     cell(m.lowPointCash), cell(m.lowPointTick), cell(m.bankruptTick),
     share(m.firstBlastSoldShareAt6000), cell(m.blastsFired),
     cell(m.warehouseFullTick), cell(m.ticksHaulWaitedOnFullStorage), share(m.boulderSoldShare), share(m.boulderOreSoldShare), grades(r), gradeCash(r), cell(m.catalogBoughtTick),
-    cell(m.affordableTick.warehouseT2), cell(m.affordableTick.researchCenter), cell(m.affordableTick.secondHauler),
+    cell(m.affordableTick.warehouseT2), cell(m.affordableTick.secondHauler),
     cell(m.firstSaleTick), cell(m.salesCostRatio, 2), NONE, ...SALES_COST_WINDOW_STARTS.map((_, i) => cell(m.salesCostWindows[i] ?? null, 2)),
     r.endReason ?? `t${r.endTick}`,
   ];
@@ -87,7 +87,6 @@ function medianRow(runs: RunResult[]): string[] {
     share(med(runs, r => r.metrics.boulderSoldShare)), share(med(runs, r => r.metrics.boulderOreSoldShare)), NONE, NONE,
     cell(med(runs, r => r.metrics.catalogBoughtTick)),
     cell(med(runs, r => r.metrics.affordableTick.warehouseT2)),
-    cell(med(runs, r => r.metrics.affordableTick.researchCenter)),
     cell(med(runs, r => r.metrics.affordableTick.secondHauler)),
     cell(med(runs, r => r.metrics.firstSaleTick)), cell(med(runs, r => r.metrics.salesCostRatio), 2),
     cell(percentile(runs.map(r => r.metrics.salesCostRatio).filter((v): v is number => v !== null), 0.1), 2),

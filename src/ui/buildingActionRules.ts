@@ -1,18 +1,17 @@
 // Which building actions the inspector offers, and why one is not (#1758).
 
 import {
-  getBuildingDef, getDefSize, getDemolishCost, getMoveCost, getResearchProgress, getResearchTicksRemaining, getUpgradeCost,
-  isSingleTierType, isTierUnlocked,
-  type Building, type BuildingTier, type BuildingType,
+  getBuildingDef, getDefSize, getDemolishCost, getMoveCost, getUpgradeCost,
+  isSingleTierType,
+  type Building, type BuildingTier,
 } from '../core/entities/Building.js';
 import { RESERVATION_REFUSAL, reservationBlocking, terrainReservations, type TerrainReservation } from '../core/entities/PlacementReservations.js';
 import { DEMOLITION_VEHICLE_ROLE, isDemolitionOrdered } from '../core/engine/BuildingDemolition.js';
 import { isUpgradeOrdered } from '../core/engine/BuildingUpgrade.js';
-import { getResearchTaskDef } from '../core/config/balance.js';
-import { getQueueBlockCode, getUnmetConditions } from '../core/entities/BuildingResearch.js';
+import { buildingTierLockedByQuest } from '../core/economy/Quests.js';
+import { t } from '../core/i18n/I18n.js';
 import { roleShortfall } from '../core/engine/OrderReachability.js';
 import { isEligibleForWork } from '../core/entities/Employee.js';
-import { researchCostFor } from '../core/events/ActiveModifiers.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { GameState } from '../core/state/GameState.js';
 import type { PlacementCutoff } from '../core/entities/Building.js';
@@ -22,8 +21,6 @@ import { memoizedPlacementCutoff } from './placementCutoffConfirm.js';
 export const REASON_CASH = 'inspector.reason.cash';
 
 export type InspectorWaitKey = 'inspector.wait.no_vehicle' | 'inspector.wait.no_driver';
-
-type ResearchBlock = { reasonKey: string; reasonParams?: Record<string, string | number> };
 
 export interface BuildingActionRules {
   upgrade: {
@@ -35,15 +32,6 @@ export interface BuildingActionRules {
     /** What the upgraded footprint would strand from the crew (#1391); null when nothing or not applicable. */
     cutoff: PlacementCutoff | null;
   };
-  research: {
-    type: BuildingType;
-    tier: BuildingTier;
-    cost: number;
-    duration: number;
-    queued: { fraction: number; remaining: number } | null;
-    /** Why queueing is refused right now; null when it can be queued. */
-    blocked: ResearchBlock | null;
-  } | null;
   move: { cost: number; disabledReasonKey: string | null };
   demolish: { cost: number; disabledReasonKey: string | null; waitKey: InspectorWaitKey | null };
 }
@@ -62,11 +50,10 @@ export function buildingActionRules(
   };
   const moveCost = getMoveCost(b);
   const demolishCost = getDemolishCost(b);
-  const { upgrade, research } = upgradeRules(state, b, ordered, upgrading, reservations);
+  const upgrade = upgradeRules(state, b, ordered, upgrading, reservations);
   const demolishWait = ordered || upgrading ? null : demolitionWaitKey(state.vehicles, state.employees);
   return {
     upgrade,
-    research,
     move: { cost: moveCost, disabledReasonKey: orderedOr(moveCost) },
     demolish: { cost: demolishCost, disabledReasonKey: orderedOr(demolishCost), waitKey: demolishWait },
   };
@@ -81,26 +68,12 @@ function demolitionWaitKey(vehicles: GameState['vehicles'], employees: GameState
   return shortfall === 'no_vehicle_in_fleet' ? 'inspector.wait.no_vehicle' : 'inspector.wait.no_driver';
 }
 
-/** Why research for `type` tier `tier` cannot be queued, ahead of cash; null when it can. */
-function researchBlock(state: GameState, type: BuildingType, tier: 2 | 3): ResearchBlock | null {
-  const code = getQueueBlockCode(state.buildings, type, tier);
-  if (code === 'no_research_center') return { reasonKey: 'inspector.reason.research_no_center' };
-  if (code !== 'conditions_not_met') return null;
-  const unmet = getUnmetConditions(state.buildings, getResearchTaskDef(type, tier).conditions)
-    .find(c => c.kind === 'research_completed');
-  return unmet
-    ? { reasonKey: 'inspector.reason.research_needs_tier', reasonParams: { tier: unmet.tier } }
-    : { reasonKey: 'ui.build.research_failed_conditions_not_met' };
-}
-
-type UpgradeRules = Pick<BuildingActionRules, 'upgrade' | 'research'>;
-
-/** Upgrade verdict in the console's `build upgrade` order: max tier, demolition, upgrade ordered, locked, reserved terrain, cash. */
+/** Upgrade verdict in the console's `build upgrade` order: max tier, demolition, upgrade ordered, locked by quest, reserved terrain, cash. */
 function upgradeRules(
   state: GameState, b: Building, ordered: boolean, upgrading: boolean, reservations: ReadonlyArray<TerrainReservation>,
-): UpgradeRules {
-  const refused = (reasonKey: string, nextTier: BuildingTier | null, cost: number | null, params?: Record<string, string | number>): UpgradeRules => ({
-    upgrade: { kind: 'refused', cost, reasonKey, ...(params ? { reasonParams: params } : {}), nextTier, cutoff: null }, research: null,
+): BuildingActionRules['upgrade'] {
+  const refused = (reasonKey: string, nextTier: BuildingTier | null, cost: number | null, params?: Record<string, string | number>): BuildingActionRules['upgrade'] => ({
+    kind: 'refused', cost, reasonKey, ...(params ? { reasonParams: params } : {}), nextTier, cutoff: null,
   });
   if (isSingleTierType(b.type)) return refused('inspector.reason.single_tier', null, null);
   if (b.tier >= 3) return refused('inspector.reason.max_tier', null, null);
@@ -109,22 +82,11 @@ function upgradeRules(
   if (ordered) return refused('inspector.reason.demolition_ordered', nextTier, cost);
   if (upgrading) return refused('inspector.reason.upgrade_ordered', nextTier, cost);
 
-  if (!isTierUnlocked(state.buildings, b.type, nextTier)) {
-    const def = getResearchTaskDef(b.type, nextTier);
-    const task = state.buildings.researchQueue.find(r => r.targetType === b.type && r.targetTier === nextTier);
+  const lockedBy = buildingTierLockedByQuest(state, b.type, nextTier);
+  if (lockedBy) {
     return {
-      upgrade: {
-        kind: 'locked', cost, reasonKey: 'ui.build.research_required', reasonParams: { tier: nextTier },
-        nextTier, cutoff: null,
-      },
-      research: {
-        type: b.type,
-        tier: nextTier,
-        cost: researchCostFor(def.cost, state.events.activeModifiers, state.tickCount),
-        duration: def.ticks,
-        blocked: task ? null : researchBlock(state, b.type, nextTier),
-        queued: task ? { fraction: getResearchProgress(task).fraction, remaining: getResearchTicksRemaining(task) } : null,
-      },
+      kind: 'locked', cost, reasonKey: 'inspector.reason.quest_required',
+      reasonParams: { tier: nextTier, quest: t(lockedBy.titleKey) }, nextTier, cutoff: null,
     };
   }
 
@@ -137,8 +99,5 @@ function upgradeRules(
   }
   const { sizeX: curX, sizeZ: curZ } = getDefSize(getBuildingDef(b.type, b.tier));
   const cutoff = memoizedPlacementCutoff(state, next, { minX: b.x, minZ: b.z, maxX: b.x + curX, maxZ: b.z + curZ });
-  return {
-    upgrade: { kind: 'available', cost, reasonKey: null, nextTier, cutoff },
-    research: null,
-  };
+  return { kind: 'available', cost, reasonKey: null, nextTier, cutoff };
 }

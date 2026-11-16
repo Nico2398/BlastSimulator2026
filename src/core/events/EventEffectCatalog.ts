@@ -22,7 +22,7 @@ export type EventEffectSpec =
   | { type: 'bonus_per_employee'; amount: number }
   | { type: 'recurring_charge'; perDay: number; days: number }
   | { type: 'ban'; what: 'blast' | 'haul' | 'drill'; hours: number }
-  | { type: 'cost_factor'; what: 'survey' | 'research' | 'explosive' | 'upkeep'; pct: number; days: number }
+  | { type: 'cost_factor'; what: 'survey' | 'explosive' | 'upkeep'; pct: number; days: number }
   | { type: 'contract_price'; pct: number; days: number }
   | { type: 'special_contract' }
   | { type: 'cancel_contract'; penalty: boolean }
@@ -39,8 +39,8 @@ export type PermitProcessingSpec = Extract<EventEffectSpec, { type: 'permit_proc
 type ModifierDraft = Omit<ActiveModifier, 'id'>;
 
 const COST_FACTOR_KIND = {
-  survey: 'survey_cost', research: 'research_cost', explosive: 'explosive_price', upkeep: 'upkeep_surcharge',
-} as const satisfies Record<'survey' | 'research' | 'explosive' | 'upkeep', ModifierKind>;
+  survey: 'survey_cost', explosive: 'explosive_price', upkeep: 'upkeep_surcharge',
+} as const satisfies Record<'survey' | 'explosive' | 'upkeep', ModifierKind>;
 
 const BAN_KIND = { blast: 'blast_ban', haul: 'haul_pause', drill: 'drill_ban' } as const satisfies Record<'blast' | 'haul' | 'drill', ModifierKind>;
 

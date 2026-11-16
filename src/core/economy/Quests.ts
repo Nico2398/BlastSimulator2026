@@ -5,11 +5,13 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
-import type { BuildingType, BuildingTier } from '../entities/Building.js';
+import { isSingleTierType, type BuildingType, type BuildingTier } from '../entities/Building.js';
+import { getBedCapacity } from '../entities/BuildingWellbeing.js';
 import { getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
 import { getAllQuests, getQuest } from './QuestCatalog.js';
 
-type QuestObjectiveKind = 'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score';
+export type QuestObjectiveKind =
+  'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'buildings_built' | 'crew_housed';
 
 interface QuestObjectiveDef {
   kind: QuestObjectiveKind;
@@ -17,10 +19,9 @@ interface QuestObjectiveDef {
 }
 
 /** What completing a quest makes purchasable. */
-interface QuestReward {
-  kind: 'explosive_tier';
-  tier: ExplosiveTier;
-}
+export type QuestReward =
+  | { kind: 'explosive_tier'; tier: ExplosiveTier }
+  | { kind: 'building_tier'; tier: 2 | 3 };
 
 export interface QuestDef {
   id: string;
@@ -82,6 +83,8 @@ function objectiveProgress(state: GameState, kind: QuestObjectiveKind): number {
     case 'explosive_kg': return q?.explosiveKg ?? 0;
     case 'rock_kg': return q?.rockKg ?? 0;
     case 'safety_score': return state.scores.safety;
+    case 'buildings_built': return state.buildings.buildings.length;
+    case 'crew_housed': return Math.min(state.employees.employees.length, getBedCapacity(state.buildings));
   }
 }
 
@@ -146,6 +149,11 @@ function questForTier(tier: ExplosiveTier): QuestDef | undefined {
   return getAllQuests().find(q => q.reward.kind === 'explosive_tier' && q.reward.tier === tier);
 }
 
+/** The quest whose reward opens building `tier`, if any. */
+function questForBuildingTier(tier: 2 | 3): QuestDef | undefined {
+  return getAllQuests().find(q => q.reward.kind === 'building_tier' && q.reward.tier === tier);
+}
+
 /** Highest explosive tier the site may buy: 1, plus the tiers whose quest is completed. */
 export function unlockedExplosiveTier(state: Pick<GameState, 'quests'>): ExplosiveTier {
   let top: ExplosiveTier = 1;
@@ -165,16 +173,21 @@ export function explosiveLockedByQuest(state: Pick<GameState, 'quests'>, explosi
   return q && !isQuestCompleted(state, q.id) ? q : null;
 }
 
-/** Whether `tier` of a building type may be placed or upgraded to; tier 1 always, every tier on a site without quests. */
-export function isBuildingTierUnlocked(
-  _state: Pick<GameState, 'buildings' | 'quests'>, _type: BuildingType, _tier: BuildingTier,
-): boolean {
-  throw new Error('not implemented');
-}
-
 /** The open quest gating `tier` of a building type; null when it is unlocked or the site has no quests. */
 export function buildingTierLockedByQuest(
-  _state: Pick<GameState, 'buildings' | 'quests'>, _type: BuildingType, _tier: BuildingTier,
+  state: Pick<GameState, 'buildings' | 'quests'>, type: BuildingType, tier: BuildingTier,
 ): QuestDef | null {
-  throw new Error('not implemented');
+  if (!state.quests || tier === 1 || isSingleTierType(type)) return null;
+  if ((state.buildings.unlockedTiers[type] ?? 1) >= tier) return null;
+  const q = questForBuildingTier(tier);
+  return q && !isQuestCompleted(state, q.id) ? q : null;
+}
+
+/** Whether `tier` of a building type may be ordered: tier 1 always, never above 1 for a single-tier type, every tier on a site without quests. */
+export function isBuildingTierUnlocked(
+  state: Pick<GameState, 'buildings' | 'quests'>, type: BuildingType, tier: BuildingTier,
+): boolean {
+  if (tier === 1) return true;
+  if (isSingleTierType(type)) return false;
+  return buildingTierLockedByQuest(state, type, tier) === null;
 }

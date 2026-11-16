@@ -63,7 +63,6 @@ export const COMMAND_CUES: Readonly<Record<string, VerbRule>> = {
   // A setting, like a policy: nothing is ordered or paid.
   tube_on_drill: { otherwise: { cue: 'ui_tab' } },
   zone: { subs: { clear: ORDER, status: null }, otherwise: null },
-  research: { subs: { queue: ORDER, status: null }, otherwise: null },
   permit: { subs: { apply: CONFIRM, status: null }, otherwise: null },
   board: { subs: { status: null, start: null }, otherwise: null },
 

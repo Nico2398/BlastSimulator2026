@@ -16,7 +16,6 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { SurveyMethod } from '../mining/SurveyCalc.js';
 import type { TaskProgressLevelUp } from './TaskProgress.js';
 import type { TrainingCompletion, TrainingCancellation } from '../entities/EmployeeTraining.js';
-import type { CancelledResearch } from '../entities/Building.js';
 import type { ArrivalGateResult } from './ArrivalGate.js';
 import type { Violation } from '../state/WorldInvariants.js';
 import type { FiredEvent } from '../events/EventSystem.js';
@@ -33,7 +32,7 @@ import { tickInjuryRecovery } from './InjuryRecovery.js';
 import { releaseInjuredEmployeesQueues, releaseDeadHoldersActions } from './TaskCancellation.js';
 import { processPayCycle, computeAverageMorale, livingNames } from '../entities/Employee.js';
 import { tickTraining } from '../entities/EmployeeTraining.js';
-import { tickResearch, getTotalOperatingCost, syncBuildingServiceFlags, getStorageCapacity } from '../entities/Building.js';
+import { getTotalOperatingCost, syncBuildingServiceFlags, getStorageCapacity } from '../entities/Building.js';
 import { getVehicleMaintenanceCostPerTick, getVehicleFuelCostPerTick } from '../entities/Vehicle.js';
 import { getBedCapacity } from '../entities/BuildingWellbeing.js';
 import { tickNeedGauges, needsMoraleEffect, computeCrewFatigueStrain } from '../entities/EmployeeNeeds.js';
@@ -129,7 +128,6 @@ export interface TickReport {
    * absent.
    */
   trainingCancellations?: TrainingCancellation[];
-  researchCancelled: CancelledResearch | undefined;
   taskCompletions: Array<{ employeeId: number; report: TaskCompletionReport }>;
   stuckEmployees: number[];
   abandonedActions: Array<{ employeeId: number; actionId: number | null }>;
@@ -315,18 +313,6 @@ export function runTick(
       state.tickCount);
   }
 
-  // 8c-2. Research Center queue — advance the head task's progress each tick,
-  //       unlocking its target tier when it completes. If the enabling
-  //       Research Center was destroyed mid-flight, the task is cancelled
-  //       and its cost refunded instead.
-  const researchCancelled = tickResearch(state.buildings, emitter);
-  if (researchCancelled) {
-    state.cash += researchCancelled.refund;
-    addIncome(state.finances, researchCancelled.refund, 'refund',
-      `Research cancelled: ${researchCancelled.targetType} T${researchCancelled.targetTier} (Research Center destroyed)`,
-      state.tickCount);
-  }
-
   // 8c-3. Haul/fragment dispatch (#552): scan on-ground fragments for ones
   // with no existing haul_debris/fragment_debris action yet (any status)
   // and queue one. Idempotent, run before 8d so a fragment that becomes
@@ -481,7 +467,6 @@ export function runTick(
     needEvents,
     trainingCompletions,
     trainingCancellations,
-    researchCancelled,
     taskCompletions,
     stuckEmployees,
     abandonedActions,

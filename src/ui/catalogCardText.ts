@@ -14,7 +14,6 @@ export const BUILDING_CAPACITY_UNIT_KEY: Record<BuildingType, string | null> = {
   blasting_academy: 'ui.build.unit.seats',
   management_office: 'ui.build.unit.seats',
   geology_lab: 'ui.build.unit.seats',
-  research_center: null,
   living_quarters: 'ui.build.unit.beds',
   freight_warehouse: 'ui.build.unit.kg',
   spoil_heap: null,

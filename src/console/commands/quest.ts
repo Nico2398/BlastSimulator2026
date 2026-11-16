@@ -10,7 +10,7 @@ import {
   type QuestDef, type QuestObjectiveStatus,
 } from '../../core/economy/Quests.js';
 import { formatGradeAmount } from '../../core/economy/MineGrade.js';
-import { explosivesOfTier } from '../../core/world/ExplosiveCatalog.js';
+import { questRewardLine } from '../../core/economy/QuestRewardText.js';
 import type { GameState } from '../../core/state/GameState.js';
 
 function objectiveLine(o: QuestObjectiveStatus): string {
@@ -20,11 +20,6 @@ function objectiveLine(o: QuestObjectiveStatus): string {
 
 function statusOf(state: GameState, def: QuestDef): string {
   return t(isQuestCompleted(state, def.id) ? 'quest.status.completed' : 'quest.status.available');
-}
-
-function rewardLine(def: QuestDef): string {
-  const names = explosivesOfTier(def.reward.tier).map(e => t(e.nameKey)).join(', ');
-  return t('quest.reward', { tier: def.reward.tier, explosives: names });
 }
 
 function questList(state: GameState): CommandResult {
@@ -43,7 +38,7 @@ function questDetail(state: GameState, id: string | undefined): CommandResult {
     t('quest.detail.giver', { giver: t(def.giverKey) }),
     t(def.pitchKey),
     ...questObjectiveStatuses(state, def).map(objectiveLine),
-    rewardLine(def),
+    questRewardLine(def.reward),
   ];
   const missing = (def.requires ?? []).filter(r => !isQuestCompleted(state, r)).map(r => t(getQuest(r)?.titleKey ?? r));
   if (!questPrerequisitesMet(state, def)) lines.push(t('quest.detail.requires', { quests: missing.join(', ') }));

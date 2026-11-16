@@ -109,10 +109,6 @@ export function tickCommand(
       lines.push(`[tick ${state.tickCount}] ${cancelled.employeeName}'s ${cancelled.skill} course was cancelled — school #${cancelled.buildingId} was destroyed. $${cancelled.refund} refunded.`);
     }
 
-    if (report.researchCancelled) {
-      lines.push(`[tick ${state.tickCount}] Research cancelled: ${report.researchCancelled.targetType} tier ${report.researchCancelled.targetTier} — Research Center destroyed, $${report.researchCancelled.refund} refunded.`);
-    }
-
     for (const { employeeId, report: completionReport } of report.taskCompletions) {
       const emp = state.employees.employees.find(e => e.id === employeeId);
       if (!emp) continue;

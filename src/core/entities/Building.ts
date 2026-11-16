@@ -2,14 +2,11 @@
 // Canonical 9 building types with 3 tiers each.
 // Ramps are directional voxel types (RampVoxelType), NOT buildings.
 // Placement grid helpers: BuildingPlacement.ts
-// Research Center queue: BuildingResearch.ts
 
 import type { Rect } from '../world/WorldGen.js';
 import { BUILDING_DEFS } from './BuildingDefs.js';
 import { RESERVATION_REFUSAL, reservationBlocking, type TerrainReservation } from './PlacementReservations.js';
 import { VANITY_TYPES } from './BuildingVanity.js';
-import { isTierUnlocked } from './BuildingResearch.js';
-import type { ResearchCondition } from './BuildingResearch.js';
 import { type VoxelGrid, getSurfaceY } from './BuildingPlacement.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD, BUILDING_UPGRADE_CREDIT_SHARE } from '../config/balance.js';
@@ -25,7 +22,6 @@ export type BuildingType =
   | 'blasting_academy'
   | 'management_office'
   | 'geology_lab'
-  | 'research_center'
   | 'living_quarters'
   | 'freight_warehouse'
   | 'spoil_heap'
@@ -238,7 +234,7 @@ export function syncBuildingServiceFlags(buildings: Building[], closed: Readonly
  * Building types people go inside of, and so have a people capacity: the
  * four training schools and living quarters. For each of them
  * `BuildingDef.capacity` already counts people (trainees, beds). Letting a
- * new type take people — a Research Center's researchers — is adding it
+ * new type take people is adding it
  * here, not editing a caller.
  */
 const PEOPLE_HOLDING_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>([
@@ -254,7 +250,7 @@ export function getBuildingPeopleCapacity(type: BuildingType, tier: BuildingTier
   return PEOPLE_HOLDING_TYPES.has(type) ? getBuildingDef(type, tier).capacity : 0;
 }
 
-/** Types with a single tier: tiers 2 and 3 alias tier 1 and cannot be researched (#1530). */
+/** Types with a single tier: tiers 2 and 3 alias tier 1 and are never unlocked (#1530). */
 const SINGLE_TIER_TYPES: ReadonlySet<BuildingType> = new Set<BuildingType>(['spoil_heap', ...VANITY_TYPES]);
 
 /** Types that take no crew (#1530). */
@@ -272,23 +268,14 @@ export function isCrewlessBuilding(type: BuildingType): boolean {
 
 // ── Building state ──
 
-export interface ResearchTask {
-  targetType: BuildingType;
-  targetTier: 2 | 3;
-  ticksRemaining: number;
-  cost: number;
-  conditions: ResearchCondition[];
-}
-
 export interface BuildingState {
   buildings: Building[];
   nextId: number;
-  researchQueue: ResearchTask[];
   unlockedTiers: Partial<Record<BuildingType, BuildingTier>>;
 }
 
 export function createBuildingState(): BuildingState {
-  return { buildings: [], nextId: 1, researchQueue: [], unlockedTiers: {} };
+  return { buildings: [], nextId: 1, unlockedTiers: {} };
 }
 
 // ── Operations ──
@@ -310,19 +297,6 @@ export interface PlaceBuildingResult extends RefusalKey {
   building?: Building;
   error?: string;
   cost?: number;
-}
-
-/**
- * Whether placing or upgrading a building at this tier is blocked because the
- * tier has not been unlocked via a Research Center task.
- * Tier 1 is always unlocked; tier 2/3 require `isTierUnlocked` to report true.
- */
-export function isPlacementBlockedByResearch(
-  state: BuildingState,
-  type: BuildingType,
-  tier: BuildingTier,
-): boolean {
-  return !isTierUnlocked(state, type, tier);
 }
 
 /**
@@ -350,15 +324,6 @@ export function placeBuilding(
   voxelGrid?: VoxelGrid,
 ): PlaceBuildingResult {
   const def = getBuildingDef(type, tier);
-
-  if (isPlacementBlockedByResearch(state, type, tier)) {
-    return {
-      success: false,
-      error: `Tier ${tier} ${type} is not researched — research required before placement.`,
-      errorKey: 'entities.build_not_researched',
-      errorParams: { tier, type },
-    };
-  }
 
   const check = checkFootprintPlacement(
     state.buildings.map(b => ({ type: b.type, tier: b.tier, x: b.x, z: b.z })),
@@ -679,12 +644,6 @@ export function spoilHeapRoomKg(b: Pick<Building, 'type' | 'tier' | 'storedSpoil
 // ── Re-exports from sub-modules ──────────────────────────────────────────────
 
 export { getSurfaceY, isBuildingFootprintCell } from './BuildingPlacement.js';
-export {
-  queueResearchTask, tickResearch, getResearchProgress, getResearchTicksRemaining, isTierUnlocked,
-  hasActiveResearchCenter, getUnmetConditions, getQueueBlockCode,
-  getResearchCenterProfile, getActiveResearchTasks,
-  type QueueBlockCode, type CancelledResearch,
-} from './BuildingResearch.js';
 export { getLivingQuartersWellbeingMultiplier } from './BuildingWellbeing.js';
 export { freightWarehouseHasRoom } from './BuildingWarehouse.js';
 export {

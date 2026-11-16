@@ -3,7 +3,6 @@
 // Real-world research notes are included for each value.
 
 import type { BuildingType, BuildingTier } from '../entities/Building.js';
-import type { ResearchCondition } from '../entities/BuildingResearch.js';
 import type { VehicleRole, VehicleTask, VehicleTier } from '../entities/Vehicle.js';
 import type { EmployeeRole, SkillCategory, NeedKey } from '../entities/Employee.js';
 import type { ActionType } from '../state/GameState.js';
@@ -1967,79 +1966,6 @@ export const TRAINING_LEVEL_FEE: Record<1 | 2 | 3, number> = {
  */
 export const TRAINING_LEVEL_TICKS_MULT: Record<1 | 2 | 3, number> = { 1: 1, 2: 1.5, 3: 2 };
 
-// ─── Research Center ───────────────────────────────────────────────────────────
-
-/**
- * Duration and cost of a Research Center task by the tier it unlocks. Tier 3
- * research costs and takes more than tier 2 — a straight step up keeps
- * late-game tiers a real investment rather than a rubber-stamp.
- */
-/** Cost, duration, and prerequisites for a single tier's research task. */
-export interface ResearchTaskDef {
-  cost: number;
-  ticks: number;
-  conditions: ResearchCondition[];
-}
-
-/**
- * Research task definitions per building type and tier. Tier 2 is a
- * cost-only first upgrade (no duration, no prerequisites); tier 3 adds a
- * duration and requires tier 2 already researched — a straight step up
- * mirrors the training level multiplier so late-game tiers stay a real
- * investment rather than a rubber-stamp.
- */
-export const RESEARCH_TASK_DEFS: Record<BuildingType, { 2: ResearchTaskDef; 3: ResearchTaskDef }> = {
-  driving_center: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'driving_center', tier: 2 }] },
-  },
-  blasting_academy: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'blasting_academy', tier: 2 }] },
-  },
-  management_office: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'management_office', tier: 2 }] },
-  },
-  geology_lab: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'geology_lab', tier: 2 }] },
-  },
-  research_center: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'research_center', tier: 2 }] },
-  },
-  living_quarters: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'living_quarters', tier: 2 }] },
-  },
-  freight_warehouse: {
-    2: { cost: 5000, ticks: 0, conditions: [] },
-    3: { cost: 12000, ticks: 50, conditions: [{ kind: 'research_completed', buildingType: 'freight_warehouse', tier: 2 }] },
-  },
-  // Single-tier: never researched (isSingleTierType); entry only satisfies the exhaustive Record (#1530).
-  spoil_heap: {
-    2: { cost: 0, ticks: 0, conditions: [] },
-    3: { cost: 0, ticks: 0, conditions: [] },
-  },
-  // Vanity projects (#1947): single-tier, never researched.
-  ceo_statue: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
-  golf_course: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
-  executive_helipad: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
-  gold_tower: { 2: { cost: 0, ticks: 0, conditions: [] }, 3: { cost: 0, ticks: 0, conditions: [] } },
-};
-
-/** Research ticks consumed per game tick by a Research Center of each tier (#1936). */
-export const RESEARCH_CENTER_SPEED_BY_TIER: Record<1 | 2 | 3, number> = { 1: 1, 2: 1.5, 3: 2 };
-
-/** Research tasks a Research Center of each tier works on in parallel (#1936). */
-export const RESEARCH_CENTER_SLOTS_BY_TIER: Record<1 | 2 | 3, number> = { 1: 1, 2: 2, 3: 3 };
-
-/** Look up the research task definition for a building type and tier. */
-export function getResearchTaskDef(type: BuildingType, tier: 2 | 3): ResearchTaskDef {
-  return RESEARCH_TASK_DEFS[type][tier];
-}
-
 // ─── Employee Needs ────────────────────────────────────────────────────────────
 // Hunger and breakNeed were removed (#928) — fatigue is the sole gauge.
 
@@ -2917,12 +2843,6 @@ export const EVENT_SURVEY_DISCOUNT_PCT = -25;
 
 /** Days a survey cost discount lasts. */
 export const EVENT_SURVEY_DISCOUNT_DAYS = 7;
-
-/** Percent change applied to research costs by an event discount (negative = cheaper). */
-export const EVENT_RESEARCH_DISCOUNT_PCT = -25;
-
-/** Days a research cost discount lasts. */
-export const EVENT_RESEARCH_DISCOUNT_DAYS = 7;
 
 // ── Smuggling vs tax audit (#1409) ──
 

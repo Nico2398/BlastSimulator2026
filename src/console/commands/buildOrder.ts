@@ -12,7 +12,6 @@ import {
   isCrewlessBuilding,
   isSingleTierType,
   placeBuilding,
-  isPlacementBlockedByResearch,
   getUpgradeCost,
   type Building,
   checkFootprintPlacement,
@@ -23,6 +22,7 @@ import {
 import type { GameState, PlannedBuilding } from '../../core/state/GameState.js';
 import { isVanityType, isVanityAvailableIn, VANITY_PROJECTS } from '../../core/entities/BuildingVanity.js';
 import { applyVanityCompletion } from '../../core/economy/VanityEffects.js';
+import { buildingTierLockedByQuest } from '../../core/economy/Quests.js';
 import { addExpense } from '../../core/economy/Finance.js';
 import { formatMoney } from '../../core/economy/formatMoney.js';
 import { getSurfaceY } from '../../core/entities/BuildingPlacement.js';
@@ -96,10 +96,11 @@ export function orderBuildingCommand(
   const tier: BuildingTier = isSingleTierType(type) ? 1 : requestedTier;
 
   // Same two-stage order buildCommand's default case already documents:
-  // research gate, then funds — both ahead of claimForAction/the footprint
+  // quest gate, then funds — both ahead of claimForAction/the footprint
   // check because those mutate (claim off-site land, reserve the site).
-  if (isPlacementBlockedByResearch(state.buildings, type, tier)) {
-    return { success: false, output: t('entities.build_not_researched', { tier, type: buildingTypeName(type) }) };
+  const lockedBy = buildingTierLockedByQuest(state, type, tier);
+  if (lockedBy) {
+    return { success: false, output: t('entities.build_tier_locked', { tier, type: buildingTypeName(type), quest: t(lockedBy.titleKey) }) };
   }
 
   if (isVanityType(type) && !isVanityAvailableIn(state)) {
@@ -171,7 +172,7 @@ export function orderBuildingCommand(
 
 /**
  * Order the next tier of a standing building to be raised in place (#1875):
- * the same requirements as a new building of that tier (research, money,
+ * the same requirements as a new building of that tier (quest-unlocked tier, money,
  * room for the footprint, a free worker) and no demolition. The building
  * keeps its id, stock and residents, and keeps operating during the works.
  * A refused order mutates nothing.
@@ -182,8 +183,9 @@ export function orderBuildingUpgrade(ctx: GameContext, building: Building, nextT
   if (isUpgradeOrdered(state, id)) {
     return { success: false, output: t('entities.build_upgrade_already_ordered', { id }) };
   }
-  if (isPlacementBlockedByResearch(state.buildings, type, nextTier)) {
-    return { success: false, output: t('entities.build_upgrade_not_researched', { tier: nextTier, type: buildingTypeName(type) }) };
+  const lockedBy = buildingTierLockedByQuest(state, type, nextTier);
+  if (lockedBy) {
+    return { success: false, output: t('entities.build_upgrade_tier_locked', { tier: nextTier, type: buildingTypeName(type), quest: t(lockedBy.titleKey) }) };
   }
   const cost = getUpgradeCost(type, nextTier);
   if (state.cash < cost) {
