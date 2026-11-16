@@ -50,6 +50,7 @@
 //            A buy rule that cannot act (unaffordable, cooling down, failed) falls through to the
 //            next. Deposits are ranked on ground-truth ore, not a survey.
 
+import { explosiveLockedByQuest } from '../../src/core/economy/Quests.js';
 import { terrainStrandedDebris } from '../../src/core/engine/TerrainStrandedDebris.js';
 import { createGameEngine } from './command-runner.js';
 import { runCommand } from '../../src/console/createRunner.js';
@@ -387,7 +388,13 @@ interface Shot {
 }
 
 /** Explosive of every shot: the run's own (hard rock needs more than SHOT's krackle), else SHOT's. */
-const shotExplosive = (s: ProbeSession): string => s.config.explosive ?? (hardRockLevel(s) ? HARD_ROCK_EXPLOSIVE : SHOT.explosive);
+const shotExplosive = (s: ProbeSession): string => {
+  const id = s.config.explosive ?? (hardRockLevel(s) ? HARD_ROCK_EXPLOSIVE : SHOT.explosive);
+  // The scripted player does not play the quests: it takes the one that opens its explosive's tier (#2280).
+  const lock = explosiveLockedByQuest(s.state, id);
+  if (lock) s.run(`quest complete ${lock.id}`);
+  return id;
+};
 
 /** Explosive a campaign level of this difficulty tier or above is shot with: krackle breaks only the cells beside its charge in its hard rock at the grade-0 charge cap. */
 const HARD_ROCK_MIN_DIFFICULTY_TIER = 4;

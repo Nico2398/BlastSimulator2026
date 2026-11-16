@@ -28,7 +28,10 @@ function rewardLine(def: QuestDef): string {
 }
 
 function questList(state: GameState): CommandResult {
-  const lines = getAllQuests().map(def => `${def.id}: ${t(def.titleKey)} [${statusOf(state, def)}]`);
+  const lines = getAllQuests().flatMap(def => [
+    `${def.id}: ${t(def.titleKey)} [${statusOf(state, def)}]`,
+    ...questObjectiveStatuses(state, def).map(objectiveLine),
+  ]);
   return { success: true, output: [t('quest.list.header'), ...lines, t('quest.list.tier', { tier: unlockedExplosiveTier(state) })].join('\n') };
 }
 
