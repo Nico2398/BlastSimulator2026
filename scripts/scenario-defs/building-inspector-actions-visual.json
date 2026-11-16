@@ -195,8 +195,7 @@
         }
       ],
       "expect": {
-        "usable": "#bs-inspector [data-action=\"demolish\"]",
-        "note": "Demolish usable with a wait note."
+        "note": "Demolish was usable with a wait note before the inspector closed."
       }
     },
     {

@@ -212,6 +212,14 @@
       "interaction": [
         {
           "type": "clickIfPresent",
+          "selector": "#bs-build-panel [data-panel-close]"
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-employee-panel [data-panel-close]"
+        },
+        {
+          "type": "clickIfPresent",
           "selector": "#bs-inspector [data-panel-close]"
         },
         {
