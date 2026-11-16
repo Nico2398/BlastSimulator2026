@@ -14,7 +14,8 @@ import { optimizerOptionsFor } from '../../../core/mining/ChargeOptimizer.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
-import { getLevel, isExplosiveAvailable, resolveAvailableExplosives } from '../../../core/campaign/Level.js';
+import { getLevel, isExplosiveAvailable, isExplosiveAvailableFor, resolveAvailableExplosives } from '../../../core/campaign/Level.js';
+import { explosiveLockedByQuest } from '../../../core/economy/Quests.js';
 
 export function chargeCommand(
   ctx: MiningContext,
@@ -49,7 +50,7 @@ export function chargeCommand(
   const stemming = parseFloat((named['stemming'] ?? String(CHARGE_DEFAULT_STEMMING_M)).replace('m', ''));
 
   if (!explosiveId) return { success: false, output: t('mining.charge.missing_explosive') };
-  const notOffered = levelExplosiveFailure(ctx.state!.campaign.activeLevelId, explosiveId);
+  const notOffered = explosiveFailure(ctx.state!, explosiveId);
   if (notOffered) return notOffered;
 
   if (holeSpec === '*') return chargePattern(ctx.state!, explosiveId, amount, stemming);
@@ -75,7 +76,7 @@ export function chargeCommand(
  * offer. Null when allowed or when the id is not in the catalog (unknown ids
  * keep their existing error path).
  */
-export function levelExplosiveFailure(levelId: string | null, explosiveId: string): CommandResult | null {
+function levelExplosiveFailure(levelId: string | null, explosiveId: string): CommandResult | null {
   if (!getExplosive(explosiveId)) return null;
   if (isExplosiveAvailable(levelId, explosiveId)) return null;
   const level = levelId ? getLevel(levelId) : undefined;
@@ -90,6 +91,20 @@ export function levelExplosiveFailure(levelId: string | null, explosiveId: strin
       level: level ? t(level.nameKey) : (levelId ?? ''),
       available: resolveAvailableExplosives(levelId).map(nameOf).join(', '),
     }),
+  };
+}
+
+/**
+ * Failure when the site may not buy `explosiveId`: a quest site names the quest that opens it (#2280),
+ * any other site falls back to the level's own list.
+ */
+export function explosiveFailure(state: GameState, explosiveId: string): CommandResult | null {
+  if (!getExplosive(explosiveId) || isExplosiveAvailableFor(state, explosiveId)) return null;
+  const quest = explosiveLockedByQuest(state, explosiveId);
+  if (!quest) return levelExplosiveFailure(state.campaign.activeLevelId, explosiveId);
+  return {
+    success: false,
+    output: t('mining.charge.explosive_locked_quest', { explosive: explosiveName(explosiveId), quest: t(quest.titleKey) }),
   };
 }
 

@@ -10,7 +10,7 @@ import {
 } from './SoftwarePreview.js';
 import { isWaterSensitiveCharge, wetHoleIdsFor } from './WetHoles.js';
 import type { GameState } from '../state/GameState.js';
-import { resolveAvailableExplosives } from '../campaign/Level.js';
+import { resolveExplosivesFor } from '../campaign/Level.js';
 import { gradeRung } from '../economy/MineGrade.js';
 import { permitLimitsForRung } from '../economy/PermitLimits.js';
 import { getExplosive } from '../world/ExplosiveCatalog.js';
@@ -195,10 +195,10 @@ export function optimizeCharges(
 
 /** Optimizer options for the game's level, wet holes and permit grade (unlimited without a grade). */
 export function optimizerOptionsFor(
-  state: Pick<GameState, 'campaign' | 'grade' | 'drillHoles' | 'holeWater'>,
+  state: Pick<GameState, 'campaign' | 'grade' | 'quests' | 'drillHoles' | 'holeWater'>,
 ): OptimizeChargesOptions {
   return {
-    explosiveIds: resolveAvailableExplosives(state.campaign.activeLevelId),
+    explosiveIds: resolveExplosivesFor(state),
     wetHoleIds: wetHoleIdsFor(state),
     ...(state.grade ? { maxTotalKg: permitLimitsForRung(gradeRung(state.grade)).maxChargeKg } : {}),
   };

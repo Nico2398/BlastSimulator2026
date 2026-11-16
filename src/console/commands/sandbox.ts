@@ -29,6 +29,7 @@ import { vehicleMaxSlopeRatio } from '../../core/entities/Vehicle.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
 import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
+import { createQuestState } from '../../core/economy/Quests.js';
 import { createGradeState, extraContractOffers, LAST_NAMED_GRADE } from '../../core/economy/MineGrade.js';
 import { MINE_TIERS_PER_GRADE } from '../../core/config/balance.js';
 import { isValidOreGradeScale } from '../../core/economy/OreGrade.js';
@@ -175,6 +176,7 @@ export function sandboxCommand(
   if (level.market) ctx.state.contracts.market = level.market;
   if (level.progression) {
     ctx.state.grade = createGradeState();
+    ctx.state.quests = createQuestState();
     // `grade:N` starts the site at permit grade N (scenarios reach later grades without playing the ladder).
     if (startGrade.grade !== undefined) ctx.state.grade.grade = startGrade.grade;
     // `tier:M` picks the tier within a named grade; endless classes have one.

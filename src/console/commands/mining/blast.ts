@@ -15,6 +15,8 @@ import type { WarehouseLoss } from '../../../core/economy/FreightWarehouses.js';
 import { refreshLogisticsCapacity } from '../../../core/engine/BuildingTaskHelpers.js';
 import { processProjections, type AccidentRecord } from '../../../core/entities/Damage.js';
 import { recordVibration, recordBuildingDestruction } from '../../../core/scores/ScoreManager.js';
+import { recordQuestBlast } from '../../../core/economy/Quests.js';
+import { QUEST_ROCK_DENSITY_KG_M3 } from '../../../core/config/balance.js';
 import { blastPitDepthM, gradeRung, recordBlastChargeShare, recordGradeBlast } from '../../../core/economy/MineGrade.js';
 import { preFireCheck, resolveOvershoot, type InspectionVerdict } from '../../../core/economy/PermitLimits.js';
 import { deductExpense } from '../../../core/economy/Finance.js';
@@ -247,6 +249,11 @@ export function* fireBlastSteps(
   state.damage.blastCount++;
   const pitDepthM = blastPitDepthM(ctx.grid!, result.clearedColumns);
   recordGradeBlast(state.grade, pitDepthM, result.totalRockVolume);
+  recordQuestBlast(state.quests, {
+    explosiveKg: Object.values(plan.charges).reduce((sum, c) => sum + c.amountKg, 0),
+    rockKg: result.totalRockVolume * QUEST_ROCK_DENSITY_KG_M3,
+    flyrockIncident: impacts.length > 0,
+  });
   updateDepth(state.levelStats, -pitDepthM, 0);
   recordBlastResult(state.levelStats, result.fragments);
   snapshotStats(state.levelStats, state);

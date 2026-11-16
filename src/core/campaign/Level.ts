@@ -3,6 +3,7 @@
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 import type { GameState } from '../state/GameState.js';
+import { explosiveLockedByQuest } from '../economy/Quests.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
@@ -387,13 +388,14 @@ export function resolveAvailableExplosives(activeLevelId: string | null): readon
  * Explosive ids the site may buy. A progression site (quests, #2280) offers tier 1 plus the tiers its completed
  * quests opened; any other site keeps its level's `availableExplosives`.
  */
-export function resolveExplosivesFor(_state: GameState): readonly string[] {
-  throw new Error('not implemented');
+export function resolveExplosivesFor(state: Pick<GameState, 'quests' | 'campaign'>): readonly string[] {
+  if (!state.quests) return resolveAvailableExplosives(state.campaign.activeLevelId);
+  return getAllExplosives().filter(e => explosiveLockedByQuest(state, e.id) === null).map(e => e.id);
 }
 
 /** True when the site may use `explosiveId` (`resolveExplosivesFor`). */
-export function isExplosiveAvailableFor(_state: GameState, _explosiveId: string): boolean {
-  throw new Error('not implemented');
+export function isExplosiveAvailableFor(state: Pick<GameState, 'quests' | 'campaign'>, explosiveId: string): boolean {
+  return resolveExplosivesFor(state).includes(explosiveId);
 }
 
 /** True when `explosiveId` may be used at the given level. */

@@ -5,6 +5,8 @@ import type { EventEmitter } from '../../core/state/EventEmitter.js';
 import type { NotifyInput } from './NotificationCenter.js';
 import { t } from '../../core/i18n/I18n.js';
 import { gradeDef } from '../../core/economy/MineGrade.js';
+import { getQuest } from '../../core/economy/QuestCatalog.js';
+import { explosivesOfTier } from '../../core/world/ExplosiveCatalog.js';
 
 /** Wires progression:grade_applied, tier_up and grade_approved to `notify`. */
 export function wireProgressionNotifications(
@@ -20,6 +22,12 @@ export function wireProgressionNotifications(
   emitter.on('progression:tier_up', ({ grade, tier }) => {
     const def = gradeDef(grade);
     notify({ severity: 'info', title: t('notification.title.permit'), body: t('notification.progression.tier_up', { name: t(def.nameKey, def.nameParams), tier }) });
+  });
+  emitter.on('quest:completed', ({ questId }) => {
+    const quest = getQuest(questId);
+    if (!quest) return;
+    const explosives = explosivesOfTier(quest.reward.tier).map(e => t(e.nameKey)).join(', ');
+    notify({ severity: 'info', title: t('notification.title.quest'), body: t('notification.quest.completed', { title: t(quest.titleKey), explosives }) });
   });
   emitter.on('progression:ore_glut', ({ oreId }) =>
     notify({ severity: 'info', title: t('notification.title.market'), body: t('notification.market.glut', { ore: t(`ore.${oreId}.name`) }) }));
