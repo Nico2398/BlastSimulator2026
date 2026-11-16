@@ -388,7 +388,7 @@ interface Shot {
 }
 
 /** Explosive of every shot: the run's own (hard rock needs more than SHOT's krackle), else SHOT's. */
-const shotExplosive = (s: ProbeSession): string => {
+const shotExplosiveUnlocked = (s: ProbeSession): string => {
   const id = s.config.explosive ?? (hardRockLevel(s) ? HARD_ROCK_EXPLOSIVE : SHOT.explosive);
   // The scripted player does not play the quests: it takes the one that opens its explosive's tier (#2280).
   const lock = explosiveLockedByQuest(s.state, id);
@@ -506,7 +506,7 @@ function buildingGroundZones(state: GameState, clearM: number): ProtectedZone[] 
  * default) unless nothing else is left.
  */
 function orderShot(
-  s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosive(s) }, at?: Pattern,
+  s: ProbeSession, earlier: readonly (Pattern & { span?: number })[] = [], spec: ShotSpec = { ...SHOT, explosive: shotExplosiveUnlocked(s) }, at?: Pattern,
   rules?: FreshSiteRules, keepOut: readonly ProtectedZone[] = rampKeepOutZones(s.state),
 ): Shot | null {
   const span = spanOf(spec);
@@ -1331,7 +1331,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const pitM = state.grade?.deepestPitM ?? 0;
   const rigDiameterM = fleetBestRigLimit(DRILL_RIG_MAX_DIAMETER_M, vehicles);
   const limit: PermitLimit = permitLimitsFor(gradeOf(s), state.grade?.tier ?? 1);
-  const explosive = getExplosive(shotExplosive(s))!;
+  const explosive = getExplosive(shotExplosiveUnlocked(s))!;
   // Each hole takes the fullest charge it holds, in the bore whose charge column is longest, so the pattern breaks out
   // of the deepest holes; the permit then sets how many holes, and the charge how close they stand. Spreading the
   // permit over its most holes left 7.5 kg holes 4 m apart: a shaft round each hole, full-height rock between (#2091).
@@ -1379,7 +1379,7 @@ function ladderPlan(s: ProbeSession, m: LadderMemory): ShotPlan {
   const side = shaft ? 1 : wanted;
   const kg = kgFor(Math.max(side, 1));
   const specFor = (n: number): ShotSpec => ({
-    rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosive(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
+    rows: n, cols: n, spacing: sized.spacing, depth, explosive: shotExplosiveUnlocked(s), kg: kgFor(n), stemming: sized.stemming, diameterM: sized.diameterM,
   });
   // A g2 shot throws rock far enough to destroy a building beside the site (a lost building sank well-being to a revolt at t8520, #2076).
   const buildingZones = state.buildings.buildings.map(b => ({ x: b.x - LADDER_BUILDING_KEEP_OUT_M, z: b.z - LADDER_BUILDING_KEEP_OUT_M, span: 2 * LADDER_BUILDING_KEEP_OUT_M + 1 }));

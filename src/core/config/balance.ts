@@ -3763,9 +3763,9 @@ export const METEORITE_ROCK_ENERGY_ABSORPTION = 5000;
 export const METEORITE_CRATER_PLACEMENT_ATTEMPTS = 64;
 
 // ── Quests (#2280) ──
-/** Explosive T2 quest: blasts in a row without a flyrock impact. */
 /** Rock density used to turn a blast's broken volume into kg for quest objectives. */
 export const QUEST_ROCK_DENSITY_KG_M3 = 2500;
+/** Explosive T2 quest: blasts in a row without a flyrock impact. */
 export const QUEST_T2_CLEAN_BLASTS = 2;
 /** Explosive T2 quest: kg of explosive detonated. */
 export const QUEST_T2_EXPLOSIVE_KG = 100;
