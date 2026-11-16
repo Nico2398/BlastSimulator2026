@@ -206,8 +206,8 @@ describe('building inspector places the role near the top (C3)', () => {
   });
 
   it('later sections do not carry the role', () => {
-    const view = viewOf(placed('research_center', 1));
-    const role = t('building.research_center.role');
+    const view = viewOf(placed('blasting_academy', 1));
+    const role = t('building.blasting_academy.role');
     for (const section of view.sections.slice(1)) {
       expect(section.textContent ?? '').not.toContain(role);
     }

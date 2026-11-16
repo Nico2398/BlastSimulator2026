@@ -24,23 +24,22 @@ describe('Level 2 — Lose — Bankruptcy', () => {
 
   it('triggers bankruptcy when cash stays below $5,000 for 100 ticks', () => {
     // Spend down to below $5,000
-    // Calibrated on $75,000. Level 2 opens with more (#1672: its free crew's payroll needs it),
+    // Calibrated on $50,000. Level 2 opens with more (#1672: its free crew's payroll needs it),
     // so drop the cash to the figure the spend-down below adds up to.
-    ctx.state!.cash = 75000;
-    ctx.state!.finances.cash = 75000;
+    ctx.state!.cash = 50000;
+    ctx.state!.finances.cash = 50000;
     // Hire 5 drillers: 5 x $1,000 = $5,000
     for (let i = 0; i < 5; i++) {
       employeeCommand(ctx, ['hire'], { role: 'driller' });
     }
 
     // Build expensive buildings:
-    // research_center T1: $25,000
     // management_office T1: $8,000
     // living_quarters T1: $10,000
     // freight_warehouse T1: $15,000
     // geology_lab T1: $12,000
-    // Total buildings: $70,000
-    // Total spent: $5,000 + $70,000 = $75,000 -> remaining $0
+    // Total buildings: $45,000
+    // Total spent: $5,000 + $45,000 = $50,000 -> remaining $0
     //
     // Coordinates below are not the original (5,5)/(10,5)/(15,5)/(20,5)/
     // (25,5): #1008 wired a flatness check into the real placement path, and
@@ -49,7 +48,6 @@ describe('Level 2 — Lose — Bankruptcy', () => {
     // nothing, so cash would never actually reach $0 and bankruptcy would
     // never trigger. These are the nearest flat, non-overlapping spots for
     // each building's own footprint ((10,5) happens to already be flat).
-    buildCommand(ctx, ['research_center'], { at: '7,1' });
     buildCommand(ctx, ['management_office'], { at: '10,5' });
     buildCommand(ctx, ['living_quarters'], { at: '14,1' });
     buildCommand(ctx, ['freight_warehouse'], { at: '17,13' });

@@ -75,7 +75,7 @@ function fireReferenceShot(cols: number, stemmingM: number): Shot {
   state.contracts.autoSell = false; state.contracts.autoClearRubble = false; // stock under test must not be sold off or cleared (#2145)
   run('time resume');
 
-  // The warehouse the level opens with, raised to tier 2 (research gate skipped; capacity is the subject).
+  // The warehouse the level opens with, raised to tier 2 (tier set directly; capacity is the subject).
   const warehouse = state.buildings.buildings.find((b) => b.type === 'freight_warehouse')!;
   warehouse.tier = 2;
   refreshLogisticsCapacity(state);

@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
-// Inspector people and activity sections (#1760): residents, school trainees and courses, research queue.
+// Inspector people and activity sections (#1760): residents, school trainees and courses.
 import { describe, it, expect, vi } from 'vitest';
 import { residentsSection, schoolSection } from '../../../../../src/ui/panels/inspector/occupantsContent.js';
-import { researchSection } from '../../../../../src/ui/panels/inspector/researchContent.js';
 import type { InspectorLinks } from '../../../../../src/ui/panels/inspector/InspectorContent.js';
 import { createGame } from '../../../../../src/core/state/GameState.js';
 import type { GameState } from '../../../../../src/core/state/GameState.js';
@@ -10,7 +9,7 @@ import type { Employee } from '../../../../../src/core/entities/Employee.js';
 import { getBuildingDef, type Building, type BuildingType } from '../../../../../src/core/entities/Building.js';
 import { getLivingQuartersWellbeingMultiplier } from '../../../../../src/core/entities/BuildingWellbeing.js';
 import { courseTerms, trainableSkills } from '../../../../../src/core/entities/EmployeeTraining.js';
-import { t, setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { setLocale } from '../../../../../src/core/i18n/I18n.js';
 
 function makeEmployee(id: number, name: string, overrides: Partial<Employee> = {}): Employee {
   return {
@@ -58,7 +57,7 @@ const course = (buildingId: number, ticksRemaining: number, skill = 'blasting', 
   ({ buildingId, skill: skill as never, ticksRemaining, fee: 500, grantsLevel });
 
 describe('residentsSection', () => {
-  it.each(['management_office', 'blasting_academy', 'research_center', 'freight_warehouse'] as BuildingType[])(
+  it.each(['management_office', 'blasting_academy', 'freight_warehouse'] as BuildingType[])(
     'returns null for %s', type => {
       const b = makeBuilding(type);
       expect(residentsSection(b, makeState([b]), mkLinks().links)).toBeNull();
@@ -143,7 +142,7 @@ describe('residentsSection', () => {
 });
 
 describe('schoolSection', () => {
-  it.each(['living_quarters', 'research_center', 'freight_warehouse'] as BuildingType[])(
+  it.each(['living_quarters', 'freight_warehouse'] as BuildingType[])(
     'returns null for %s', type => {
       const b = makeBuilding(type);
       expect(schoolSection(b, makeState([b]), mkLinks().links)).toBeNull();
@@ -237,181 +236,5 @@ describe('schoolSection', () => {
     e.trainingState = null;
     b.occupantIds = [];
     expect(schoolSection(b, s, mkLinks().links)!.rowSignature).not.toBe(sec.rowSignature);
-  });
-});
-
-describe('researchSection', () => {
-  const task = (tier: 2 | 3, ticks: number, cost: number, type: BuildingType = 'management_office') =>
-    ({ targetType: type, targetTier: tier, ticksRemaining: ticks, cost, conditions: [] });
-
-  it.each(['living_quarters', 'blasting_academy', 'freight_warehouse'] as BuildingType[])('returns null for %s', type => {
-    const b = makeBuilding(type);
-    expect(researchSection(b, makeState([b]))).toBeNull();
-  });
-
-  it('shows an idle line when the queue is empty', () => {
-    const b = makeBuilding('research_center');
-    const root = mount(researchSection(b, makeState([b]))!.section);
-    expect(root.querySelector('[data-live="research-idle"]')).not.toBeNull();
-    expect(root.querySelector('[data-live="research-running0"]')).toBeNull();
-    noRawKeys(root);
-  });
-
-  it('shows the running task with its target tier name, percent and ticks left', () => {
-    const b = makeBuilding('research_center');
-    const s = makeState([b]);
-    s.buildings.researchQueue = [task(2, 120, 5000)];
-    const root = mount(researchSection(b, s)!.section);
-    const running = root.querySelector('[data-live="research-running0"]')!;
-    expect(running.textContent).toContain(t('building.management_office.t2.name'));
-    expect(running.textContent).toContain('120');
-    expect(running.textContent).toMatch(/\d+\s?%/);
-    expect(root.querySelector('[data-live="research-idle"]')).toBeNull();
-    noRawKeys(root);
-  });
-
-  it('lists pending tasks after the first with their cost', () => {
-    const b = makeBuilding('research_center');
-    const s = makeState([b]);
-    s.buildings.researchQueue = [task(2, 120, 5000), task(3, 300, 7777, 'blasting_academy'), task(2, 200, 4321, 'geology_lab')];
-    const root = mount(researchSection(b, s)!.section);
-    const pending = [...root.querySelectorAll<HTMLElement>('[data-live^="research-pending"]')];
-    expect(pending).toHaveLength(2);
-    expect(pending[0]!.textContent).toContain(t('building.blasting_academy.t3.name'));
-    expect(pending[0]!.textContent!.replace(/[ ,.  ]/g, '')).toContain('7777');
-    expect(pending[1]!.textContent!.replace(/[ ,.  ]/g, '')).toContain('4321');
-  });
-
-  it('says paused while the centre is closed and the queue is not empty', () => {
-    const b = makeBuilding('research_center');
-    const s = makeState([b]);
-    s.buildings.researchQueue = [task(2, 120, 5000)];
-    const open = mount(researchSection(b, s)!.section);
-    expect(open.querySelector('[data-live="research-paused"]')).toBeNull();
-    b.outOfService = true;
-    const closed = mount(researchSection(b, s)!.section);
-    expect(closed.querySelector('[data-live="research-paused"]')).not.toBeNull();
-    noRawKeys(closed);
-  });
-
-  it('shows no paused mark for a closed centre with an empty queue', () => {
-    const b = makeBuilding('research_center', { active: false });
-    const root = mount(researchSection(b, makeState([b]))!.section);
-    expect(root.querySelector('[data-live="research-paused"]')).toBeNull();
-  });
-
-  it('sync updates ticks left in place; a queue change alters the row signature', () => {
-    const b = makeBuilding('research_center');
-    const s = makeState([b]);
-    s.buildings.researchQueue = [task(2, 120, 5000)];
-    const sec = researchSection(b, s)!;
-    const root = mount(sec.section);
-    const node = root.querySelector('[data-live="research-running0"]')!;
-    const before = node.textContent;
-    s.buildings.researchQueue[0]!.ticksRemaining = 33;
-    sec.sync(root);
-    expect(root.querySelector('[data-live="research-running0"]')).toBe(node);
-    expect(node.textContent).not.toBe(before);
-    expect(node.textContent).toContain('33');
-    const sig = sec.rowSignature;
-    s.buildings.researchQueue.push(task(3, 300, 900, 'blasting_academy'));
-    expect(researchSection(b, s)!.rowSignature).not.toBe(sig);
-  });
-});
-
-describe('researchSection speed and parallel slots (#1936)', () => {
-  const task = (type: BuildingType, ticks: number) =>
-    ({ targetType: type, targetTier: 3 as const, ticksRemaining: ticks, cost: 12000, conditions: [] });
-  const TYPES: BuildingType[] = ['driving_center', 'geology_lab', 'management_office', 'blasting_academy'];
-  const setup = (tier: 1 | 2 | 3, n: number) => {
-    const b = makeBuilding('research_center', { tier });
-    const s = makeState([b]);
-    s.buildings.researchQueue = TYPES.slice(0, n).map((ty) => task(ty, 50));
-    return { b, s };
-  };
-  const live = (root: HTMLElement, k: string) => root.querySelector<HTMLElement>(`[data-live="${k}"]`);
-
-  it('tier 3 with 4 queued: three running rows, one pending row', () => {
-    const { b, s } = setup(3, 4);
-    const root = mount(researchSection(b, s)!.section);
-    expect(live(root, 'research-running0')).not.toBeNull();
-    expect(live(root, 'research-running1')).not.toBeNull();
-    expect(live(root, 'research-running2')).not.toBeNull();
-    expect(live(root, 'research-running3')).toBeNull();
-    expect(live(root, 'research-pending0')).not.toBeNull();
-    expect(live(root, 'research-pending1')).toBeNull();
-    expect(live(root, 'research-running')).toBeNull();
-    expect(live(root, 'research-running1')!.textContent).toContain(t('building.geology_lab.t3.name'));
-    expect(live(root, 'research-pending0')!.textContent).toContain(t('building.blasting_academy.t3.name'));
-    noRawKeys(root);
-  });
-
-  it('tier 2 with 3 queued: two running rows, pending numbering restarts at 0', () => {
-    const { b, s } = setup(2, 3);
-    const root = mount(researchSection(b, s)!.section);
-    expect(live(root, 'research-running0')).not.toBeNull();
-    expect(live(root, 'research-running1')).not.toBeNull();
-    expect(live(root, 'research-running2')).toBeNull();
-    expect(live(root, 'research-pending0')!.textContent).toContain(t('building.management_office.t3.name'));
-  });
-
-  it('tier 1 with 2 queued: one running row (research-running0), one pending', () => {
-    const { b, s } = setup(1, 2);
-    const root = mount(researchSection(b, s)!.section);
-    expect(live(root, 'research-running0')).not.toBeNull();
-    expect(live(root, 'research-running1')).toBeNull();
-    expect(live(root, 'research-pending0')).not.toBeNull();
-  });
-
-  it('fewer tasks than slots: only as many running rows as tasks, no pending', () => {
-    const { b, s } = setup(3, 2);
-    const root = mount(researchSection(b, s)!.section);
-    expect(live(root, 'research-running1')).not.toBeNull();
-    expect(live(root, 'research-running2')).toBeNull();
-    expect(root.querySelector('[data-live^="research-pending"]')).toBeNull();
-  });
-
-  it('empty queue still shows the idle row', () => {
-    const { b, s } = setup(3, 0);
-    const root = mount(researchSection(b, s)!.section);
-    expect(live(root, 'research-idle')).not.toBeNull();
-    expect(root.querySelector('[data-live^="research-running"]')).toBeNull();
-  });
-
-  it('speed and slots line uses inspector.research_speed', () => {
-    expect(t('inspector.research_speed', { speed: 2, slots: 3 })).not.toBe('inspector.research_speed');
-    const { b, s } = setup(3, 1);
-    const root = mount(researchSection(b, s)!.section);
-    expect(root.textContent).toContain(t('inspector.research_speed', { speed: 2, slots: 3 }));
-    const t2 = setup(2, 1);
-    expect(mount(researchSection(t2.b, t2.s)!.section).textContent).toContain(t('inspector.research_speed', { speed: 1.5, slots: 2 }));
-  });
-
-  it('sync updates every running row in place with ceil of fractional ticks', () => {
-    const { b, s } = setup(3, 2);
-    const sec = researchSection(b, s)!;
-    const root = mount(sec.section);
-    const row1 = live(root, 'research-running1')!;
-    s.buildings.researchQueue[1]!.ticksRemaining = 12.5;
-    s.buildings.researchQueue[0]!.ticksRemaining = 7.2;
-    sec.sync(root);
-    expect(live(root, 'research-running1')).toBe(row1);
-    expect(row1.textContent).toContain('13');
-    expect(row1.textContent).not.toContain('12.5');
-    expect(live(root, 'research-running0')!.textContent).toContain('8');
-    expect(live(root, 'research-running0')!.textContent).not.toContain('7.2');
-  });
-
-  it('rowSignature changes with the active count even for the same queue', () => {
-    const a = setup(1, 3);
-    const c = setup(3, 3);
-    expect(researchSection(a.b, a.s)!.rowSignature).not.toBe(researchSection(c.b, c.s)!.rowSignature);
-  });
-
-  it('rowSignature changes when a centre upgrade grows the active count', () => {
-    const { b, s } = setup(1, 3);
-    const before = researchSection(b, s)!.rowSignature;
-    b.tier = 2;
-    expect(researchSection(b, s)!.rowSignature).not.toBe(before);
   });
 });

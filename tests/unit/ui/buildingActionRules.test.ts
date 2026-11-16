@@ -5,7 +5,10 @@ import type { GameState } from '../../../src/core/state/GameState.js';
 import {
   getUpgradeCost, getMoveCost, getDemolishCost, isSingleTierType, getBuildingDef, type Building, type BuildingType,
 } from '../../../src/core/entities/Building.js';
-import { getResearchTaskDef } from '../../../src/core/config/balance.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest } from '../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../src/core/economy/QuestCatalog.js';
+import { setLocale, t } from '../../../src/core/i18n/I18n.js';
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
 import { Random } from '../../../src/core/math/Random.js';
@@ -24,6 +27,16 @@ function stateWith(b: Building, cash = 9_999_999): GameState {
   s.buildings.buildings = [b];
   return s;
 }
+
+/** The same site, on a progression ladder: quests exist, so higher tiers are locked behind them (#2283). */
+function questStateWith(b: Building, cash = 9_999_999): GameState {
+  const s = stateWith(b, cash);
+  s.grade = createGradeState();
+  s.quests = createQuestState();
+  return s;
+}
+
+const questTitle = (id: string): string => t(getQuest(id)!.titleKey);
 
 function addRampOver(s: GameState, b: Building): void {
   s.builtRamps.push({
@@ -50,47 +63,83 @@ describe('buildingActionRules — upgrade', () => {
     const r = buildingActionRules(s, b);
     expect(r.upgrade).toMatchObject({ kind: 'available', nextTier: 2, cost: getUpgradeCost(b.type, 2), reasonKey: null });
     expect(r.upgrade.cost).toBe(16_000); // #1905: T2 20,000 minus half of T1 8,000
-    expect(r.research).toBeNull();
+    expect('research' in r).toBe(false);
   });
 
-  it('is locked (not refused) when the next tier still needs research, and offers research', () => {
+  it('is available on a site without quests with nothing unlocked: every tier is open', () => {
     const b = makeBuilding();
-    const s = stateWith(b);
+    const r = buildingActionRules(stateWith(b), b);
+    expect(r.upgrade).toMatchObject({ kind: 'available', nextTier: 2, cost: getUpgradeCost(b.type, 2) });
+  });
+
+  it('is locked (not refused) when the next tier needs its quest, naming the quest and keeping the usual cost', () => {
+    setLocale('en');
+    const b = makeBuilding();
+    const s = questStateWith(b);
     const r = buildingActionRules(s, b);
-    expect(r.upgrade.kind).toBe('locked');
-    expect(r.upgrade.nextTier).toBe(2);
-    const def = getResearchTaskDef('management_office', 2);
-    expect(r.research).toMatchObject({ type: 'management_office', tier: 2, cost: def.cost, duration: def.ticks, queued: null });
-  });
-
-  it('shows live progress once research is queued', () => {
-    const b = makeBuilding({ tier: 2 });
-    const s = stateWith(b);
-    const def = getResearchTaskDef('management_office', 3);
-    s.buildings.researchQueue.push({
-      targetType: 'management_office', targetTier: 3, ticksRemaining: Math.floor(def.ticks / 2), cost: def.cost, conditions: [],
+    expect(r.upgrade).toMatchObject({
+      kind: 'locked',
+      reasonKey: 'inspector.reason.quest_required',
+      reasonParams: { tier: 2, quest: questTitle('quest_building_t2') },
+      nextTier: 2,
+      cost: getUpgradeCost('management_office', 2),
     });
-    const q = buildingActionRules(s, b).research!.queued!;
-    expect(q.remaining).toBe(Math.floor(def.ticks / 2));
-    expect(q.fraction).toBeGreaterThan(0);
-    expect(q.fraction).toBeLessThan(1);
+    expect('research' in r).toBe(false);
   });
 
-  it('research is null once the tier is unlocked', () => {
+  it('the locked reason names the localized quest title, in French too', () => {
     const b = makeBuilding();
-    const s = stateWith(b);
-    s.buildings.unlockedTiers['management_office'] = 3;
-    expect(buildingActionRules(s, b).research).toBeNull();
+    const s = questStateWith(b);
+    setLocale('fr');
+    try {
+      expect(buildingActionRules(s, b).upgrade.reasonParams).toEqual({ tier: 2, quest: questTitle('quest_building_t2') });
+    } finally {
+      setLocale('en');
+    }
   });
 
-  it('is refused at max tier with a reason, no next tier, no cost, no research', () => {
+  it('a tier-2 building is locked behind the T3 quest, even with the T2 quest completed', () => {
+    setLocale('en');
+    const b = makeBuilding({ tier: 2 });
+    const s = questStateWith(b);
+    completeQuest(s, 'quest_building_t2');
+    const r = buildingActionRules(s, b).upgrade;
+    expect(r).toMatchObject({
+      kind: 'locked', reasonKey: 'inspector.reason.quest_required', nextTier: 3,
+      reasonParams: { tier: 3, quest: questTitle('quest_building_t3') },
+      cost: getUpgradeCost('management_office', 3),
+    });
+  });
+
+  it('is available at its usual cost once the quest completes', () => {
+    const b = makeBuilding();
+    const s = questStateWith(b);
+    completeQuest(s, 'quest_building_t2');
+    const r = buildingActionRules(s, b);
+    expect(r.upgrade).toMatchObject({ kind: 'available', nextTier: 2, cost: getUpgradeCost('management_office', 2), reasonKey: null });
+  });
+
+  it('is available where the tier is grandfathered by unlockedTiers on a quest site', () => {
+    const b = makeBuilding();
+    const s = questStateWith(b);
+    s.buildings.unlockedTiers['management_office'] = 2;
+    expect(buildingActionRules(s, b).upgrade.kind).toBe('available');
+  });
+
+  it('locked stays locked when cash is short: the quest is named, not the funds gap', () => {
+    const b = makeBuilding();
+    const r = buildingActionRules(questStateWith(b, 0), b).upgrade;
+    expect(r.kind).toBe('locked');
+    expect(r.reasonKey).toBe('inspector.reason.quest_required');
+  });
+
+  it('is refused at max tier with a reason, no next tier, no cost', () => {
     const b = makeBuilding({ tier: 3 });
     const r = buildingActionRules(stateWith(b), b);
     expect(r.upgrade.kind).toBe('refused');
     expect(r.upgrade.nextTier).toBeNull();
     expect(r.upgrade.cost).toBeNull();
     expect(r.upgrade.reasonKey).toBeTruthy();
-    expect(r.research).toBeNull();
   });
 
   it('is refused for a single-tier type (spoil heap)', () => {
@@ -100,7 +149,6 @@ describe('buildingActionRules — upgrade', () => {
     const r = buildingActionRules(stateWith(b), b);
     expect(r.upgrade.kind).toBe('refused');
     expect(r.upgrade.nextTier).toBeNull();
-    expect(r.research).toBeNull();
   });
 
   it('is refused on short cash, with a reason distinct from the max-tier one', () => {
@@ -152,11 +200,11 @@ describe('buildingActionRules — upgrade', () => {
   it('refusal order: demolition ordered beats locked, locked beats reserved, reserved beats cash', () => {
     const b = makeBuilding();
     // locked beats reserved: a locked tier stays "locked" even with a ramp in the way.
-    const s1 = stateWith(b);
+    const s1 = questStateWith(b);
     addRampOver(s1, b);
     expect(buildingActionRules(s1, b).upgrade.kind).toBe('locked');
     // demolition ordered beats locked.
-    const s2 = stateWith(b);
+    const s2 = questStateWith(b);
     demolitionOrder(s2, b.id);
     const ordered = buildingActionRules(s2, b).upgrade;
     expect(ordered.kind).toBe('refused');
@@ -233,55 +281,6 @@ describe('buildingActionRules — move and demolish', () => {
     const s = stateWith(b);
     demolitionOrder(s, b.id);
     expect(buildingActionRules(s, b).demolish.disabledReasonKey).toBeTruthy();
-  });
-});
-
-function addResearchCenter(s: GameState): void {
-  s.buildings.buildings.push(makeBuilding({ id: 90, type: 'research_center', tier: 1, x: 30, z: 30 }));
-}
-
-describe('buildingActionRules — research prerequisite (#1820)', () => {
-  it('tier 2 without a Research Center is blocked naming the Research Center', () => {
-    const b = makeBuilding();
-    const r = buildingActionRules(stateWith(b), b).research!;
-    expect(r.blocked).toEqual({ reasonKey: 'inspector.reason.research_no_center' });
-  });
-
-  it('tier 2 with an operating Research Center is not blocked', () => {
-    const b = makeBuilding();
-    const s = stateWith(b);
-    addResearchCenter(s);
-    expect(buildingActionRules(s, b).research!.blocked).toBeNull();
-  });
-
-  it('a Research Center that is not operating does not count', () => {
-    const b = makeBuilding();
-    const s = stateWith(b);
-    addResearchCenter(s);
-    s.buildings.buildings.find(x => x.id === 90)!.active = false;
-    expect(buildingActionRules(s, b).research!.blocked).toEqual({ reasonKey: 'inspector.reason.research_no_center' });
-  });
-
-  it('tier 3 with a Research Center but no tier-2 research names the missing tier', () => {
-    const b = makeBuilding({ tier: 2 });
-    const s = stateWith(b);
-    addResearchCenter(s);
-    expect(buildingActionRules(s, b).research!.blocked).toEqual({
-      reasonKey: 'inspector.reason.research_needs_tier', reasonParams: { tier: 2 },
-    });
-  });
-
-  it('tier 3 with the tier-2 research done and a Research Center is not blocked', () => {
-    const b = makeBuilding({ tier: 2 });
-    const s = stateWith(b);
-    addResearchCenter(s);
-    s.buildings.unlockedTiers['management_office'] = 2;
-    expect(buildingActionRules(s, b).research!.blocked).toBeNull();
-  });
-
-  it('tier 3 with no Research Center reports the Research Center first', () => {
-    const b = makeBuilding({ tier: 2 });
-    expect(buildingActionRules(stateWith(b), b).research!.blocked).toEqual({ reasonKey: 'inspector.reason.research_no_center' });
   });
 });
 

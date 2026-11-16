@@ -97,7 +97,7 @@ export const KNOWN_COMMANDS = [
   'new_game', 'campaign', 'time', 'scores', 'finances',
   'employee', 'state', 'survey', 'tick', 'event',
   'drill_plan', 'charge', 'blast', 'contract',
-  'build', 'vehicle', 'stats', 'inspect', 'zone', 'research', 'permit',
+  'build', 'vehicle', 'stats', 'inspect', 'zone', 'permit',
   'tutorial_start', 'corrupt', 'mafia', 'buy_software', 'weather', 'buy',
   'fragments', 'optimize_charges', 'preview', 'blast_preview', 'install_tubing', 'tube_on_drill', 'drain_hole',
   'build_ramp', 'ramp', 'widen_ramp', 'repair_ramp', 'ramp_flow', 'level_ground', 'set_policy', 'terrain_info', 'help',

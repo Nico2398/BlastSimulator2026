@@ -67,14 +67,14 @@ function getRoofYAt(roofY: number): (id: number) => number | null {
 const DRIVING_CENTER_CAPACITY = getBuildingPeopleCapacity('driving_center', 1);
 // freight_warehouse: not in the people-holding set, so 0 regardless of BuildingDef.capacity.
 const FREIGHT_WAREHOUSE_CAPACITY = getBuildingPeopleCapacity('freight_warehouse', 1);
-// research_center: also not people-holding — the "hypothetically non-empty occupantIds" case.
-const RESEARCH_CENTER_CAPACITY = getBuildingPeopleCapacity('research_center', 1);
+// spoil_heap: also not people-holding — the "hypothetically non-empty occupantIds" case.
+const SPOIL_HEAP_CAPACITY = getBuildingPeopleCapacity('spoil_heap', 1);
 
 describe('BuildingOccupancyLabels', () => {
-  it('driving_center tier 1 has a nonzero people capacity, freight_warehouse and research_center do not (fixture sanity)', () => {
+  it('driving_center tier 1 has a nonzero people capacity, freight_warehouse and spoil_heap do not (fixture sanity)', () => {
     expect(DRIVING_CENTER_CAPACITY).toBeGreaterThan(0);
     expect(FREIGHT_WAREHOUSE_CAPACITY).toBe(0);
-    expect(RESEARCH_CENTER_CAPACITY).toBe(0);
+    expect(SPOIL_HEAP_CAPACITY).toBe(0);
   });
 
   it('creates no label for a building with zero occupants', () => {
@@ -93,9 +93,9 @@ describe('BuildingOccupancyLabels', () => {
     const scene = new THREE.Scene();
     const labels = new BuildingOccupancyLabels(scene, makeCamera());
     const warehouse = makeBuilding({ id: 2, type: 'freight_warehouse', occupantIds: [1, 2] });
-    const researchCenter = makeBuilding({ id: 3, type: 'research_center', occupantIds: [1] });
+    const heap = makeBuilding({ id: 3, type: 'spoil_heap', occupantIds: [1] });
 
-    labels.sync([warehouse, researchCenter], getPositionAt(POS_A), getRoofYAt(2));
+    labels.sync([warehouse, heap], getPositionAt(POS_A), getRoofYAt(2));
 
     expect(labels.count).toBe(0);
     labels.dispose();

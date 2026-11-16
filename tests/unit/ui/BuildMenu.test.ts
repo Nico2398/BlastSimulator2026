@@ -1,16 +1,10 @@
 // @vitest-environment jsdom
-// BlastSimulator2026 — Placed-buildings list layout (issue #462)
+// BlastSimulator2026 — Placed-buildings list layout (issue #462), catalog tier gate (#2283)
 //
-// Bug: `makePlacedRow()`'s `info` div uses plain `flex:1` (no basis) and its
-// four action buttons (Move/Upgrade/Queue Research/Demolish) have no
-// flex/white-space override. With 4 buttons in a 270px-wide `#bs-build-panel`
-// the `info` column collapses to near-zero width, showing only a stray
-// fragment of the label (e.g. a lone ':') for rows like Research Center that
-// still show the "Queue Research" button. `makeCatalogRow()` already ships
-// the fix for the identical defect (flex:1 1 50% on info, flex:0 1 auto +
-// white-space:normal on buttons) — this file asserts `makePlacedRow()`
-// matches that pattern. jsdom has no layout engine, so assertions check
-// inline style VALUES, not rendered pixel widths.
+// Bug: `makePlacedRow()`'s `info` div uses plain `flex:1` (no basis), which
+// collapsed the label column to near-zero width. This file asserts
+// `makePlacedRow()` keeps its flex basis. jsdom has no layout engine, so
+// assertions check inline style VALUES, not rendered pixel widths.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BuildMenu } from '../../../src/ui/BuildMenu.js';
@@ -29,7 +23,10 @@ import { tierCompareExplain, placedRowTitle } from '../../../src/ui/buildingExpl
 import { buildingCardLine, buildingCardTooltip, buildingCardEffects, buildingScoreEffectLines } from '../../../src/ui/catalogCardText.js';
 import type { ClaimRefusalReason } from '../../../src/core/world/PlayableArea.js';
 import { computeRampCost } from '../../../src/core/mining/Ramp.js';
-import { RAMP_DEFAULT_WIDTH, RESEARCH_TASK_DEFS } from '../../../src/core/config/balance.js';
+import { RAMP_DEFAULT_WIDTH } from '../../../src/core/config/balance.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest } from '../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../src/core/economy/QuestCatalog.js';
 /** Cost per metre of a default-width ramp. */
 const RAMP_COST_PER_METER = computeRampCost(1, RAMP_DEFAULT_WIDTH);
 
@@ -39,6 +36,16 @@ function makeMockState(overrides?: Partial<GameState>): GameState {
   s.cash = 99999;
   return { ...s, ...overrides };
 }
+
+/** A progression-style site: quests exist, so tiers 2 and 3 are locked behind them (#2283). */
+function makeQuestState(): GameState {
+  const s = makeMockState();
+  s.grade = createGradeState();
+  s.quests = createQuestState();
+  return s;
+}
+
+const questTitle = (id: string): string => t(getQuest(id)!.titleKey);
 
 function makeBuilding(overrides: Partial<Building> & Pick<Building, 'id' | 'type' | 'tier'>): Building {
   return {
@@ -86,10 +93,10 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     container.remove();
   });
 
-  it('Research Center row: label column keeps its flex basis and min-width:0, and no action button is rendered', () => {
-    const researchCenter = makeBuilding({ id: 1, type: 'research_center', tier: 1 });
+  it('tier-1 row: label column keeps its flex basis and min-width:0, and no action button is rendered', () => {
+    const office = makeBuilding({ id: 1, type: 'management_office', tier: 1 });
     const state = makeMockState();
-    state.buildings.buildings = [researchCenter];
+    state.buildings.buildings = [office];
 
     menu.update(state);
 
@@ -103,7 +110,7 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(info!.textContent).toContain('#1');
     expect(info!.textContent).toContain('(5,5)');
 
-    for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn']) {
+    for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-demolish-btn']) {
       expect(row.querySelector(sel), sel).toBeNull();
     }
   });
@@ -125,7 +132,7 @@ describe('BuildMenu — placed-row layout does not collapse the label column (is
     expect(info!.textContent).toContain('#2');
     expect(info!.textContent).toContain('(5,5)');
 
-    for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn']) {
+    for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-demolish-btn']) {
       expect(row.querySelector(sel), sel).toBeNull();
     }
   });
@@ -181,7 +188,7 @@ describe('BuildMenu — placed-row affordability guard (issue #511)', () => {
 });
 
 // ── #1009 coverage: catalog placement, terrain tools (ramp/level-ground),
-// research queueing, and placed-row actions (move/upgrade/demolish). ─────────
+// the tier gate, and placed-row actions (move/upgrade/demolish). ─────────
 //
 // Mirrors DrillStep.test.ts's `makeMockKit()` — a lightweight stand-in for
 // PlacementController/SelectionOverlay/ParamStrip, enough surface for
@@ -240,7 +247,7 @@ function makeMockKit(options?: { activeRegion?: TileRegion | null }) {
   return { kit: { controller, overlay, strip } as unknown as PlacementKit, controller, overlay, strip };
 }
 
-describe('BuildMenu — catalog placement, terrain tools, and research flow (#1009 coverage)', () => {
+describe('BuildMenu — catalog placement, terrain tools, and the tier gate (#1009 coverage)', () => {
   let container: HTMLDivElement;
   let menu: BuildMenu;
   let gameConsole: ReturnType<typeof vi.fn<[string], CommandResult>>;
@@ -288,10 +295,10 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole.mock.calls[0]![0]).toContain('tier:1');
   });
 
-  it('catalog Place button on a locked tier reports research-required instead of arming the tool', () => {
+  it('catalog Place button on a quest-locked tier is disabled and does not arm the tool', () => {
     const { kit, controller } = makeMockKit();
     menu.setPlacementKit(kit);
-    const state = makeMockState();
+    const state = makeQuestState();
     menu.update(state);
 
     const row = container.querySelector('[data-build-type="management_office"]')!;
@@ -300,42 +307,77 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     tierSel.dispatchEvent(new Event('change'));
 
     const placeBtn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn')!;
+    expect(placeBtn.disabled).toBe(true);
     placeBtn.click();
 
     expect(controller.isArmed).toBe(false);
     expect(gameConsole).not.toHaveBeenCalled();
   });
 
-  it('catalog Queue Research button dispatches research queue and reports ticks remaining on success', () => {
-    const state = makeMockState();
+  it('the Place button opens once the tier quest completes, without reopening the panel', () => {
+    const { kit, controller } = makeMockKit();
+    menu.setPlacementKit(kit);
+    const state = makeQuestState();
     menu.update(state);
-    gameConsole.mockReturnValue({ success: true, output: '' });
-    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 2, ticksRemaining: 42, cost: 500, conditions: [] });
-
     const row = container.querySelector('[data-build-type="management_office"]')!;
     const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
     tierSel.value = '2';
     tierSel.dispatchEvent(new Event('change'));
+    const placeBtn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn')!;
+    expect(placeBtn.disabled).toBe(true);
 
-    const researchBtn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!;
-    researchBtn.click();
-
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
+    completeQuest(state, 'quest_building_t2');
+    menu.update(state);
+    expect(placeBtn.disabled).toBe(false);
+    placeBtn.click();
+    expect(controller.isArmed).toBe(true);
   });
 
-  it('catalog Queue Research button reports a translated failure on refusal', () => {
-    const state = makeMockState();
+  it('tier 3 stays locked after the T2 quest, and opens with the T3 quest', () => {
+    const state = makeQuestState();
+    completeQuest(state, 'quest_building_t2');
     menu.update(state);
-    gameConsole.mockReturnValue({ success: false, output: 'nope', code: 'insufficient_funds' });
+    const row = container.querySelector('[data-build-type="management_office"]')!;
+    const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    tierSel.value = '3';
+    tierSel.dispatchEvent(new Event('change'));
+    const placeBtn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn')!;
+    expect(placeBtn.disabled).toBe(true);
+    completeQuest(state, 'quest_building_t3');
+    menu.update(state);
+    expect(placeBtn.disabled).toBe(false);
+  });
 
+  it('a site without quests offers every tier: Place is enabled for tier 2 with nothing unlocked', () => {
+    const { kit, controller } = makeMockKit();
+    menu.setPlacementKit(kit);
+    menu.update(makeMockState());
     const row = container.querySelector('[data-build-type="management_office"]')!;
     const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
     tierSel.value = '2';
     tierSel.dispatchEvent(new Event('change'));
+    const placeBtn = row.querySelector<HTMLButtonElement>('.bs-build-buy-btn')!;
+    expect(placeBtn.disabled).toBe(false);
+    placeBtn.click();
+    expect(controller.isArmed).toBe(true);
+  });
 
-    const researchBtn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!;
-    expect(() => researchBtn.click()).not.toThrow();
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
+  it('a tier grandfathered into unlockedTiers is open on a quest site', () => {
+    const state = makeQuestState();
+    state.buildings.unlockedTiers['management_office'] = 2;
+    menu.update(state);
+    const row = container.querySelector('[data-build-type="management_office"]')!;
+    const tierSel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
+    tierSel.value = '2';
+    tierSel.dispatchEvent(new Event('change'));
+    expect(row.querySelector<HTMLButtonElement>('.bs-build-buy-btn')!.disabled).toBe(false);
+  });
+
+  it('the catalog has no Research Center card and no Queue Research button', () => {
+    menu.update(makeQuestState());
+    expect(container.querySelector('[data-build-type="research_center"]')).toBeNull();
+    expect(container.querySelector('.bs-build-research-btn')).toBeNull();
+    expect(container.querySelector('.bs-build-research-progress')).toBeNull();
   });
 
   it('Terrain section: Ramp button arms the line tool; confirming dispatches build_ramp with depth', () => {
@@ -685,9 +727,9 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole).toHaveBeenCalledWith('build move 7 to:20,21');
   });
 
-  it('requestUpgrade on a locked next tier reports research-required instead of upgrading', () => {
+  it('requestUpgrade on a quest-locked next tier does not upgrade', () => {
     const building = makeBuilding({ id: 8, type: 'management_office', tier: 1 });
-    const state = makeMockState();
+    const state = makeQuestState();
     state.buildings.buildings = [building];
     menu.update(state);
 
@@ -708,15 +750,9 @@ describe('BuildMenu — catalog placement, terrain tools, and research flow (#10
     expect(gameConsole).toHaveBeenCalledWith('build upgrade 9');
   });
 
-  it('queueResearchFor dispatches research queue for the next tier', () => {
-    const building = makeBuilding({ id: 10, type: 'management_office', tier: 1 });
-    const state = makeMockState();
-    state.buildings.buildings = [building];
-    menu.update(state);
-
-    menu.queueResearchFor(10);
-
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
+  it('the menu no longer queues research', () => {
+    expect((menu as unknown as Record<string, unknown>)['queueResearchFor']).toBeUndefined();
+    expect((menu as unknown as Record<string, unknown>)['queueResearch']).toBeUndefined();
   });
 
   it('refreshUnderConstructionCounts shows the per-type count once a building enters plannedBuildings', () => {
@@ -1107,9 +1143,9 @@ describe('BuildMenu — refused placement ghost and failed confirm (#1396)', () 
   });
 });
 
-// ── #1398: research cost/duration on the button, progress while queued ──────
+// ── #2283: the catalog tracks the tier quests ───────────────────────────────
 
-describe('BuildMenu — research cost, duration and progress (#1398)', () => {
+describe('BuildMenu — catalog buttons follow the tier quests (#2283)', () => {
   let container: HTMLDivElement;
   let menu: BuildMenu;
 
@@ -1124,110 +1160,62 @@ describe('BuildMenu — research cost, duration and progress (#1398)', () => {
   });
 
   const catalogRow = (type: string) => container.querySelector<HTMLElement>(`[data-build-type="${type}"]`)!;
+  const placeBtn = (type: string) => catalogRow(type).querySelector<HTMLButtonElement>('.bs-build-buy-btn')!;
 
-  function selectTier(row: HTMLElement, tier: 2 | 3): void {
+  function selectTier(row: HTMLElement, tier: 1 | 2 | 3): void {
     const sel = row.querySelector<HTMLSelectElement>('.bs-build-tier-sel')!;
     sel.value = String(tier);
     sel.dispatchEvent(new Event('change'));
   }
 
-  /** Tier 2 already unlocked so tier 3 is the locked next tier. */
-  function stateWithTier2(): GameState {
-    const state = makeMockState();
-    state.buildings.unlockedTiers['management_office'] = 2;
-    return state;
-  }
-
-  it('en.json defines the cost and progress keys', async () => {
-    const en = (await import('../../../src/core/i18n/locales/en.json')).default as Record<string, string>;
-    expect(en['ui.build.queue_research_cost']).toContain('{cost}');
-    expect(en['ui.build.queue_research_cost']).toContain('{duration}');
-    expect(en['ui.build.research_progress']).toContain('{percent}');
-    expect(en['ui.build.research_progress']).toContain('{remaining}');
+  it('every multi-tier catalog row is locked for tiers 2 and 3 on a quest site, open for tier 1', () => {
+    menu.update(makeQuestState());
+    for (const type of ['management_office', 'living_quarters', 'freight_warehouse', 'geology_lab']) {
+      const row = catalogRow(type);
+      selectTier(row, 1);
+      expect(placeBtn(type).disabled, `${type} T1`).toBe(false);
+      selectTier(row, 2);
+      expect(placeBtn(type).disabled, `${type} T2`).toBe(true);
+      selectTier(row, 3);
+      expect(placeBtn(type).disabled, `${type} T3`).toBe(true);
+    }
   });
 
-  for (const tier of [2, 3] as const) {
-    it(`catalog research button shows cost and duration for tier ${tier}`, () => {
-      const state = makeMockState();
-      if (tier === 3) state.buildings.unlockedTiers['management_office'] = 2;
-      menu.update(state);
-      const row = catalogRow('management_office');
-      selectTier(row, tier);
-      const def = RESEARCH_TASK_DEFS['management_office'][tier];
-      const label = row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!.textContent ?? '';
-      expect(label).toContain(formatMoney(def.cost));
-      expect(label).toContain(String(def.ticks));
-      expect(label).toBe(t('ui.build.queue_research_cost', { cost: formatMoney(def.cost), duration: def.ticks }));
-    });
-  }
-
-  it('catalog research button label updates when the tier selector changes', () => {
-    const state = stateWithTier2();
-    state.buildings.unlockedTiers = {};
+  it('one quest opens the tier on every row at once', () => {
+    const state = makeQuestState();
     menu.update(state);
-    const row = catalogRow('management_office');
-    const btn = row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!;
-    selectTier(row, 2);
-    const label2 = btn.textContent;
-    state.buildings.unlockedTiers['management_office'] = 2;
-    menu.update({ ...state });
-    selectTier(row, 3);
-    const label3 = btn.textContent;
-    expect(label3).not.toBe(label2);
-    expect(label3).toContain(formatMoney(RESEARCH_TASK_DEFS['management_office'][3].cost));
-  });
-
-  it('queued task shows a progress element and hides the button (catalog row)', () => {
-    const state = stateWithTier2();
-    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 25, cost: 12000, conditions: [] });
+    completeQuest(state, 'quest_building_t2');
     menu.update(state);
-    const row = catalogRow('management_office');
-    selectTier(row, 3);
-    const progress = row.querySelector<HTMLElement>('.bs-build-research-progress');
-    expect(progress).not.toBeNull();
-    expect(progress!.textContent).toBe(t('ui.build.research_progress', { percent: 50, remaining: 25 }));
-    expect(row.querySelector<HTMLButtonElement>('.bs-build-research-btn')!.style.display).toBe('none');
+    for (const type of ['management_office', 'living_quarters', 'freight_warehouse', 'geology_lab']) {
+      selectTier(catalogRow(type), 2);
+      expect(placeBtn(type).disabled, type).toBe(false);
+    }
   });
 
-  it('queued task adds no progress element or research button to the placed row; the catalog row keeps its own', () => {
-    const state = stateWithTier2();
-    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
-    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 25, cost: 12000, conditions: [] });
+  it('a placed row of a locked next tier gains no action buttons or progress element', () => {
+    const state = makeQuestState();
+    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 1 })];
     menu.update(state);
     const row = findPlacedRow(container, 1);
+    expect(row.querySelector('button')).toBeNull();
     expect(row.querySelector('.bs-build-research-progress')).toBeNull();
-    expect(row.querySelector('.bs-build-research-btn')).toBeNull();
-    selectTier(catalogRow('management_office'), 3);
-    expect(catalogRow('management_office').querySelector('.bs-build-research-progress')).not.toBeNull();
   });
 
-  it('a research-queue change does not rebuild the placed row', () => {
-    const state = stateWithTier2();
-    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
+  it('a quest completing does not rebuild the placed row', () => {
+    const state = makeQuestState();
+    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 1 })];
     menu.update(state);
     const row = findPlacedRow(container, 1);
-    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 25, cost: 12000, conditions: [] });
+    completeQuest(state, 'quest_building_t2');
     menu.update(state);
     expect(findPlacedRow(container, 1)).toBe(row);
   });
 
-  it('no progress element when nothing is queued', () => {
-    const state = stateWithTier2();
-    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
-    menu.update(state);
-    selectTier(catalogRow('management_office'), 3);
-    expect(container.querySelector('.bs-build-research-progress')).toBeNull();
-  });
-
-  it('progress element disappears and button state resets once research completes', () => {
-    const state = stateWithTier2();
-    state.buildings.buildings = [makeBuilding({ id: 1, type: 'management_office', tier: 2 })];
-    state.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 3, ticksRemaining: 5, cost: 12000, conditions: [] });
-    menu.update(state);
-    state.buildings.researchQueue = [];
-    state.buildings.unlockedTiers['management_office'] = 3;
-    menu.update(state);
-    expect(container.querySelector('.bs-build-research-progress')).toBeNull();
+  it('the price follows the selected tier even while that tier is locked', () => {
+    menu.update(makeQuestState());
+    const row = catalogRow('management_office');
+    selectTier(row, 2);
+    expect(row.textContent).toContain(t('ui.build.cost', { cost: formatMoney(getBuildingDef('management_office', 2).constructionCost) }));
   });
 });
 
@@ -1425,11 +1413,20 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     expect(menu.visible).toBe(false);
   });
 
-  it('requestUpgrade on a locked tier reports research-required and does not upgrade', () => {
-    observed(makeBuilding({ id: 8, type: 'management_office', tier: 1 }));
+  it('requestUpgrade on a quest-locked tier reports the quest and does not upgrade', () => {
+    observed(makeBuilding({ id: 8, type: 'management_office', tier: 1 }), (s) => {
+      s.grade = createGradeState();
+      s.quests = createQuestState();
+    });
     menu.requestUpgrade(8);
     expect(gameConsole).not.toHaveBeenCalledWith(expect.stringContaining('build upgrade'));
-    expect(messages).toContain(t('ui.build.research_required', { tier: 2 }));
+    expect(messages.some(m => m.includes(questTitle('quest_building_t2')))).toBe(true);
+  });
+
+  it('requestUpgrade needs no unlock on a site without quests', () => {
+    observed(makeBuilding({ id: 8, type: 'management_office', tier: 1 }));
+    menu.requestUpgrade(8);
+    expect(gameConsole).toHaveBeenCalledWith('build upgrade 8');
   });
 
   it('requestUpgrade surfaces the console refusal text', () => {
@@ -1445,37 +1442,6 @@ describe('BuildMenu — inspector-driven shared flows, panel never opened (#1758
     menu.requestUpgrade(9);
     observed(makeBuilding({ id: 9, type: 'management_office', tier: 1 }));
     menu.requestUpgrade(404);
-    expect(gameConsole).not.toHaveBeenCalled();
-  });
-
-  it('queueResearch (now public) dispatches research queue and reports progress to the handler', () => {
-    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
-    menu.queueResearch('management_office', 2);
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
-    expect(messages.length).toBeGreaterThan(0);
-  });
-
-  it('queueResearch failure reports the translated reason to the handler', () => {
-    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
-    gameConsole.mockReturnValue({ success: false, output: 'x', code: 'no_research_center' });
-    menu.queueResearch('management_office', 2);
-    expect(messages).toContain(t('ui.build.research_failed_no_research_center'));
-  });
-
-  it('queueResearch of tier 1 is ignored', () => {
-    menu.queueResearch('management_office', 1);
-    expect(gameConsole).not.toHaveBeenCalled();
-  });
-
-  it('queueResearchFor queues the next tier of the building by id; unknown id or max tier sends nothing', () => {
-    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
-    menu.queueResearchFor(10);
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
-    gameConsole.mockClear();
-    menu.queueResearchFor(404);
-    expect(gameConsole).not.toHaveBeenCalled();
-    observed(makeBuilding({ id: 11, type: 'management_office', tier: 3 }));
-    menu.queueResearchFor(11);
     expect(gameConsole).not.toHaveBeenCalled();
   });
 
@@ -1558,11 +1524,11 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
     it('a placed row has no action buttons; clicking it selects', () => {
       const cb = vi.fn();
       menu.setSelectBuildingHandler(cb);
-      const s = stateWith([makeBuilding({ id: 4, type: 'research_center', tier: 1 })]);
+      const s = stateWith([makeBuilding({ id: 4, type: 'management_office', tier: 1 })]);
       s.cash = 1e9;
       menu.update(s);
       const row = findPlacedRow(container, 4);
-      for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-research-btn', '.bs-build-demolish-btn']) {
+      for (const sel of ['.bs-build-move-btn', '.bs-build-upgrade-btn', '.bs-build-demolish-btn']) {
         expect(row.querySelector(sel), sel).toBeNull();
       }
       expect(row.querySelector('.bs-build-research-progress')).toBeNull();
@@ -1896,7 +1862,7 @@ describe('BuildMenu — placed rows are a selectable master list (#1759)', () =>
   });
 });
 
-describe('BuildMenu — catalog price and research refusal (#1820)', () => {
+describe('BuildMenu — catalog price (#1820)', () => {
   let container: HTMLDivElement;
   let menu: BuildMenu;
   let gameConsole: ReturnType<typeof vi.fn<[string], CommandResult>>;
@@ -1941,52 +1907,6 @@ describe('BuildMenu — catalog price and research refusal (#1820)', () => {
     sel.dispatchEvent(new Event('change'));
     const def = getBuildingDef('management_office', 2);
     expect(row.textContent).toContain(t('ui.build.cost', { cost: formatMoney(def.constructionCost) }));
-  });
-
-  function observed(b: Building): void {
-    const state = makeMockState();
-    state.buildings.buildings = [b];
-    menu.observe(state);
-  }
-
-  it('queueResearchFor returns the translated refusal and does not write the closed panel status line', () => {
-    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
-    gameConsole.mockReturnValue({ success: false, output: 'raw core text', code: 'no_research_center' });
-    const refusal = menu.queueResearchFor(10);
-    expect(refusal).toBe(t('ui.build.research_failed_no_research_center'));
-    expect(messages).toEqual([]);
-  });
-
-  it('queueResearchFor translates each refusal code it relays', () => {
-    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
-    gameConsole.mockReturnValue({ success: false, output: 'x', code: 'conditions_not_met' });
-    expect(menu.queueResearchFor(10)).toBe(t('ui.build.research_failed_conditions_not_met'));
-    gameConsole.mockReturnValue({ success: false, output: 'x', code: 'insufficient_funds' });
-    expect(menu.queueResearchFor(10)).toBe(t('ui.build.research_failed_insufficient_funds'));
-  });
-
-  it('queueResearchFor returns null on success', () => {
-    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
-    expect(menu.queueResearchFor(10)).toBeNull();
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
-  });
-
-  it('a successful research queue re-applies catalog button state; a refusal does not', () => {
-    observed(makeBuilding({ id: 10, type: 'management_office', tier: 1 }));
-    const refresh = vi.spyOn(menu as unknown as { refreshCatalogButtons(cash: number): void }, 'refreshCatalogButtons');
-    gameConsole.mockReturnValue({ success: false, output: 'no', code: 'insufficient_funds' });
-    menu.queueResearchFor(10);
-    expect(refresh).not.toHaveBeenCalled();
-    gameConsole.mockReturnValue({ success: true, output: '' });
-    menu.queueResearchFor(10);
-    expect(refresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('queueResearchFor returns null and sends nothing for an unknown building or max tier', () => {
-    observed(makeBuilding({ id: 11, type: 'management_office', tier: 3 }));
-    expect(menu.queueResearchFor(11)).toBeNull();
-    expect(menu.queueResearchFor(404)).toBeNull();
-    expect(gameConsole).not.toHaveBeenCalled();
   });
 });
 

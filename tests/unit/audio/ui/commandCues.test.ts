@@ -90,7 +90,6 @@ describe('success cues', () => {
     ['build_ramp cancel 1', 'ui_back'],
     ['ramp spiral from:1,2 depth:10 grade:10 width:5', 'order_queued'],
     ['widen_ramp id:1 width:5', 'order_queued'],
-    ['research queue type:office tier:2', 'order_queued'],
     ['drain_hole hole:*', 'order_queued'],
     ['install_tubing hole:3', 'order_queued'],
     ['zone clear x1:0 z1:0 x2:4 z2:4', 'order_queued'],
@@ -154,7 +153,7 @@ describe('silence', () => {
   it.each([
     'tick', 'tick 20', 'state', 'state summary', 'finances', 'scores', 'needs', 'stats', 'weather advance',
     'employee list', 'employee candidates', 'vehicle list', 'build list', 'build types', 'contract list',
-    'contract status', 'research status', 'drill_plan show', 'charge show', 'survey show', 'blast status',
+    'contract status', 'drill_plan show', 'charge show', 'survey show', 'blast status',
     'blast_plan list', 'blast_plan validate', 'time', 'time status', 'zone status', 'event status',
     'event fire x', 'mafia status', 'new_game seed:1', 'campaign start level:a', 'sandbox start',
     'tutorial_start', 'preview energy', 'inspect 1,2,3', 'help', 'nonsense', '',
@@ -187,7 +186,7 @@ describe('refusals', () => {
   it.each([
     'employee hire role:driller', 'employee fire 99', 'vehicle buy debris_hauler tier:1', 'build site_office at:1,2',
     'build destroy 7', 'drill_plan grid x:0 z:0', 'charge hole:1', 'survey seismic', 'contract accept 9', 'save',
-    'time speed 4', 'research queue type:x', 'blast', 'blast detonate', 'blast cancel', 'level_ground cancel x',
+    'time speed 4', 'blast', 'blast detonate', 'blast cancel', 'level_ground cancel x',
     'event choose 7',
   ])('plays ui_denied once for refused "%s"', line => {
     cue(line, false);

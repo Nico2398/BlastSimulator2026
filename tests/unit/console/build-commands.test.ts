@@ -5,7 +5,10 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { buildCommand } from '../../../src/console/commands/entities.js';
 import { tickCommand } from '../../../src/console/commands/events.js';
 import type { MiningContext } from '../../../src/console/commands/mining.js';
-import { getBuildingDef } from '../../../src/core/entities/Building.js';
+import { getBuildingDef, getUpgradeCost } from '../../../src/core/entities/Building.js';
+import { getQuest } from '../../../src/core/economy/QuestCatalog.js';
+import { completeQuest, createQuestState } from '../../../src/core/economy/Quests.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
 import { equipDemolition, tickUntilDemolished } from '../../helpers/demolition.js';
 import { createRunner } from '../../../src/console/createRunner.js';
@@ -17,7 +20,7 @@ function makeCtx(): MiningContext {
   // `place_building` work before any of these tests can see a real building.
   const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
   // These tests exercise tier placement/upgrade mechanics directly, not the
-  // research gate — pre-unlock every tier so placement isn't blocked.
+  // quest gate: this site has no quests, so every tier is already open.
   ctx.state!.buildings.unlockedTiers.management_office = 3;
   return ctx;
 }
@@ -82,8 +85,7 @@ describe('build command — tier placement', () => {
 
   it('places a T2 building when tier:2 is supplied', () => {
     const ctx = makeCtx();
-    // #410: tier 2+ placement is gated on Research Center unlock — pre-unlock so
-    // this test still exercises tier placement, not the research gate itself.
+    // Tier 2 placement: this site has no quests, so it is not gated.
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
     const result = buildCommand(ctx, ['management_office'], { at: '2,0', tier: '2' });
     expect(result.success).toBe(true);
@@ -172,7 +174,6 @@ describe('build command — upgrade', () => {
   });
 
   it('orders an upgrade with no Building Destroyer or driver; the building keeps its id (#1875)', () => {
-    // #410: research-gated — unlock tier 2 for management_office before upgrading.
     ctx.state!.buildings.unlockedTiers['management_office'] = 2;
     const originalId = ctx.state!.buildings.buildings[0]!.id;
     const result = buildCommand(ctx, ['upgrade', String(originalId)], {});
@@ -237,8 +238,7 @@ describe('build command — upgrade', () => {
   });
 
   it('rejects upgrade of a T3 building', () => {
-    // Research-gated: unlock tiers 2 and 3 so the setup upgrades (T1→T2→T3)
-    // succeed, leaving only the max-tier rejection under test.
+    // The setup upgrades (T1→T2→T3) succeed, leaving only the max-tier rejection under test.
     ctx.state!.buildings.unlockedTiers['management_office'] = 3;
     ctx.state!.cash += 100000;
     // upgrade to T2 then T3 — the id is stable across upgrades
@@ -260,31 +260,156 @@ describe('build command — upgrade', () => {
   });
 });
 
-// ── build command — research gate (#410) ──────────────────────────────────
+// ── build command — building-tier quest gate (#2283) ──────────────────────
 
-describe('build command — research gate', () => {
-  it('rejects direct T2 placement when the tier has not been researched', () => {
-    const ctx = makeCtx();
-    // makeCtx() pre-unlocks every tier for the other suites; re-lock here so
-    // this test exercises the unresearched state it claims to.
-    ctx.state!.buildings.unlockedTiers.management_office = 1;
+describe('build command — building-tier quest gate', () => {
+  const B2 = 'quest_building_t2';
+  const B3 = 'quest_building_t3';
+
+  /** A progression-style site: quests exist, so tiers 2 and 3 are locked until their quest completes. */
+  function questCtx(): MiningContext {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
+    ctx.state!.grade = createGradeState();
+    ctx.state!.quests = createQuestState();
+    ctx.state!.cash = 2_000_000;
+    return ctx;
+  }
+
+  function ownedOffice(ctx: MiningContext): number {
+    expect(buildCommand(ctx, ['management_office'], { at: '2,0' }).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    return ctx.state!.buildings.buildings[0]!.id;
+  }
+
+  beforeEach(() => setLocale('en'));
+
+  it('refuses a direct T2 placement, naming the quest and mutating nothing', () => {
+    const ctx = questCtx();
+    const cash = ctx.state!.cash;
     const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
     expect(result.success).toBe(false);
-    expect(result.output).toMatch(/research/i);
+    expect(result.output).toContain(t(getQuest(B2)!.titleKey));
+    expect(ctx.state!.cash).toBe(cash);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.pendingActions).toHaveLength(0);
     expect(ctx.state!.buildings.buildings).toHaveLength(0);
   });
 
-  it('rejects upgrade past T1 when the tier has not been researched', () => {
-    const ctx = makeCtx();
-    ctx.state!.buildings.unlockedTiers.management_office = 1;
-    buildCommand(ctx, ['management_office'], { at: '2,0' });
-    tickUntilConstructionDone(ctx);
-    const id = ctx.state!.buildings.buildings[0]!.id;
+  it('the refusal is the build_tier_locked text with tier, type and quest', () => {
+    const ctx = questCtx();
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
+    expect(result.output).toBe(t('entities.build_tier_locked', {
+      tier: 2, type: t('building.management_office.name'), quest: t(getQuest(B2)!.titleKey),
+    }));
+  });
 
+  it('refuses a direct T3 placement naming the T3 quest, even with T2 completed', () => {
+    const ctx = questCtx();
+    completeQuest(ctx.state!, B2);
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '3' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain(t(getQuest(B3)!.titleKey));
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+  });
+
+  it('refuses an upgrade past T1, naming the quest, leaving the tier, cash and orders untouched', () => {
+    const ctx = questCtx();
+    const id = ownedOffice(ctx);
+    const cash = ctx.state!.cash;
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);
-    expect(result.output).toMatch(/research/i);
+    expect(result.output).toBe(t('entities.build_upgrade_tier_locked', {
+      tier: 2, type: t('building.management_office.name'), quest: t(getQuest(B2)!.titleKey),
+    }));
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
+    expect(ctx.state!.cash).toBe(cash);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+    expect(ctx.state!.pendingActions).toHaveLength(0);
+  });
+
+  it('refuses the T2 -> T3 upgrade with only the T2 quest completed', () => {
+    const ctx = questCtx();
+    completeQuest(ctx.state!, B2);
+    const id = ownedOffice(ctx);
+    expect(buildCommand(ctx, ['upgrade', String(id)], {}).success).toBe(true);
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
+    const cash = ctx.state!.cash;
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success).toBe(false);
+    expect(result.output).toContain(t(getQuest(B3)!.titleKey));
+    expect(ctx.state!.cash).toBe(cash);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+  });
+
+  it('the gate precedes the funds gap: a locked and unaffordable tier names the quest', () => {
+    const ctx = questCtx();
+    ctx.state!.cash = 1;
+    const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain(t(getQuest(B2)!.titleKey));
+  });
+
+  it('once the T2 quest is completed a T2 placement goes through at the usual cost', () => {
+    const ctx = questCtx();
+    completeQuest(ctx.state!, B2);
+    const cash = ctx.state!.cash;
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0', tier: '2' });
+    expect(result.success, result.output).toBe(true);
+    expect(ctx.state!.cash).toBe(cash - getBuildingDef('management_office', 2).constructionCost);
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
+  });
+
+  it('once the T2 quest is completed an upgrade goes through at the usual cost', () => {
+    const ctx = questCtx();
+    const id = ownedOffice(ctx);
+    completeQuest(ctx.state!, B2);
+    const cash = ctx.state!.cash;
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.success, result.output).toBe(true);
+    expect(ctx.state!.cash).toBe(cash - getUpgradeCost('management_office', 2));
+    tickUntilConstructionDone(ctx);
+    expect(ctx.state!.buildings.buildings[0]!.tier).toBe(2);
+    expect(ctx.state!.buildings.buildings[0]!.id).toBe(id);
+  });
+
+  it('the T3 quest opens the T3 placement', () => {
+    const ctx = questCtx();
+    completeQuest(ctx.state!, B2);
+    completeQuest(ctx.state!, B3);
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0', tier: '3' });
+    expect(result.success, result.output).toBe(true);
+  });
+
+  it('the console shortcut `quest complete` opens the tier for every building type', () => {
+    const { runner, ctx } = createRunner();
+    expect(runner.run('sandbox start biome:desert_badlands seed:42').success).toBe(true);
+    ctx.state!.cash = 5_000_000;
+    const before = runner.run('build living_quarters tier:2 at:60,60');
+    expect(before.success).toBe(false);
+    expect(before.output).toContain(t(getQuest(B2)!.titleKey));
+    expect(runner.run(`quest complete ${B2}`).success).toBe(true);
+    const after = runner.run('build living_quarters tier:2 at:60,60');
+    expect(after.output).not.toContain(t(getQuest(B2)!.titleKey));
+  });
+
+  it('a tier grandfathered into unlockedTiers is not locked on a quest site', () => {
+    const ctx = questCtx();
+    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
+    const result = buildCommand(ctx, ['management_office'], { at: '2,0', tier: '2' });
+    expect(result.success, result.output).toBe(true);
+    const t3 = buildCommand(ctx, ['management_office'], { at: '20,20', tier: '3' });
+    expect(t3.success).toBe(false);
+    expect(t3.output).toContain(t(getQuest(B3)!.titleKey));
+  });
+
+  it('a site without quests is ungated: every tier may be ordered', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
+    expect(ctx.state!.quests).toBeUndefined();
+    ctx.state!.cash = 2_000_000;
+    expect(buildCommand(ctx, ['management_office'], { at: '2,0', tier: '3' }).success).toBe(true);
+    expect(buildCommand(ctx, ['management_office'], { at: '20,20', tier: '2' }).success).toBe(true);
   });
 });
 

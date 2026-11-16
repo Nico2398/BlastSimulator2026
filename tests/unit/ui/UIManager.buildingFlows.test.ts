@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// UIManager routes the building inspector's Move / Upgrade / Research to the
+// UIManager routes the building inspector's Move / Upgrade to the
 // Build panel's shared flows without ever opening the panel (#1758).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { UIManager } from '../../../src/ui/UIManager.js';
@@ -100,11 +100,8 @@ describe('UIManager — building flows without the Build panel (#1758)', () => {
     expect(gameConsole).not.toHaveBeenCalledWith(expect.stringContaining('build upgrade'));
   });
 
-  it('queueBuildingResearch dispatches research queue for the next tier of the building, panel closed', () => {
-    ui.update(state);
-    ui.queueBuildingResearch(7);
-    expect(gameConsole).toHaveBeenCalledWith('research queue type:management_office tier:2');
-    expect(panelOpen()).toBe(false);
+  it('has no research flow any more', () => {
+    expect((ui as unknown as Record<string, unknown>)['queueBuildingResearch']).toBeUndefined();
   });
 
   it('the state fed to update() is the one the flows read, even with the Build panel hidden', () => {

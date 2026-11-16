@@ -168,7 +168,7 @@ type BuildOrders = Parameters<typeof unreachableNewestBuildOrder>[0];
 /** Planned buildings with their place_building orders; `blocked[i]` is order i's blockedReason (undefined: none). */
 function buildOrders(...blocked: Array<string | undefined>): BuildOrders {
   return {
-    plannedBuildings: blocked.map((_, i) => ({ id: i + 1, actionId: 100 + i, type: 'research_center', tier: 1, x: 4 * i, z: 8 })),
+    plannedBuildings: blocked.map((_, i) => ({ id: i + 1, actionId: 100 + i, type: 'living_quarters', tier: 1, x: 4 * i, z: 8 })),
     pendingActions: blocked.map((reason, i) => ({ id: 100 + i, type: 'place_building', ...(reason ? { blockedReason: reason } : {}) })),
   } as unknown as BuildOrders;
 }

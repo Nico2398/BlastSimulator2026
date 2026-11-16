@@ -84,7 +84,7 @@ describe('click tone', () => {
   });
 
   it('denies a locked (enabled but unavailable) button', () => {
-    click(mount(button('locked', 'Research')));
+    click(mount(button('locked', 'Upgrade')));
     expect(player.ids).toEqual(['ui_denied']);
   });
 

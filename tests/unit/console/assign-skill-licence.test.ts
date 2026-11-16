@@ -3,7 +3,7 @@
 // A driving licence's level (1-3) is what the per-tier slope limit gates on, and
 // `assign_skill` rewrites a qualification with no licence level, so a scenario
 // had no way to get a driver licensed for a tier-2 or tier-3 vehicle without
-// building and researching the school. `licence:N` sets it directly.
+// building the school. `licence:N` sets it directly.
 
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../../src/console-api.js';

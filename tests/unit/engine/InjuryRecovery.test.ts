@@ -45,7 +45,7 @@ function putInside(state: GameState, emp: Employee, buildingId: number): void {
 function placeLq(state: GameState, tier: 1 | 2 | 3 = 1) {
   const r = placeBuilding(state.buildings, 'living_quarters', 20, 20, 100, 100, 1);
   if (!('building' in r) || !r.building) throw new Error('placement failed');
-  // Higher tiers are research-gated; set the tier directly (the unit under test reads it).
+  // Set the tier directly (the unit under test reads it).
   r.building.tier = tier;
   return r.building;
 }

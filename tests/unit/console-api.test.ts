@@ -82,17 +82,13 @@ function makeOreSaleOffer(materialId: string, quantityKg: number): Contract {
  * number rather than the raw per-material record because expect's
  * increased/decreased/equals/changedBy only compare flat numeric fields, and
  * a scenario can't pin which material id a real blast's RNG happened to
- * expose (#671). researchQueueLength (state.buildings.researchQueue.length)
- * closes the same gap for research tracked as a single active queue entry —
- * a scenario proving research genuinely cleared (not just "still in
- * progress N ticks remaining") had no field to check headlessly in command
- * mode before this.
+ * expose (#671).
  */
 const SERIALIZED_FIELDS = [
   'boardConfidence',
   'mineGrade', 'unseenApprovalGrade', 'trafficJamCount', 'trafficJams', 'pendingEvent', 'noticeCount', 'seed', 'time', 'tickCount', 'isPaused', 'timeScale', 'mineType', 'weather', 'wallSlumpCount',
   'worldSizeX', 'worldSizeZ', 'worldMinX', 'worldMinZ',
-  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'redGhostCount', 'researchQueueLength', 'chargedCount', 'wetHoleCount',
+  'drillHoles', 'chargesByHole', 'finances', 'holeCount', 'orderedHoleCount', 'orderedChargeCount', 'orderedRampSegmentCount', 'orderedBuildingCount', 'unreachableGhostCount', 'redGhostCount', 'chargedCount', 'wetHoleCount',
   'surveyCount', 'pendingActionCount', 'buildingCount', 'maxBuildingTier', 'builtRampCount', 'rampLegCount', 'builtRampWidth', 'builtRampFlow', 'vehicleCount', 'vehicleBoardingCount', 'vehicleLoaded', 'employeeCount',
   'qualificationCount', 'proficiencyTotal', 'trainingCount', 'collapsedCount', 'minFatigue', 'insideBuildingCount',
   'stuckEmployeeCount', 'activeContractCount', 'fillableOreSaleOffered', 'fillableDirtiteSaleOffered', 'fillableRustiteSaleOffered', 'winningRustiteSaleOffered', 'rubbleDisposalOffered', 'supplyOffered', 'blastBanned', 'blingiteSaleOffered', 'fillableSaleOffered', 'deathCount',

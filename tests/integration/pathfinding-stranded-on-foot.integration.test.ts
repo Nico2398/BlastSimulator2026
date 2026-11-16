@@ -48,7 +48,7 @@ function hireOne(ctx: GameContext, role = 'driller'): number {
 
 /**
  * Push a Building directly onto state.buildings, bypassing placeBuilding's
- * flatness/tier-research/overlap validation entirely — this file is
+ * flatness/overlap validation entirely — this file is
  * reproducing the NavGrid-classification consequence of a completed
  * building, not exercising placement rules (that's #410's own suite). Then
  * rebuilds the live NavGrid via buildGameNavGrid (state/GameState.js), the

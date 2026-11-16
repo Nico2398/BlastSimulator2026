@@ -39,6 +39,10 @@ import { ACCIDENT_COST, FRAME_COST, FRAME_EVIDENCE_TICKS } from '../../../src/co
 import { Random } from '../../../src/core/math/Random.js';
 import { STARTING_CASH } from '../../../src/core/config/balance.js';
 import { makeEmptyGameContext, makeGameContext } from '../../helpers/gameContext.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { createQuestState } from '../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../src/core/economy/QuestCatalog.js';
+import { t } from '../../../src/core/i18n/I18n.js';
 
 function makeCtx(cash: number): MiningContext {
   const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32 });
@@ -248,15 +252,16 @@ describe('build <type> at: — insufficient funds guard', () => {
     expect(ctx.state!.buildings.buildings).toHaveLength(0);
   });
 
-  it('reports the research gate, not the funds gap, when the tier is both locked and unaffordable', () => {
-    // Precedence copied from `research queue`: cash is the last thing checked,
-    // so a refusal names the precondition the player can actually act on.
-    // Both terms of BuildMenu's `cash < def.constructionCost || locked` are
-    // false here — only the message differs.
+  it('reports the quest gate, not the funds gap, when the tier is both locked and unaffordable', () => {
+    // Cash is the last thing checked, so a refusal names the precondition the
+    // player can actually act on. Both terms of BuildMenu's
+    // `cash < def.constructionCost || locked` are true here — only the message differs.
     const ctx = makeCtx(0);
+    ctx.state!.grade = createGradeState();
+    ctx.state!.quests = createQuestState();
     const result = buildCommand(ctx, ['management_office'], { at: '0,0', tier: '2' });
     expect(result.success).toBe(false);
-    expect(result.output).toContain('not researched');
+    expect(result.output).toContain(t(getQuest('quest_building_t2')!.titleKey));
     expect(result.output).not.toContain('Insufficient funds');
   });
 
@@ -360,7 +365,7 @@ describe('build upgrade — insufficient funds guard', () => {
     // Edge case: the pre-existing tier>=3 check must keep running ahead of
     // the new funds guard, not get shadowed by it.
     const ctx = makeCtx(0);
-    unlockTier2(ctx); // also unlocks T3 — placeTestBuilding's own placeBuilding() re-checks the research gate
+    unlockTier2(ctx);
     const id = placeTestBuilding(ctx, 'management_office', 3);
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);

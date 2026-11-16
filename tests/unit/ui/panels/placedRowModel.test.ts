@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { placedRowModel, siteRowModel } from '../../../../src/ui/panels/placedRowModel.js';
 import { createGame } from '../../../../src/core/state/GameState.js';
 import type { GameState, PlannedBuilding } from '../../../../src/core/state/GameState.js';
-import { getBuildingDef, type Building, type BuildingType, type BuildingTier } from '../../../../src/core/entities/Building.js';
+import { getBuildingDef, getAllBuildingTypes, type Building, type BuildingType, type BuildingTier } from '../../../../src/core/entities/Building.js';
 import { utilizationExplain, badgeExplain } from '../../../../src/ui/buildingExplain.js';
 import { t } from '../../../../src/core/i18n/I18n.js';
 import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
@@ -76,17 +76,6 @@ describe('placedRowModel — utilization (#1759)', () => {
   it('empty freight warehouse reports fraction 0', () => {
     const b = mk({ id: 1, type: 'freight_warehouse' });
     expect(placedRowModel(b, stateWith(b)).utilization!.fraction).toBe(0);
-  });
-
-  it('research center is busy when the queue is non-empty', () => {
-    const b = mk({ id: 1, type: 'research_center' });
-    const s = stateWith(b);
-    const idle = placedRowModel(b, s).utilization;
-    s.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 2 } as never);
-    const busy = placedRowModel(b, s).utilization;
-    expect(busy).not.toBeNull();
-    expect(busy!.text).not.toBe('');
-    expect(busy!.text).not.toBe(idle?.text);
   });
 
   it('spoil heap shows its fill against the finite capacity (#1892)', () => {
@@ -219,12 +208,11 @@ describe('placedRowModel — explanations (#2171)', () => {
     expect(m.badgeExplain).not.toBe(badgeExplain('demolition_ordered', { closureEventId: null, closureTicksRemaining: null }));
   });
 
-  it.each<[BuildingType, 'beds' | 'kg' | 'research']>([
+  it.each<[BuildingType, 'beds' | 'kg']>([
     ['living_quarters', 'beds'],
     ['management_office', 'beds'],
     ['spoil_heap', 'kg'],
     ['freight_warehouse', 'kg'],
-    ['research_center', 'research'],
   ])('%s utilization carries the %s explanation', (type, kind) => {
     const b = mk({ id: 1, type });
     const u = placedRowModel(b, stateWith(b)).utilization!;
@@ -232,10 +220,11 @@ describe('placedRowModel — explanations (#2171)', () => {
     expect(u.explain).toBe(utilizationExplain(b, kind));
   });
 
-  it('a busy research queue keeps an explanation', () => {
-    const b = mk({ id: 1, type: 'research_center' });
-    const s = stateWith(b);
-    s.buildings.researchQueue.push({ targetType: 'management_office', targetTier: 2 } as never);
-    expect(placedRowModel(b, s).utilization!.explain).toBe(utilizationExplain(b, 'research'));
+  it('every building type builds a row model with no research utilization line', () => {
+    for (const type of getAllBuildingTypes()) {
+      const b = mk({ id: 1, type });
+      const u = placedRowModel(b, stateWith(b)).utilization;
+      if (u) expect(`${u.text} ${u.explain}`).not.toMatch(/research/i);
+    }
   });
 });

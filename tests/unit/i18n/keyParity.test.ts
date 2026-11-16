@@ -642,13 +642,12 @@ describe('en.json / fr.json — no untranslated (byte-identical) value outside t
   });
 });
 
-describe('inspector occupants and research keys (#1760)', () => {
+describe('inspector occupants keys (#1760)', () => {
   const keys = [
-    'inspector.section.residents', 'inspector.section.trainees', 'inspector.section.courses', 'inspector.section.research',
+    'inspector.section.residents', 'inspector.section.trainees', 'inspector.section.courses',
     'inspector.beds', 'inspector.seats', 'inspector.resident_rest', 'inspector.housing_effect',
     'inspector.overcapacity_warning', 'inspector.no_residents', 'inspector.no_trainees', 'inspector.trainee_row',
-    'inspector.walking_in', 'inspector.course_row', 'inspector.course_superseded', 'inspector.research_running',
-    'inspector.research_pending', 'inspector.research_paused', 'inspector.research_idle',
+    'inspector.walking_in', 'inspector.course_row', 'inspector.course_superseded',
   ];
   it.each(keys)('%s exists in en and fr with non-empty text', key => {
     expect(en[key], `en ${key}`).toBeTruthy();

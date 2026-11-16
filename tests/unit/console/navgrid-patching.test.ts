@@ -32,9 +32,8 @@ function makeCtx(): MiningContext {
   // instead of writing the hole straight into state.drillHoles — it needs a
   // 'blasting'-qualified employee and a drill_rig vehicle to ever land.
   const ctx = makeGameContext({ mineType: 'desert', seed: 1, size: 32, staffed: true });
-  // These tests exercise NavGrid patching on placement/upgrade, not the
-  // research gate — pre-unlock every tier so placement isn't blocked.
-  ctx.state!.buildings.unlockedTiers.management_office = 3;
+  // These tests exercise NavGrid patching on placement/upgrade, not a tier
+  // gate: this site has no quests, so every tier is open.
   return ctx;
 }
 
@@ -258,9 +257,6 @@ describe('NavGrid patching — building upgrade', () => {
 
     const buildingId = ctx.state!.buildings.buildings[0]!.id;
 
-    // #410: upgrade is research-gated — unlock tier 2 first.
-    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
-
     // Upgrade T1 → T2: demolition, then construction of the new tier (#1392)
     equipDemolition(ctx);
     const upgradeResult = buildCommand(ctx, ['upgrade', String(buildingId)], {});
@@ -281,8 +277,6 @@ describe('NavGrid patching — building upgrade', () => {
 
   it('does not patch NavGrid when upgrade fails (already at max tier)', () => {
     const ctx = makeCtx();
-    // #410: tier 3 placement is research-gated — unlock it for this setup step.
-    ctx.state!.buildings.unlockedTiers['management_office'] = 3;
     // Start with a T3 management_office (3×3 footprint at 8,8 — flat on this
     // seed/size/mineType; (10,10) is sloped, #1008)
     buildCommand(ctx, ['management_office'], { at: '8,8', tier: '3' });

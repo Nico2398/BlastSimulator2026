@@ -102,10 +102,6 @@ function makeFlatNavGrid(width: number, height: number): NavGrid {
  */
 function setupSchool(type: BuildingType, tier: BuildingTier = 1, x = 10, z = 10) {
   const state = createGame({ seed: SEED });
-  // Tier 2/3 placement is research-gated (isTierUnlocked) — a fixture that
-  // wants a higher-tier school directly, without playing through research,
-  // unlocks it up front rather than placeBuilding silently refusing.
-  state.buildings.unlockedTiers[type] = tier;
   const school = placeBuilding(state.buildings, type, x, z, 64, 64, tier).building!;
   const grid = makeFlatNavGrid(32, 32);
   const def = getBuildingDef(type, tier);
@@ -1288,6 +1284,6 @@ describe('courseTerms and schoolCourses (#1760)', () => {
 
   it('returns no courses for a non-school building', () => {
     expect(schoolCourses(makeBuilding({ type: 'living_quarters' }), [])).toEqual([]);
-    expect(schoolCourses(makeBuilding({ type: 'research_center' }), [])).toEqual([]);
+    expect(schoolCourses(makeBuilding({ type: 'geology_lab', outOfService: true }), [])).toEqual([]);
   });
 });

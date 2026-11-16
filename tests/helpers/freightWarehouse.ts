@@ -63,7 +63,7 @@ export function setFreightRoomExact(state: GameState, freeKg: number): void {
   }
 }
 
-/** Tier-1 warehouses only (higher tiers need research before placement), until capacity covers `kg`. */
+/** Tier-1 warehouses only (higher tiers are set directly by upgradeFreightWarehousesToTier3), until capacity covers `kg`. */
 function placeFixtureWarehouses(state: GameState, kg: number): void {
   for (let i = 0; i < MAX_FIXTURE_WAREHOUSES; i++) {
     addFreightWarehouseToState(state, 20 + 6 * (i % 20), 20 + 6 * Math.floor(i / 20), 1);
@@ -101,7 +101,7 @@ export function stockWarehouse(state: GameState, warehouseId: number, fragment: 
  * Upgrade every placed (adding depots beside the first until `minTotalKg` fits) freight warehouse to tier 3 (FREIGHT_WAREHOUSE_CAPACITY_KG[3] each) in place and
  * resync capacity: a tier-1 warehouse cannot take one heavy boulder,
  * and a per-warehouse rule means pooled capacity alone does not help.
- * Skips the research gate on purpose; upgrades are not what these fixtures probe.
+ * Sets the tier directly on purpose; upgrades are not what these fixtures probe.
  */
 export function upgradeFreightWarehousesToTier3(state: GameState, minTotalKg = 0): void {
   // Extra depots go in a row in a column beyond the first one (4x4 footprint, 5 apart).

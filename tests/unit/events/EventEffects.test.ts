@@ -1,4 +1,4 @@
-// BlastSimulator2026 — #1568: timed survey_cost / research_cost / out_of_service
+// BlastSimulator2026 — #1568: timed survey_cost / out_of_service
 // modifiers take effect in the systems they name.
 
 import { describe, it, expect } from 'vitest';
@@ -9,10 +9,8 @@ import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.j
 import { purchaseVehicle, ROLE_LICENCE_REQUIRED } from '../../../src/core/entities/Vehicle.js';
 import {
   placeBuilding, createBuildingState, isOperating, syncBuildingServiceFlags,
-  findNearestActiveBuildingOfType, getStorageCapacity, getBuildingDef, queueResearchTask,
-  getQueueBlockCode, type Building,
+  findNearestActiveBuildingOfType, getStorageCapacity, getBuildingDef, type Building,
 } from '../../../src/core/entities/Building.js';
-import { hasActiveResearchCenter, tickResearch } from '../../../src/core/entities/BuildingResearch.js';
 import { freightWarehouseSites } from '../../../src/core/entities/BuildingWarehouse.js';
 import { enrolInTraining, availableTrainingOffers } from '../../../src/core/entities/EmployeeTraining.js';
 import { addModifier, pruneExpired, type ActiveModifier } from '../../../src/core/events/ActiveModifiers.js';
@@ -20,10 +18,10 @@ import { runSurvey, surveyCostFor } from '../../../src/core/mining/SurveyCalc.js
 import { cancelAction } from '../../../src/core/engine/TaskCancellation.js';
 import { findFreeVehicleForRole, findVehicleForClaim, reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { runTick } from '../../../src/core/engine/TickPipeline.js';
-import { researchCommand } from '../../../src/console/commands/research.js';
-import { getResearchTaskDef, SURVEY_COSTS } from '../../../src/core/config/balance.js';
+import { setupEvents } from '../../../src/core/events/index.js';
+import { getAllEvents, type EventConsequence } from '../../../src/core/events/EventPool.js';
+import { SURVEY_COSTS } from '../../../src/core/config/balance.js';
 import { mod } from '../../helpers/eventEffectWorld.js';
-import { makeGameContext } from '../../helpers/gameContext.js';
 
 const SEED = 42;
 
@@ -123,67 +121,35 @@ describe('runSurvey under survey_cost (#1568)', () => {
   });
 });
 
-describe('research_cost (#1568)', () => {
-  function researchCtx(cash = 500_000) {
-    const ctx = makeGameContext({ mineType: 'desert', seed: '42', size: '32', cash: String(cash) });
-    const placed = placeBuilding(ctx.state!.buildings, 'research_center', 20, 20, 32, 32, 1, 0, 0);
-    if (!placed.success) throw new Error(placed.error);
-    return ctx;
-  }
-  const args = { type: 'driving_center', tier: '2' };
-  const baseCost = getResearchTaskDef('driving_center', 2).cost;
+describe('politics_tax_reform (#2283: the Research Center is gone)', () => {
+  const taxReform = () => {
+    setupEvents();
+    return getAllEvents().find(e => e.id === 'politics_tax_reform')!;
+  };
+  const effectsOf = (c: EventConsequence | undefined) => (c?.effects ?? []);
+  const costFactorsOf = (c: EventConsequence | undefined) =>
+    effectsOf(c).flatMap(e => (e.type === 'cost_factor' ? [e] : []));
 
-  it('queueResearchTask sets cost = scaledCost and returns it', () => {
-    const ctx = researchCtx();
-    const res = queueResearchTask(ctx.state!.buildings, 'driving_center', 2, 2);
-    expect(res.success).toBe(true);
-    expect(res.cost).toBe(Math.round(baseCost * 2));
-    expect(ctx.state!.buildings.researchQueue[0]!.cost).toBe(Math.round(baseCost * 2));
+  it('its compliant option discounts explosive prices', () => {
+    const cost = costFactorsOf(taxReform().consequences[0]);
+    expect(cost.map(e => e.what)).toEqual(['explosive']);
+    expect(cost[0]!.pct).toBeLessThan(0);
   });
 
-  it('queueResearchTask defaults to factor 1', () => {
-    const ctx = researchCtx();
-    expect(queueResearchTask(ctx.state!.buildings, 'driving_center', 2).cost).toBe(baseCost);
+  it('no option of any event discounts research any more', () => {
+    for (const ev of getAllEvents()) {
+      for (const c of ev.consequences) {
+        for (const branch of [c, c.altConsequence]) {
+          for (const effect of costFactorsOf(branch)) expect(effect.what as string, ev.id).not.toBe('research');
+        }
+      }
+    }
   });
 
-  it('console queue charges round(cost * factor) and the task records it', () => {
-    const ctx = researchCtx();
-    addMod(ctx.state!, { kind: 'research_cost', magnitude: 1.5 });
-    const before = ctx.state!.cash;
-    const res = researchCommand(ctx, ['queue'], args);
-    expect(res.success, res.output).toBe(true);
-    const charged = Math.round(baseCost * 1.5);
-    expect(ctx.state!.cash).toBe(before - charged);
-    expect(ctx.state!.buildings.researchQueue[0]!.cost).toBe(charged);
-    expect(ctx.state!.finances.transactions.filter(t => t.type === 'expense').at(-1)!.amount).toBe(charged);
-  });
-
-  it('console queue is unchanged without a modifier', () => {
-    const ctx = researchCtx();
-    const before = ctx.state!.cash;
-    researchCommand(ctx, ['queue'], args);
-    expect(ctx.state!.cash).toBe(before - baseCost);
-  });
-
-  it('console queue refuses insufficient_funds when cash is below the scaled price only', () => {
-    const ctx = researchCtx(baseCost + 1);
-    addMod(ctx.state!, { kind: 'research_cost', magnitude: 2 });
-    const res = researchCommand(ctx, ['queue'], args);
-    expect(res.success).toBe(false);
-    expect(res.code).toBe('insufficient_funds');
-    expect(ctx.state!.cash).toBe(baseCost + 1);
-    expect(ctx.state!.buildings.researchQueue).toHaveLength(0);
-  });
-
-  it('queue stores the scaled cost on the task (what a cancel refunds)', () => {
-    // baseCost > 0 is required for the factor to be observable
-    expect(baseCost).toBeGreaterThan(0);
-    const ctx = researchCtx();
-    addMod(ctx.state!, { kind: 'research_cost', magnitude: 2 });
-    const before = ctx.state!.cash;
-    researchCommand(ctx, ['queue'], args);
-    expect(ctx.state!.buildings.researchQueue[0]!.cost).toBe(baseCost * 2);
-    expect(before - ctx.state!.cash).toBe(baseCost * 2);
+  it('the compliant option keeps its cash cost and ecology gain', () => {
+    const option = taxReform().consequences[0]!;
+    expect(option.cashDelta).toBeLessThan(0);
+    expect(option.scoreDelta?.ecology).toBeGreaterThan(0);
   });
 });
 
@@ -335,33 +301,6 @@ describe('closed buildings are skipped (#1568)', () => {
       building({ id: 2, type: 'geology_lab', tier: 1 }),
     ]);
     expect(offers.find(o => o.skill === 'geology')?.building.id).toBe(2);
-  });
-
-  it('a closed Research Center blocks queueing with no_research_center', () => {
-    const bs = createBuildingState();
-    bs.buildings.push(building({ type: 'research_center', outOfService: true }));
-    expect(hasActiveResearchCenter(bs)).toBe(false);
-    expect(getQueueBlockCode(bs, 'driving_center', 2)).toBe('no_research_center');
-    const res = queueResearchTask(bs, 'driving_center', 2);
-    expect(res).toMatchObject({ success: false, code: 'no_research_center' });
-  });
-
-  it('a closed Research Center pauses research without cancelling the queue', () => {
-    const bs = createBuildingState();
-    bs.buildings.push(building({ type: 'research_center', outOfService: true }));
-    bs.researchQueue.push({ targetType: 'driving_center', targetTier: 2, ticksRemaining: 5, cost: 100, conditions: [] });
-    expect(tickResearch(bs)).toBeUndefined();
-    expect(bs.researchQueue).toHaveLength(1);
-    expect(bs.researchQueue[0]!.ticksRemaining).toBe(5);
-    delete bs.buildings[0]!.outOfService;
-    tickResearch(bs);
-    expect(bs.researchQueue[0]!.ticksRemaining).toBe(4);
-  });
-
-  it('an open Research Center still counts', () => {
-    const bs = createBuildingState();
-    bs.buildings.push(building({ type: 'research_center' }));
-    expect(hasActiveResearchCenter(bs)).toBe(true);
   });
 
   it('a closed freight warehouse adds no storage capacity or site', () => {

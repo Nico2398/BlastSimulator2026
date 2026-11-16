@@ -229,7 +229,7 @@ describe('ActiveModifiers.actionBlocked', () => {
   });
 });
 
-// ── #1568: survey_cost / research_cost / out_of_service consumers ──
+// ── #1568: survey_cost / out_of_service consumers ──
 
 describe('ActiveModifiers.scaledCost (#1568)', () => {
   it('rounds base * factor to whole cash', () => {

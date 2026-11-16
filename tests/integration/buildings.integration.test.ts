@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Integration tests: Buildings lifecycle
 // Covers placement, listing, destruction, demolition, upgrade, move,
-// warehouse storage, explosives inventory, and research tier-unlock.
+// warehouse storage, explosives inventory, and the building-tier quest gate (#2283).
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { GameContext } from '../../src/console/commands/world.js';
@@ -18,10 +18,6 @@ import {
   demolishBuilding,
   getStorageCapacity,
   getBuildingScoreEffects,
-  hasActiveResearchCenter,
-  queueResearchTask,
-  tickResearch,
-  isTierUnlocked,
   getBuildingDef,
   getSurfaceY,
   type BuildingType,
@@ -30,12 +26,17 @@ import { createLogisticsState, syncLogisticsCapacity, addBlastFragments } from '
 import { syncHaulDispatch } from '../../src/core/economy/HaulDispatch.js';
 import type { FragmentData } from '../../src/core/mining/BlastExecution.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
+import { createGradeState } from '../../src/core/economy/MineGrade.js';
+import { createQuestState, completeQuest, isBuildingTierUnlocked } from '../../src/core/economy/Quests.js';
+import { getQuest } from '../../src/core/economy/QuestCatalog.js';
+import { t } from '../../src/core/i18n/I18n.js';
 import {
   BUILDING_CONSTRUCTION_BASE_DURATION_TICKS,
   BUILDING_CONSTRUCTION_TIER_MULTIPLIER,
   ACTION_STARVATION_TICK_THRESHOLD,
   BUILDING_PLACEMENT_MAX_HEIGHT_SPREAD,
   NEED_HARD_THRESHOLDS,
+  QUEST_BUILDING_T2_BUILDINGS,
 } from '../../src/core/config/balance.js';
 
 // ── Shared helpers ──────────────────────────────────────────────────────────
@@ -108,7 +109,6 @@ const ALL_BUILDING_TYPES: BuildingType[] = [
   'blasting_academy',
   'management_office',
   'geology_lab',
-  'research_center',
   'living_quarters',
   'freight_warehouse',
 ];
@@ -219,33 +219,24 @@ describe('Buildings lifecycle', () => {
     expect(result.output).toContain('not found');
   });
 
-  // ── 5. Upgrade + research tier-unlock ───────────────────────────────────────
+  // ── 5. Upgrade + quest tier-unlock ──────────────────────────────────────────
 
-  it('upgrade command changes building tier', () => {
-    // --- Research pipeline: queue, tick, unlock — on the SAME buildings state the
-    //     console upgrade command operates on. Queuing research on a disconnected
-    //     BuildingState would leave ctx.state!.buildings.unlockedTiers empty, and
-    //     the upgrade below would then be rejected by the research gate. A placed
-    //     research_center is also a hard prerequisite (#442) to queue research at all. ---
+  /** Turn the site into a progression-style one: quests exist, so higher tiers are locked behind them. */
+  function withQuests(): void {
+    ctx.state!.grade = createGradeState();
+    ctx.state!.quests = createQuestState();
+  }
+
+  it('upgrade command changes building tier once the T2 quest is completed', () => {
+    withQuests();
     const bs = ctx.state!.buildings;
-    placeBuilding(bs, 'research_center', 50, 50, 64, 64);
 
-    // Tier 2 is locked initially
-    expect(isTierUnlocked(bs, 'living_quarters', 2)).toBe(false);
+    // Tier 2 is locked initially, and the research pipeline is gone.
+    expect(isBuildingTierUnlocked(ctx.state!, 'living_quarters', 2)).toBe(false);
+    expect('researchQueue' in bs).toBe(false);
 
-    // Queue a research task for tier-2 living_quarters — tier-2 (first upgrade) is
-    // cost-only: 0 ticks, no conditions.
-    const researchResult = queueResearchTask(bs, 'living_quarters', 2);
-    expect(researchResult.success, JSON.stringify(researchResult)).toBe(true);
-    expect(bs.researchQueue).toHaveLength(1);
-    expect(bs.researchQueue[0]!.ticksRemaining).toBe(0);
-
-    // Tick once — a 0-duration task completes on the very next tick.
-    tickResearch(bs);
-
-    // Tier 2 should now be unlocked and queue empty
-    expect(isTierUnlocked(bs, 'living_quarters', 2)).toBe(true);
-    expect(bs.researchQueue).toHaveLength(0);
+    completeQuest(ctx.state!, 'quest_building_t2');
+    expect(isBuildingTierUnlocked(ctx.state!, 'living_quarters', 2)).toBe(true);
 
     // --- Console upgrade command ---
     buildCommand(ctx, ['living_quarters'], { at: '9,14', tier: '1' });
@@ -272,37 +263,60 @@ describe('Buildings lifecycle', () => {
     expect(defT2.capacity).toBe(40); // Tier 2 living_quarters capacity
   });
 
-  // ── 5b. Reject direct placement of a non-unlocked tier ──────────────────────
-
-  it('rejects direct placement of an unresearched tier via the build command', () => {
-    const result = buildCommand(ctx, ['living_quarters'], { at: '9,14', tier: '2' });
-    expect(result.success).toBe(false);
-    expect(result.output).toMatch(/research/i);
-    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+  it('the quest completes by play: enough buildings and housed crew, then the tick pipeline opens tier 2', () => {
+    withQuests();
+    ctx.state!.cash = 5_000_000;
+    for (const [type, at] of [['living_quarters', '9,14'], ['management_office', '4,4'], ['geology_lab', '20,2'], ['driving_center', '20,20']] as const) {
+      expect(buildCommand(ctx, [type], { at }).success).toBe(true);
+    }
+    tickUntilConstructionDone(ctx, 1500);
+    expect(ctx.state!.buildings.buildings.length).toBeGreaterThanOrEqual(QUEST_BUILDING_T2_BUILDINGS);
+    // The staffed crew is housed in the living quarters' beds.
+    tickCommand(ctx, ['5'], {});
+    expect(ctx.state!.quests!.completed).toContain('quest_building_t2');
+    expect(isBuildingTierUnlocked(ctx.state!, 'living_quarters', 2)).toBe(true);
+    expect(ctx.state!.quests!.completed).not.toContain('quest_building_t3');
   });
 
-  // ── 5c. Reject upgrade to a tier that has not been researched ───────────────
+  // ── 5b. Reject direct placement of a locked tier ────────────────────────────
 
-  it('rejects upgrade to a tier that has not been researched', () => {
+  it('rejects direct placement of a locked tier via the build command, naming the quest', () => {
+    withQuests();
+    const result = buildCommand(ctx, ['living_quarters'], { at: '9,14', tier: '2' });
+    expect(result.success).toBe(false);
+    expect(result.output).toContain(t(getQuest('quest_building_t2')!.titleKey));
+    expect(ctx.state!.buildings.buildings).toHaveLength(0);
+    expect(ctx.state!.plannedBuildings).toHaveLength(0);
+  });
+
+  // ── 5c. Reject upgrade to a tier whose quest is open ────────────────────────
+
+  it('rejects upgrade to a tier whose quest is not completed', () => {
+    withQuests();
     buildCommand(ctx, ['living_quarters'], { at: '9,14', tier: '1' });
     tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
 
     const result = buildCommand(ctx, ['upgrade', '1'], {});
     expect(result.success).toBe(false);
-    expect(result.output).toMatch(/research/i);
+    expect(result.output).toContain(t(getQuest('quest_building_t2')!.titleKey));
 
     // The failed upgrade must not have replaced the tier-1 building
     expect(ctx.state!.buildings.buildings).toHaveLength(1);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(1);
   });
 
+  it('a site without quests offers every tier: tier 3 may be ordered directly', () => {
+    ctx.state!.cash = 5_000_000;
+    const result = buildCommand(ctx, ['living_quarters'], { at: '9,14', tier: '3' });
+    expect(result.success, result.output).toBe(true);
+  });
+
   // ── 6. Reject upgrade at max tier ───────────────────────────────────────────
 
   it('rejects upgrade at max tier', () => {
-    // Place a tier-3 building directly — pre-unlock tier 3 research so the setup
+    // Place a tier-3 building directly — this site has no quests, so the setup
     // placement itself is not the thing under test here (that's tests 5b/5c).
-    ctx.state!.buildings.unlockedTiers['living_quarters'] = 3;
     buildCommand(ctx, ['living_quarters'], { at: '9,14', tier: '3' });
     tickUntilConstructionDone(ctx);
     expect(ctx.state!.buildings.buildings[0]!.tier).toBe(3);
@@ -319,9 +333,10 @@ describe('Buildings lifecycle', () => {
     const result = buildCommand(ctx, ['types'], {});
     expect(result.success).toBe(true);
 
-    for (const t of ALL_BUILDING_TYPES) {
-      expect(result.output).toContain(t);
+    for (const type of ALL_BUILDING_TYPES) {
+      expect(result.output).toContain(type);
     }
+    expect(result.output).not.toContain('research_center');
   });
 
   // ── 8. List shows all placed ────────────────────────────────────────────────
@@ -479,9 +494,7 @@ describe('Construction sites — order-then-build (#556)', () => {
   });
 
   it('a tier-2 order carries payload.durationTicks scaled by BUILDING_CONSTRUCTION_TIER_MULTIPLIER[2]', () => {
-    // Tier 2 requires research to be unlocked first (same gate as direct placement).
-    ctx.state!.buildings.unlockedTiers['management_office'] = 2;
-
+    // This site has no quests: every tier is open.
     const result = buildCommand(ctx, ['management_office'], { at: '6,9', tier: '2' });
     expect(result.success, JSON.stringify(result)).toBe(true);
 
@@ -523,16 +536,6 @@ describe('Construction sites — order-then-build (#556)', () => {
     expect(getBuildingScoreEffects(ctx.state!.buildings).wellBeing).toBeGreaterThan(0);
   });
 
-  it('research_center only gates research once construction completes, not at order time', () => {
-    buildCommand(ctx, ['research_center'], { at: '6,9' });
-    expect(hasActiveResearchCenter(ctx.state!.buildings)).toBe(false);
-
-    tickUntilConstructionDone(ctx);
-
-    expect(ctx.state!.plannedBuildings).toHaveLength(0);
-    expect(hasActiveResearchCenter(ctx.state!.buildings)).toBe(true);
-  });
-
   it('rejects the order when funds are insufficient, charging nothing and queuing nothing', () => {
     ctx.state!.cash = 10;
 
@@ -544,11 +547,13 @@ describe('Construction sites — order-then-build (#556)', () => {
     expect(ctx.state!.buildings.buildings).toHaveLength(0);
   });
 
-  it('rejects ordering an unresearched tier, same gate as direct placement', () => {
+  it('rejects ordering a quest-locked tier, same gate as direct placement', () => {
+    ctx.state!.grade = createGradeState();
+    ctx.state!.quests = createQuestState();
     const result = buildCommand(ctx, ['living_quarters'], { at: '6,9', tier: '2' });
 
     expect(result.success).toBe(false);
-    expect(result.output).toMatch(/research/i);
+    expect(result.output).toContain(t(getQuest('quest_building_t2')!.titleKey));
     expect(ctx.state!.plannedBuildings).toHaveLength(0);
   });
 
@@ -978,10 +983,6 @@ describe('construction levels the ground under the footprint (#1008)', () => {
 
   it('a refused upgrade leaves the original building standing, unbilled', () => {
     const ctx = makeStaffedCtx();
-    const bs = ctx.state!.buildings;
-    placeBuilding(bs, 'research_center', 50, 50, 64, 64);
-    expect(queueResearchTask(bs, 'management_office', 2).success).toBe(true);
-    tickResearch(bs);
 
     // Flatten the whole T2 footprint (including the row T2 grows onto) before
     // T1 is even built, so T1 finishes standing on flat ground regardless
@@ -1035,11 +1036,6 @@ describe('construction levels the ground under the footprint (#1008)', () => {
 
   it('an upgrade levels the ground the larger tier newly covers', () => {
     const ctx = makeStaffedCtx();
-    const bs = ctx.state!.buildings;
-    placeBuilding(bs, 'research_center', 50, 50, 64, 64);
-    expect(queueResearchTask(bs, 'management_office', 2).success).toBe(true);
-    tickResearch(bs);
-    expect(isTierUnlocked(bs, 'management_office', 2)).toBe(true);
 
     // management_office T1 covers 2x2, T2 2x3 — so T2 grows onto row z+2.
     // T1's own completion-carve levels only its true 2x2 footprint (#1198,

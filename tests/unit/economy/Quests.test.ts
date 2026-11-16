@@ -36,6 +36,8 @@ import {
 
 const T2 = 'quest_explosive_t2';
 const T3 = 'quest_explosive_t3';
+const B2 = 'quest_building_t2';
+const B3 = 'quest_building_t3';
 
 function questSite(): GameState {
   const s = createGame({ seed: 42, mineType: 'desert' });
@@ -68,8 +70,15 @@ const ids = (list: readonly { id: string }[]): string[] => list.map(e => e.id);
 describe('quest catalog (#2280 C2, C4)', () => {
   beforeAll(() => setLocale('en'));
 
-  it('lists the two explosive quests', () => {
-    expect(getAllQuests().map(q => q.id).sort()).toEqual([T2, T3]);
+  it('lists the two explosive quests and the two building quests', () => {
+    expect(getAllQuests().map(q => q.id).sort()).toEqual([B2, B3, T2, T3]);
+  });
+
+  it('the explosive quests reward explosive tiers, the building quests building tiers', () => {
+    for (const q of getAllQuests()) {
+      const expected = q.id === B2 || q.id === B3 ? 'building_tier' : 'explosive_tier';
+      expect(q.reward.kind, q.id).toBe(expected);
+    }
   });
 
   it('getQuest finds a quest by id and returns undefined for an unknown id', () => {
@@ -101,8 +110,13 @@ describe('quest catalog (#2280 C2, C4)', () => {
     expect(QUEST_T3_SAFETY_SCORE).toBe(60);
   });
 
-  it('both quests share one giver, the explosives supplier', () => {
+  it('both explosive quests share one giver, the explosives supplier', () => {
     expect(getQuest(T2)!.giverKey).toBe(getQuest(T3)!.giverKey);
+  });
+
+  it('the building quests are given by someone other than the explosives supplier', () => {
+    expect(getQuest(B2)!.giverKey).toBe(getQuest(B3)!.giverKey);
+    expect(getQuest(B2)!.giverKey).not.toBe(getQuest(T2)!.giverKey);
   });
 
   it.each(['en', 'fr'] as const)('every quest string resolves in %s (no raw key shown)', (locale) => {
@@ -131,8 +145,9 @@ describe('quest catalog (#2280 C2, C4)', () => {
     en.forEach((text, i) => expect(text.length, `string ${i}`).toBeGreaterThan(0));
   });
 
-  it('the two quests have distinct titles', () => {
-    expect(t(getQuest(T2)!.titleKey)).not.toBe(t(getQuest(T3)!.titleKey));
+  it('every quest has a distinct title', () => {
+    const titles = getAllQuests().map(q => t(q.titleKey));
+    expect(new Set(titles).size).toBe(titles.length);
   });
 });
 

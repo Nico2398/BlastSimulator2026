@@ -110,7 +110,6 @@ describe('forceShiftRestIfNeeded (legacy, fatigue-only, fixed-duration path)', (
     const { employee } = hireEmployee(state.employees, 'driller', rng, 0, 0);
     employee.activeActionId = 200;
     employee.ticksWorked = WORK_DURATION_TICKS;
-    state.buildings.unlockedTiers.living_quarters = 3; // tier 2 requires research unlock
     placeBuilding(state.buildings, 'living_quarters', 30, 30, 100, 100, 2);
 
     forceShiftRestIfNeeded(state, employee, [], []);

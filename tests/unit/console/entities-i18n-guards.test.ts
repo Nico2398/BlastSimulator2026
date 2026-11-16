@@ -3,7 +3,7 @@
 // entities.ts's own hardcoded usage/rejection/success strings for buildCommand
 // and zoneCommand — the build list empty message, destroy's usage/success,
 // building_not_found shared across destroy/upgrade/move, upgrade's usage/
-// max_tier/not_researched/failed/success, move's usage/success, the unknown-
+// max_tier/tier_locked/failed/success, move's usage/success, the unknown-
 // subcommand and per-type "at:" usage messages, and zone's clear usage/
 // success, status "no zone" message, and unknown-subcommand usage — all route
 // through t() (see src/core/i18n/I18n.ts and
@@ -28,6 +28,9 @@ import {
   type BuildingTier,
 } from '../../../src/core/entities/Building.js';
 import { makeGameContext } from '../../helpers/gameContext.js';
+import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { createQuestState } from '../../../src/core/economy/Quests.js';
+import { getQuest } from '../../../src/core/economy/QuestCatalog.js';
 import { refusalText } from '../../../src/console/commands/commandUtils.js';
 import { employeeCommand } from '../../../src/console/commands/employees.js';
 import { vehicleCommand } from '../../../src/console/commands/vehicle.js';
@@ -46,6 +49,17 @@ import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'js
 function makeCtx(cash = 1_000_000): GameContext {
   return makeGameContext({ mineType: 'desert', seed: 1, size: 32, cash });
 }
+
+/** A progression-style site: it has quests, so tiers 2 and 3 are locked behind them (#2283). */
+function makeQuestCtx(cash = 1_000_000): GameContext {
+  const ctx = makeCtx(cash);
+  ctx.state!.grade = createGradeState();
+  ctx.state!.quests = createQuestState();
+  return ctx;
+}
+
+const QUEST_B2 = 'quest_building_t2';
+const questTitle = (id: string): string => t(getQuest(id)!.titleKey);
 
 /** Place a building directly through core placeBuilding, at an arbitrary cell — bypasses cash and the build console command. */
 function placeAt(ctx: GameContext, type: BuildingType, tier: BuildingTier, x: number, z: number): number {
@@ -219,26 +233,40 @@ describe('entities.ts — build upgrade at max tier (T3)', () => {
   });
 });
 
-// ── build_upgrade_not_researched ─────────────────────────────────────────
+// ── build_upgrade_tier_locked ────────────────────────────────────────────
 
-describe('entities.ts — build upgrade to an unresearched tier', () => {
-  const EN = 'Tier 2 Management Office is not researched — research required before upgrade.';
+describe('entities.ts — build upgrade to a locked tier', () => {
+  const expected = (): string => t('entities.build_upgrade_tier_locked', {
+    tier: 2, type: t('building.management_office.name'), quest: questTitle(QUEST_B2),
+  });
 
-  it('matches the exact English literal by default (tier 2 never unlocked)', () => {
-    const ctx = makeCtx();
+  it('prints the build_upgrade_tier_locked text by default, naming the building and the quest', () => {
+    const ctx = makeQuestCtx();
     const id = placeTestBuilding(ctx, 'management_office', 1);
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);
-    expect(result.output).toBe(EN);
+    expect(result.output).toBe(expected());
+    expect(result.output).toContain('Management Office');
+    expect(result.output).toContain(questTitle(QUEST_B2));
   });
 
-  it('differs from the English literal under locale fr', () => {
-    const ctx = makeCtx();
+  it('differs from the English text under locale fr and names the French quest title', () => {
+    const ctx = makeQuestCtx();
     const id = placeTestBuilding(ctx, 'management_office', 1);
+    const en = expected();
     setLocale('fr');
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);
-    expect(result.output).not.toBe(EN);
+    expect(result.output).not.toBe(en);
+    expect(result.output).toBe(expected());
+    expect(result.output).toContain(questTitle(QUEST_B2));
+  });
+
+  it('is not refused for its tier on a site without quests', () => {
+    const ctx = makeCtx();
+    const id = placeTestBuilding(ctx, 'management_office', 1);
+    const result = buildCommand(ctx, ['upgrade', String(id)], {});
+    expect(result.output).not.toBe(expected());
   });
 });
 
@@ -395,7 +423,8 @@ function expectEnglish(output: string, key: string, params: Record<string, strin
 describe('refusals — new locale keys exist in both languages', () => {
   const keys = [
     'shell.placement.refused_out_of_bounds',
-    'entities.build_not_researched',
+    'entities.build_tier_locked',
+    'entities.build_upgrade_tier_locked',
     'entities.build_no_approach',
     'employees.fire_unionized',
     'vehicle.not_debris_hauler',
@@ -466,19 +495,23 @@ describe('build <type> at: — placement refusals', () => {
 });
 
 describe('build <type> at: — order refusals', () => {
-  it('unresearched tier — en keeps the English literal', () => {
-    const ctx = makeCtx();
+  it('locked tier — en prints the exact build_tier_locked text', () => {
+    const ctx = makeQuestCtx();
     const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
     expect(result.success).toBe(false);
-    expect(result.output).toBe('Tier 2 Management Office is not researched — research required before placement.');
+    expect(result.output).toBe(en('entities.build_tier_locked', {
+      tier: 2, type: 'Management Office', quest: questTitle(QUEST_B2),
+    }));
   });
 
-  it('unresearched tier — fr prints the exact build_not_researched text', () => {
-    const ctx = makeCtx();
+  it('locked tier — fr prints the exact build_tier_locked text', () => {
+    const ctx = makeQuestCtx();
     setLocale('fr');
     const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
     expect(result.success).toBe(false);
-    expect(result.output).toBe(fr('entities.build_not_researched', { tier: 2, type: 'Bureau de Gestion' }));
+    expect(result.output).toBe(fr('entities.build_tier_locked', {
+      tier: 2, type: 'Bureau de Gestion', quest: questTitle(QUEST_B2),
+    }));
     expect(result.output).not.toContain('management_office');
   });
 
@@ -753,34 +786,34 @@ describe('vehicle haul / break — refusals', () => {
   }
 });
 
-// ── #1808: not-researched refusals name the building by display name ─────
+// ── #1808: tier-locked refusals name the building by display name ─────
 
-describe('not-researched refusals — translated building display name (#1808)', () => {
+describe('tier-locked refusals — translated building display name (#1808)', () => {
   it('upgrade fr — uses the translated display name, not the raw id', () => {
-    const ctx = makeCtx();
+    const ctx = makeQuestCtx();
     const id = placeTestBuilding(ctx, 'management_office', 1);
     setLocale('fr');
     const result = buildCommand(ctx, ['upgrade', String(id)], {});
     expect(result.success).toBe(false);
     expect(result.output).toBe(
-      fr('entities.build_upgrade_not_researched', { tier: 2, type: t('building.management_office.name') }),
+      fr('entities.build_upgrade_tier_locked', { tier: 2, type: t('building.management_office.name'), quest: questTitle(QUEST_B2) }),
     );
     expect(result.output).toContain('Bureau de Gestion');
     expect(result.output).not.toContain('management_office');
   });
 
   it('placement fr — uses t()-computed expectation', () => {
-    const ctx = makeCtx();
+    const ctx = makeQuestCtx();
     setLocale('fr');
     const result = buildCommand(ctx, ['management_office'], { at: '4,4', tier: '2' });
     expect(result.output).toBe(
-      fr('entities.build_not_researched', { tier: 2, type: t('building.management_office.name') }),
+      fr('entities.build_tier_locked', { tier: 2, type: t('building.management_office.name'), quest: questTitle(QUEST_B2) }),
     );
   });
 
   for (const locale of ['en', 'fr'] as const) {
     it(`living_quarters upgrade (${locale}) — no raw id, has display name`, () => {
-      const ctx = makeCtx();
+      const ctx = makeQuestCtx();
       const id = placeTestBuilding(ctx, 'living_quarters', 1);
       setLocale(locale);
       const result = buildCommand(ctx, ['upgrade', String(id)], {});
@@ -791,7 +824,7 @@ describe('not-researched refusals — translated building display name (#1808)',
     });
 
     it(`living_quarters placement (${locale}) — no raw id, has display name`, () => {
-      const ctx = makeCtx();
+      const ctx = makeQuestCtx();
       setLocale(locale);
       const result = buildCommand(ctx, ['living_quarters'], { at: '4,4', tier: '2' });
       expect(result.success).toBe(false);

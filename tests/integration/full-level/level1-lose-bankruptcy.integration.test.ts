@@ -23,22 +23,17 @@ describe('Level 1 — Lose — Bankruptcy', () => {
   });
 
   it('triggers bankruptcy when cash stays below $5,000 for 100 ticks', () => {
-    // Spend money to drain cash below $5,000
-    // Hire 5 drillers: 5 x $1,000 = $5,000
+    // Spend money to drain cash below $5,000.
+    // Calibrated on $25,000 (the Research Center is gone, #2283, so the spend-down
+    // below adds up to less than the level's $50,000 opening cash):
+    // Hire 5 drillers: 5 x $1,000 = $5,000 -> $20,000
+    ctx.state!.cash = 25000;
+    ctx.state!.finances.cash = 25000;
     for (let i = 0; i < 5; i++) {
       employeeCommand(ctx, ['hire'], { role: 'driller' });
     }
 
-    // Build expensive buildings (T1 costs):
-    // management_office: $8,000
-    // research_center: $25,000
-    // living_quarters: $10,000
-    // freight_warehouse: $15,000
-    // Total: $58,000 + $5,000 hiring = $63,000 > $50,000
-    // Let's be more conservative to stay under $5k:
-    // Already spent $5,000 on hiring. Cash = $45,000.
-    // Build management_office ($8k) -> $37,000
-    // Build research_center ($25k) -> $12,000
+    // Build management_office ($8k) -> $12,000
     // Build living_quarters ($10k) -> $2,000
     // That should be under $5k.
     //
@@ -49,7 +44,6 @@ describe('Level 1 — Lose — Bankruptcy', () => {
     // and bankruptcy would never trigger. These are the nearest flat,
     // non-overlapping spots for each building's own footprint.
     buildCommand(ctx, ['management_office'], { at: '9,4' });
-    buildCommand(ctx, ['research_center'], { at: '12,3' });
     buildCommand(ctx, ['living_quarters'], { at: '14,0' });
 
     // Verify cash is below $5,000

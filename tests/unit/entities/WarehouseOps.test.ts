@@ -118,7 +118,7 @@ describe('freightWarehouseSites (#1372)', () => {
     const a = placeBuilding(bs, 'freight_warehouse', 10, 10, 100, 100, 1);
     const b = placeBuilding(bs, 'freight_warehouse', 40, 10, 100, 100, 1);
     expect(a.success && b.success).toBe(true);
-    b.building!.tier = 2; // placing tier 2 needs research; the upgrade itself is not under test
+    b.building!.tier = 2; // set the tier directly; the upgrade itself is not under test
     const sites = freightWarehouseSites(bs);
     expect(sites).toHaveLength(2);
     const byId = new Map(sites.map(s => [s.id, s]));
