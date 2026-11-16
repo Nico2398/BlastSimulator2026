@@ -1,0 +1,810 @@
+{
+  "name": "quest-explosive-tier",
+  "description": "Quests (#2280): on a sandbox site the Progression panel lists the T2 and T3 explosive quests from the start, and the Charge step shows big_bada_boom locked behind the T2 quest it names (the console refuses it too). Two clean blasts with 100 kg detonated complete the quest on their own; the panel reads completed, the big_bada_boom card turns into a selectable one and a charge with it is ordered and loaded.",
+  "steps": [
+    {
+      "command": "sandbox start biome:desert_badlands kit:full seed:42 tier:3",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:desert_badlands kit:full seed:42 tier:3"
+        }
+      ],
+      "description": "Progression site at grade 0 tier 3: the permit allows 130 kg and 290 m2 a blast, so two clean shots stay inside it (no fine, no inspection strike to muddy the streak). Quest state starts with the site.",
+      "expect": {
+        "equals": {
+          "mineGrade": {
+            "grade": 0,
+            "tier": 3,
+            "pendingTicksLeft": null
+          }
+        }
+      }
+    },
+    {
+      "command": "quest list",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "quest list"
+        }
+      ],
+      "description": "Both explosive quests are listed from the start, available, every objective at zero."
+    },
+    {
+      "command": "quest detail quest_explosive_t2",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"permits\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"quest\"][data-quest-id=\"quest_explosive_t2\"][data-state=\"available\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"quest\"][data-quest-id=\"quest_explosive_t3\"][data-state=\"available\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-quest-id=\"quest_explosive_t2\"] [data-role=\"quest-objective\"][data-kind=\"clean_blasts\"][data-met=\"false\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-quest-id=\"quest_explosive_t2\"] [data-role=\"quest-objective\"][data-kind=\"explosive_kg\"][data-met=\"false\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-quest-id=\"quest_explosive_t2\"] [data-role=\"quest-reward\"]"
+        }
+      ],
+      "description": "Open the Progression panel from the tool rail: both quests are on the list from the start, available, with their objectives unmet and the reward named."
+    },
+    {
+      "command": "quest list",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"permits\"]"
+        }
+      ],
+      "description": "Close the Progression panel with the same rail button (central panels share the screen with the Blast Workshop)."
+    },
+    {
+      "command": "charge hole:* explosive:big_bada_boom stemming:2",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-role=\"explosive-locked\"][data-explosive=\"big_bada_boom\"][data-quest=\"quest_explosive_t2\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-role=\"explosive-locked\"][data-explosive=\"obliviax\"][data-quest=\"quest_explosive_t3\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"boomite\"]"
+        }
+      ],
+      "description": "Charge step: big_bada_boom is a locked card naming the quest that opens it, obliviax names the T3 quest, tier-1 boomite stays a normal card. The console refuses the locked explosive the same way.",
+      "commandOutcome": "refused"
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedBuildingCount equals:0 max_ticks:400",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedBuildingCount",
+          "equals": 0,
+          "maxTicks": 400,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "No building order is pending.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedBuildingCount": 0
+        }
+      }
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:7 start:36,30",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 7
+        },
+        {
+          "type": "dragTiles",
+          "x1": 36,
+          "z1": 30,
+          "x2": 42,
+          "z2": 36
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Blast 1: order the 3x3 pattern."
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Blast 1: the driller lands every ordered hole.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle stemming:2",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Blast 1: fill every 7 m hole with krackle up to 2 m of stemming, 128.7 kg in all, inside the 130 kg tier-3 limit.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Blast 1: the blaster loads every charge.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "description": "Blast 1: arm the shot; it fires once the danger zone is clear.",
+      "timeout": 90
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Blast 1: the sequence evacuates the pattern and fires; the holes are consumed. One clean blast, 128.7 kg detonated: the explosive objective is met, the streak is at 1 of 2.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "description": "Blast 1: dismiss the blast report.",
+      "timeout": 60
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:4 start:10,30",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 4
+        },
+        {
+          "type": "dragTiles",
+          "x1": 10,
+          "z1": 30,
+          "x2": 16,
+          "z2": 36
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Blast 2: order the 3x3 pattern."
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Blast 2: the driller lands every ordered hole.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:krackle stemming:2",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"krackle\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "Blast 2: fill every 4 m hole with krackle up to 2 m of stemming.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Blast 2: the blaster loads every charge.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "blast detonate",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 4
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"execute\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        },
+        {
+          "type": "clickSelector",
+          "selector": ".bs-confirm-overlay .bs-btn-danger"
+        }
+      ],
+      "description": "Blast 2: arm the shot; it fires once the danger zone is clear.",
+      "timeout": 90
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Blast 2: the sequence fires; the second clean blast completes the streak, so the T2 quest completes on the next tick.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "holeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "waitForSelector",
+          "selector": "[data-action=\"report-close\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "[data-action=\"report-close\"]"
+        }
+      ],
+      "description": "Blast 2: dismiss the blast report.",
+      "timeout": 60
+    },
+    {
+      "command": "tick 2",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "tick 2"
+        }
+      ],
+      "description": "Two ticks of paperwork: the tick pipeline books the quest the second blast completed."
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "quest detail quest_explosive_t2",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"permits\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"quest\"][data-quest-id=\"quest_explosive_t2\"][data-state=\"completed\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-permit-panel [data-role=\"quest\"][data-quest-id=\"quest_explosive_t3\"][data-state=\"available\"]"
+        }
+      ],
+      "description": "Progression panel: the T2 quest reads completed (its objectives were never typed in: two clean blasts and 100 kg detonated), T3 is still available."
+    },
+    {
+      "command": "quest list",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"permits\"]"
+        }
+      ],
+      "description": "Close the Progression panel again."
+    },
+    {
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:4 start:32,42",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 1
+        },
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"grid-tool\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"spacing\"]",
+          "value": 3
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-param-strip [data-field=\"depth\"]",
+          "value": 4
+        },
+        {
+          "type": "focusTile",
+          "x": 35,
+          "z": 45,
+          "distance": 30,
+          "pitch": 75
+        },
+        {
+          "type": "dragTiles",
+          "x1": 32,
+          "z1": 42,
+          "x2": 38,
+          "z2": 48
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "description": "Blast 3: order the 3x3 pattern."
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedHoleCount equals:0 max_ticks:1500",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedHoleCount",
+          "equals": 0,
+          "maxTicks": 1500,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "Blast 3: the driller lands every ordered hole.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedHoleCount": 0
+        }
+      }
+    },
+    {
+      "command": "charge hole:* explosive:big_bada_boom stemming:2",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "blast"
+        },
+        {
+          "type": "ensureStep",
+          "step": 2
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"big_bada_boom\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"select-explosive\"][data-explosive=\"big_bada_boom\"]"
+        },
+        {
+          "type": "setStepper",
+          "selector": "#bs-blast-panel [data-field=\"stemming\"]",
+          "value": 2
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-blast-panel [data-action=\"charge-all\"]"
+        }
+      ],
+      "description": "The big_bada_boom card is a selectable card now (paid for as usual, per hole, when loaded): select it and order the charge.",
+      "expect": {
+        "increased": [
+          "orderedChargeCount"
+        ]
+      }
+    },
+    {
+      "command": "event choose 0",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        }
+      ],
+      "description": "Clear an event if one is pending (nondeterministic beat); a pending event halts the clock.",
+      "commandOutcome": "either"
+    },
+    {
+      "command": "wait_until field:orderedChargeCount equals:0 max_ticks:3400",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "orderedChargeCount",
+          "equals": 0,
+          "maxTicks": 3400,
+          "timeoutMs": 300000
+        }
+      ],
+      "description": "The blaster loads every big_bada_boom charge.",
+      "timeout": 330,
+      "expect": {
+        "equals": {
+          "orderedChargeCount": 0
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "observe",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state"
+        }
+      ],
+      "description": "The nine holes carry a big_bada_boom charge.",
+      "expect": {
+        "equals": {
+          "chargedCount": 9
+        }
+      }
+    }
+  ]
+}

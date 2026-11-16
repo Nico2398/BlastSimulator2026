@@ -9,6 +9,9 @@ import { formatGameDuration } from '../../../../src/ui/formatGameDuration.js';
 import { formatMoney } from '../../../../src/core/economy/formatMoney.js';
 import { permitLimitsFor } from '../../../../src/core/economy/PermitLimits.js';
 import { setLocale, t } from '../../../../src/core/i18n/I18n.js';
+import { createQuestState, completeQuest } from '../../../../src/core/economy/Quests.js';
+import { getAllQuests, getQuest } from '../../../../src/core/economy/QuestCatalog.js';
+import { explosivesOfTier } from '../../../../src/core/world/ExplosiveCatalog.js';
 import { meetTargets, tierTargets } from '../../../helpers/gradeLadder.js';
 import { MINE_GRADES, PERMIT_STRIKES_TO_SUSPEND, PERMIT_STRIKE_WINDOW_TICKS, PERMIT_SUSPENSION_TICKS } from '../../../../src/core/config/balance.js';
 
@@ -446,5 +449,189 @@ describe('PermitPanel — strikes explanation (#2170)', () => {
     panel.update(progression());
     expect(explain().length).toBeGreaterThan(0);
     expect(explain()).not.toBe(en);
+  });
+});
+
+describe('PermitPanel — the Progression panel and its quests (#2280)', () => {
+  const T2 = 'quest_explosive_t2';
+  const T3 = 'quest_explosive_t3';
+
+  function questSite(): GameState {
+    const s = progression();
+    s.quests = createQuestState();
+    s.scores.safety = 0;
+    return s;
+  }
+
+  const questEls = (): HTMLElement[] => Array.from(panel.root.querySelectorAll<HTMLElement>('[data-role="quest"]'));
+  const questEl = (id: string): HTMLElement => questEls().find(e => e.dataset['questId'] === id)!;
+  const objectives = (id: string): HTMLElement[] =>
+    Array.from(questEl(id).querySelectorAll<HTMLElement>('[data-role="quest-objective"]'));
+  const objective = (id: string, kind: string): HTMLElement => objectives(id).find(o => o.dataset['kind'] === kind)!;
+  const barWidth = (row: HTMLElement): string => {
+    const bar = row.querySelector<HTMLElement>('[data-role="quest-bar"]')!;
+    return (bar.querySelector<HTMLElement>('.bsx-progress-fill') ?? bar).style.width;
+  };
+  const names = (tier: 2 | 3): string[] => explosivesOfTier(tier).map(e => t(e.nameKey));
+
+  it('the panel is titled PROGRESSION and keeps its root id', () => {
+    panel.update(questSite());
+    expect(panel.root.textContent).toContain('PROGRESSION');
+    expect(panel.root.id).toBe('bs-permit-panel');
+  });
+
+  it('lists every quest from the start, all available', () => {
+    panel.update(questSite());
+    expect(questEls().map(e => e.dataset['questId']).sort()).toEqual(getAllQuests().map(q => q.id).sort());
+    for (const e of questEls()) expect(e.dataset['state']).toBe('available');
+  });
+
+  it('keeps the grade ladder beside the quests', () => {
+    panel.update(questSite());
+    expect(gradeEls()).toHaveLength(4);
+    expect(tierEls()).toHaveLength(3);
+    expect(applyBtn()).not.toBeNull();
+    expect(checklistRows().length).toBeGreaterThan(0);
+    expect(q('[data-role="permit-stamp"]')).not.toBeNull();
+  });
+
+  it('quest objective rows never count as grade-up checklist rows', () => {
+    const s = questSite();
+    panel.update(s);
+    expect(checklistRows()).toHaveLength(nextGradeTargets(s).length);
+  });
+
+  it('shows each quest title and its giver', () => {
+    panel.update(questSite());
+    for (const def of getAllQuests()) {
+      const el = questEl(def.id);
+      expect(el.textContent).toContain(t(def.titleKey));
+      expect(el.querySelector('[data-role="quest-giver"]')!.textContent).toContain(t(def.giverKey));
+    }
+  });
+
+  it('renders one objective row per objective, with its kind', () => {
+    panel.update(questSite());
+    expect(objectives(T2).map(o => o.dataset['kind']).sort()).toEqual(['clean_blasts', 'explosive_kg']);
+    expect(objectives(T3).map(o => o.dataset['kind']).sort()).toEqual(['clean_blasts', 'rock_kg', 'safety_score']);
+  });
+
+  it('objectives start unmet with an empty bar', () => {
+    panel.update(questSite());
+    for (const o of objectives(T2)) {
+      expect(o.dataset['met']).toBe('false');
+      expect(barWidth(o)).toBe('0%');
+    }
+  });
+
+  it('shows live progress text with current and needed, and it moves with the counters', () => {
+    const s = questSite();
+    panel.update(s);
+    const before = objective(T2, 'explosive_kg').textContent;
+    s.quests!.cleanBlasts = 1;
+    s.quests!.explosiveKg = 40;
+    panel.update(s);
+    expect(objective(T2, 'explosive_kg').textContent).not.toBe(before);
+    expect(objective(T2, 'explosive_kg').textContent).toMatch(/40[\s\S]*100/);
+    expect(objective(T2, 'clean_blasts').textContent).toMatch(/1[\s\S]*2/);
+  });
+
+  it('bar width is min(100, current / needed * 100)% and the met flag follows', () => {
+    const s = questSite();
+    s.quests!.cleanBlasts = 1;
+    s.quests!.explosiveKg = 40;
+    panel.update(s);
+    expect(barWidth(objective(T2, 'clean_blasts'))).toBe('50%');
+    expect(barWidth(objective(T2, 'explosive_kg'))).toBe('40%');
+    expect(objective(T2, 'clean_blasts').dataset['met']).toBe('false');
+    s.quests!.cleanBlasts = 7;
+    s.quests!.explosiveKg = 100;
+    panel.update(s);
+    expect(barWidth(objective(T2, 'clean_blasts'))).toBe('100%');
+    expect(barWidth(objective(T2, 'explosive_kg'))).toBe('100%');
+    expect(objective(T2, 'clean_blasts').dataset['met']).toBe('true');
+    expect(objective(T2, 'explosive_kg').dataset['met']).toBe('true');
+  });
+
+  it('the safety objective follows the live safety score', () => {
+    const s = questSite();
+    s.scores.safety = 30;
+    panel.update(s);
+    expect(barWidth(objective(T3, 'safety_score'))).toBe('50%');
+    expect(objective(T3, 'safety_score').dataset['met']).toBe('false');
+    s.scores.safety = 75;
+    panel.update(s);
+    expect(objective(T3, 'safety_score').dataset['met']).toBe('true');
+  });
+
+  it('names the explosives each quest makes purchasable', () => {
+    panel.update(questSite());
+    const t2 = questEl(T2).querySelector('[data-role="quest-reward"]')!.textContent!;
+    expect(names(2).some(n => t2.includes(n))).toBe(true);
+    const t3 = questEl(T3).querySelector('[data-role="quest-reward"]')!.textContent!;
+    expect(names(3).some(n => t3.includes(n))).toBe(true);
+  });
+
+  it('T3 carries a prerequisite note naming the T2 quest while T2 is open; T2 carries none', () => {
+    panel.update(questSite());
+    const note = questEl(T3).querySelector('[data-role="quest-requires"]');
+    expect(note).not.toBeNull();
+    expect(note!.textContent).toContain(t(getQuest(T2)!.titleKey));
+    expect(questEl(T2).querySelector('[data-role="quest-requires"]')).toBeNull();
+  });
+
+  it('the prerequisite note goes once T2 is completed', () => {
+    const s = questSite();
+    panel.update(s);
+    completeQuest(s, T2);
+    panel.update(s);
+    expect(questEl(T3).querySelector('[data-role="quest-requires"]')).toBeNull();
+  });
+
+  it('a completed quest reads completed on the next update, the other stays available', () => {
+    const s = questSite();
+    panel.update(s);
+    completeQuest(s, T2);
+    panel.update(s);
+    expect(questEl(T2).dataset['state']).toBe('completed');
+    expect(questEl(T3).dataset['state']).toBe('available');
+  });
+
+  it('a completed quest still shows its title and reward', () => {
+    const s = questSite();
+    completeQuest(s, T2);
+    panel.update(s);
+    expect(questEl(T2).textContent).toContain(t(getQuest(T2)!.titleKey));
+    expect(questEl(T2).querySelector('[data-role="quest-reward"]')).not.toBeNull();
+  });
+
+  it('a site without quests shows no quest cards, and still shows the ladder', () => {
+    panel.update(progression());
+    expect(questEls()).toHaveLength(0);
+    expect(gradeEls()).toHaveLength(4);
+  });
+
+  it('a state without a ladder or quests shows no quest cards', () => {
+    panel.update(createGame({ seed: 1, mineType: 'desert' }));
+    expect(questEls()).toHaveLength(0);
+  });
+
+  it('refreshLocale re-renders the quest card in French', () => {
+    const s = questSite();
+    panel.update(s);
+    const en = questEl(T2).textContent;
+    setLocale('fr');
+    panel.refreshLocale();
+    expect(questEl(T2).textContent).not.toBe(en);
+    expect(questEl(T2).textContent).toContain(t(getQuest(T2)!.titleKey));
+  });
+
+  it('re-rendering on every update does not duplicate quest cards', () => {
+    const s = questSite();
+    panel.update(s);
+    panel.update(s);
+    panel.update(s);
+    expect(questEls()).toHaveLength(getAllQuests().length);
+    expect(objectives(T2)).toHaveLength(2);
   });
 });
