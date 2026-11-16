@@ -79,7 +79,7 @@
     },
     {
       "command": "quest complete quest_vehicle_t2",
-      "role": "setup",
+      "role": "bootstrap",
       "interaction": [
         {
           "type": "command",

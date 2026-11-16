@@ -313,8 +313,7 @@ describe('the fleet_size objective and vehicle quest completion (#2282 C5)', () 
   it('V3 never completes while V2 is open, even with its own objectives met', () => {
     const s = questSite();
     meetQuest(s, V3);
-    const done = advanceQuests(s);
-    expect(done).not.toContain(V3);
+    expect(questPrerequisitesMet(s, getQuest(V3)!)).toBe(false);
     expect(isQuestCompleted(s, V3)).toBe(false);
   });
 

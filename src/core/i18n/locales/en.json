@@ -4479,7 +4479,7 @@
   "vehicle.upgrade_usage": "Usage: vehicle upgrade <id>",
   "vehicle.upgrade_success": "Vehicle #{id} upgraded to tier {tier}. Cost: ${cost}",
   "vehicle.upgrade_max_tier": "Vehicle #{id} is already at the maximum tier.",
-  "vehicle.tier_locked": "The dealer shrugs. Tier {tier} machines are for people who finished \"{quest}\".",
+  "vehicle.tier_locked": "The dealer shrugs. Those machines are for people who finished \"{quest}\".",
   "vehicle.upgrade_no_licensed": "Warning: nobody on the roster holds the licence to drive this tier.",
   "vehicle.scrap_success": "Vehicle #{id} scrapped. Residual value: ${value}",
   "vehicle.break_usage": "Usage: vehicle break <vehicleId> fragment:<fragmentId>",
