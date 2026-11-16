@@ -182,6 +182,17 @@
       }
     },
     {
+      "command": "quest complete quest_vehicle_t2",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "quest complete quest_vehicle_t2"
+        }
+      ],
+      "description": "The tier-2 rig is sold once the dealer's fleet quest is taken as done (#2282; the gate itself is sandbox-dealer-tier-gate's job)."
+    },
+    {
       "command": "vehicle buy drill_rig tier:2",
       "role": "player",
       "description": "Buy a tier-2 drill rig (#6): it bores 127 mm holes.",
