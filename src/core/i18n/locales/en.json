@@ -5046,5 +5046,20 @@
   "ui.blast_workshop.water_fix.tube": "Tube {count}",
   "ui.blast_workshop.water_fix.open": "Open water controls",
   "ui.blast_workshop.water_fix.buy_funds": "Not enough cash to buy tubing.",
-  "ui.blast_workshop.water_fix.tube_first": "{count} wet hole(s) sit in porous rock and refill until tubed. Tube them first, then drain."
+  "ui.blast_workshop.water_fix.tube_first": "{count} wet hole(s) sit in porous rock and refill until tubed. Tube them first, then drain.",
+  "vehicle.travel_vehicle.tier1": "Rushbus Shuttle",
+  "vehicle.travel_vehicle.tier2": "Zoom-Zoom Race Car",
+  "vehicle.travel_vehicle.desc": "Carries one employee across the site in a hurry; does no work",
+  "vehicle_type.travel_vehicle": "Travel Vehicle",
+  "quest.race_car.title": "Dex's Need for Speed",
+  "quest.race_car.pitch": "Dex has a single-seat race car with no cup holder and no brakes worth mentioning. Prove you can drive the shuttles hard, and he lets you have it.",
+  "quest.reward.travel_tier": "Reward: the tier {tier} travel vehicle (race car) becomes purchasable",
+  "notification.quest.completed_travel": "Quest \"{title}\" completed. The race car is now for sale.",
+  "quest.objective.travel_km": "Driven in travel vehicles: {current} / {needed} km",
+  "vehicle.travel_grade_locked": "The dealer shrugs. The shuttle is for mines with the {name} permit (G{grade}).",
+  "ui.fleet.grade_locked": "Needs permit G{grade}: {name}",
+  "ui.fleet.dealer_licence_none": "No licence needed",
+  "ui.fleet.licence_line_none": "Anyone can drive it",
+  "ui.fleet.row_anyone": "Anyone can drive it",
+  "vehicle.buy_tier_max": "{type} is sold in tiers 1 to {max} only."
 }

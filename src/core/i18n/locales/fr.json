@@ -5046,5 +5046,20 @@
   "ui.blast_workshop.water_fix.tube": "Tuber {count}",
   "ui.blast_workshop.water_fix.open": "Ouvrir les commandes d'eau",
   "ui.blast_workshop.water_fix.buy_funds": "Pas assez d'argent pour acheter du tubage.",
-  "ui.blast_workshop.water_fix.tube_first": "{count} trou(s) humide(s) en roche poreuse se remplissent tant qu'ils ne sont pas tubés. Tubez-les d'abord, puis vidangez."
+  "ui.blast_workshop.water_fix.tube_first": "{count} trou(s) humide(s) en roche poreuse se remplissent tant qu'ils ne sont pas tubés. Tubez-les d'abord, puis vidangez.",
+  "vehicle.travel_vehicle.tier1": "Navette Rapidobus",
+  "vehicle.travel_vehicle.tier2": "Bolide Vroum-Vroum",
+  "vehicle.travel_vehicle.desc": "Emmène un employé à travers le site en vitesse ; ne fait aucun travail",
+  "vehicle_type.travel_vehicle": "Véhicule de transport",
+  "quest.race_car.title": "Dex et le goût de la vitesse",
+  "quest.race_car.pitch": "Dex a un bolide monoplace sans porte-gobelet et sans freins dignes de ce nom. Prouvez que vous menez les navettes tambour battant, et il vous le cède.",
+  "quest.reward.travel_tier": "Récompense : le véhicule de transport de niveau {tier} (bolide) devient achetable",
+  "notification.quest.completed_travel": "Quête « {title} » terminée. Le bolide est désormais en vente.",
+  "quest.objective.travel_km": "Parcourus en véhicule de transport : {current} / {needed} km",
+  "vehicle.travel_grade_locked": "Le concessionnaire hausse les épaules. La navette est réservée aux mines au permis {name} (G{grade}).",
+  "ui.fleet.grade_locked": "Exige le permis G{grade} : {name}",
+  "ui.fleet.dealer_licence_none": "Aucun permis requis",
+  "ui.fleet.licence_line_none": "Tout le monde peut la conduire",
+  "ui.fleet.row_anyone": "Tout le monde peut la conduire",
+  "vehicle.buy_tier_max": "{type} n'existe qu'en niveaux 1 à {max}."
 }

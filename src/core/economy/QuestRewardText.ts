@@ -16,6 +16,7 @@ export function questCompletedBody(def: QuestDef): string {
   switch (reward.kind) {
     case 'explosive_tier': return t('notification.quest.completed', { title, explosives: explosiveNames(reward.tier) });
     case 'vehicle_tier': return t('notification.quest.completed_vehicles', { title, tier: reward.tier });
+    case 'travel_tier': return t('notification.quest.completed_travel', { title });
     case 'building_tier': return t('notification.quest.completed_buildings', { title, tier: reward.tier });
   }
 }

@@ -101,7 +101,7 @@ interface UpgradeState {
 /** Next-tier upgrade availability and price; the single source for the Inspector. */
 export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number, site: Pick<GameState, 'quests'>): UpgradeState {
   const cost = computeVehicleUpgradeCost(v.type, v.tier);
-  const next = nextVehicleTier(v.tier);
+  const next = nextVehicleTier(v.tier, v.type);
   const available = next !== null && cost !== null;
   const refusal = next === null ? null : vehicleTierRefusal(site, next);
   return {
@@ -125,7 +125,7 @@ interface LicenceWarning {
 
 /** Warning when nobody on the roster can drive the next tier; null at max tier or when someone can. */
 export function licenceWarning(v: Pick<Vehicle, 'type' | 'tier'>, employees: readonly Employee[]): LicenceWarning | null {
-  const next = nextVehicleTier(v.tier);
+  const next = nextVehicleTier(v.tier, v.type);
   if (next === null || rosterCanDriveVehicleTier(employees, v.type, next)) return null;
   return { key: 'ui.fleet.upgrade_licence_warning', params: {} };
 }

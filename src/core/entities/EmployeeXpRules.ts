@@ -46,9 +46,8 @@ export function computeTaskXpAwards(employee: Employee, action: PendingAction): 
     awards.push(computeAwardFor(employee, action.requiredSkill));
   }
 
-  if (action.requiredVehicleRole !== null) {
-    awards.push(computeAwardFor(employee, ROLE_LICENCE_REQUIRED[action.requiredVehicleRole]));
-  }
+  const licence = action.requiredVehicleRole === null ? null : ROLE_LICENCE_REQUIRED[action.requiredVehicleRole];
+  if (licence !== null) awards.push(computeAwardFor(employee, licence));
 
   return awards;
 }

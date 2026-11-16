@@ -5,6 +5,8 @@
 import type { MovementTrail } from './MovementTrail.js';
 import {
   VEHICLE_BASE_STATS,
+  TRAVEL_VEHICLE_STATS,
+  VEHICLE_ROLE_MAX_TIER,
   VEHICLE_TIER_MULTIPLIERS,
   VEHICLE_SCRAP_RESIDUAL_FRACTION,
   NAV_CLEARANCE_VEHICLE_CELLS,
@@ -25,7 +27,8 @@ export type VehicleRole =
   | 'debris_hauler'
   | 'drill_rig'
   | 'rock_digger'
-  | 'rock_fragmenter';
+  | 'rock_fragmenter'
+  | 'travel_vehicle';
 
 // ── VehicleTier ──
 
@@ -98,6 +101,12 @@ function makeTiers(role: VehicleRole, base: BaseStats): Record<VehicleTier, Vehi
   return result;
 }
 
+/** The travel role's two tiers (shuttle, race car); `getVehicleDefByTier` never reads a tier above `vehicleRoleMaxTier`. */
+function makeTravelTiers(): Record<VehicleTier, VehicleDef> {
+  const def = (tier: 1 | 2): VehicleDef => ({ type: 'travel_vehicle', tier, nameKey: `vehicle.travel_vehicle.tier${tier}`, ...TRAVEL_VEHICLE_STATS[tier] });
+  return { 1: def(1), 2: def(2), 3: def(2) };
+}
+
 const VEHICLE_DEFS: Record<VehicleRole, Record<VehicleTier, VehicleDef>> = {
   debris_hauler:      makeTiers('debris_hauler',      VEHICLE_BASE_STATS.debris_hauler),
   rock_digger:        makeTiers('rock_digger',         VEHICLE_BASE_STATS.rock_digger),
@@ -105,11 +114,17 @@ const VEHICLE_DEFS: Record<VehicleRole, Record<VehicleTier, VehicleDef>> = {
   building_destroyer: makeTiers('building_destroyer',  VEHICLE_BASE_STATS.building_destroyer),
   rock_fragmenter:    makeTiers('rock_fragmenter',     VEHICLE_BASE_STATS.rock_fragmenter),
   charging_truck:     makeTiers('charging_truck',      VEHICLE_BASE_STATS.charging_truck),
+  travel_vehicle:     makeTravelTiers(),
 };
+
+/** Highest tier `role` is sold in: 3 for the work roles, 2 for the travel role. */
+export function vehicleRoleMaxTier(role: VehicleRole): VehicleTier {
+  return VEHICLE_ROLE_MAX_TIER[role];
+}
 
 /** Returns the def for the given role and tier. */
 export function getVehicleDefByTier(role: VehicleRole, tier: VehicleTier): VehicleDef {
-  return VEHICLE_DEFS[role][tier];
+  return VEHICLE_DEFS[role][Math.min(tier, VEHICLE_ROLE_MAX_TIER[role]) as VehicleTier];
 }
 
 /** Returns all registered vehicle roles in catalog order. */

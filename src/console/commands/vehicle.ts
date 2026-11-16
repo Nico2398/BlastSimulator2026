@@ -183,7 +183,7 @@ export function vehicleCommand(
       const vehicle = state.vehicles.vehicles.find(v => v.id === id);
       if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
       const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
-      const nextTier = nextVehicleTier(vehicle.tier);
+      const nextTier = nextVehicleTier(vehicle.tier, vehicle.type);
       if (cost === null || nextTier === null) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
       const refusal = vehicleTierRefusal(state, nextTier);
       if (refusal) return { success: false, output: refusal };

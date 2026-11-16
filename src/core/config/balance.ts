@@ -1429,6 +1429,33 @@ export const VEHICLE_BASE_STATS = {
 } as const;
 
 /**
+ * Stats of the travel role (#2285): tier 1 shuttle, tier 2 single-seat race car. They carry an employee between
+ * places and do no site work, so workRate and capacity are 0. Speed in grid cells/tick (walking is AGENT_WALK_SPEED,
+ * the hauler 3). Explicit per tier: the race car is a different machine, not a scaled shuttle.
+ */
+export const TRAVEL_VEHICLE_STATS = {
+  1: { workRate: 0, purchaseCost: 20_000, maintenanceCostPerTick: 2, fuelCostPerTick: 3, capacity: 0, speed: 6, maxHp: 80 },
+  2: { workRate: 0, purchaseCost: 45_000, maintenanceCostPerTick: 3, fuelCostPerTick: 5, capacity: 0, speed: 10, maxHp: 60 },
+} as const;
+
+/** Mine grade that opens the shuttle (travel tier 1) on a progression site. */
+export const TRAVEL_VEHICLE_UNLOCK_GRADE = 2;
+
+/** Straight-line distance (grid cells) below which an employee walks rather than fetching a travel vehicle. */
+export const TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS = 24;
+
+/** Highest tier each role is sold in: three for the work roles, two for the travel role. */
+export const VEHICLE_ROLE_MAX_TIER: Record<VehicleRole, VehicleTier> = {
+  debris_hauler: 3,
+  rock_digger: 3,
+  drill_rig: 3,
+  building_destroyer: 3,
+  rock_fragmenter: 3,
+  charging_truck: 3,
+  travel_vehicle: 2,
+};
+
+/**
  * Fraction of purchaseCost paid back on `vehicle scrap`, further scaled by the
  * vehicle's current hp/maxHp — a wrecked vehicle is worth less for parts than
  * a pristine one. Unlike building demolition (which costs money, tearing a
@@ -1562,6 +1589,7 @@ export const VEHICLE_ROLE_ARRIVAL_TASK: Record<VehicleRole, VehicleTask> = {
   drill_rig: 'drilling',
   debris_hauler: 'transport',
   charging_truck: 'loading',
+  travel_vehicle: 'moving',
   rock_digger: 'clearing',
   rock_fragmenter: 'clearing',
   building_destroyer: 'clearing',
@@ -1572,6 +1600,7 @@ export const VEHICLE_SEAT_COUNT: Record<VehicleRole, number> = {
   drill_rig: 1,
   debris_hauler: 1,
   charging_truck: 1,
+  travel_vehicle: 1,
   rock_digger: 1,
   rock_fragmenter: 1,
   building_destroyer: 1,
@@ -3714,3 +3743,7 @@ export const QUEST_V3_FLEET_SIZE = 6;
 export const QUEST_V3_ROCK_KG = 250_000;
 /** Vehicle T3 quest: safety score to hold. */
 export const QUEST_V3_SAFETY_SCORE = 50;
+/** Race-car quest (#2285): kilometres driven in travel vehicles (one grid cell is one metre). */
+export const QUEST_RACE_CAR_TRAVEL_KM = 1;
+/** Grid cells in a kilometre, for the race-car quest's distance objective. */
+export const CELLS_PER_KM = 1000;

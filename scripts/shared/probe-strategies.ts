@@ -1445,6 +1445,7 @@ function upgradeBuilding(s: ProbeSession, m: ReinvestMemory, type: string): bool
 function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier: VehicleTier, holders = 1): boolean {
   const { state } = s;
   const skill = ROLE_LICENCE_REQUIRED[role];
+  if (skill === null) return true; // nothing to earn: anyone drives it (travel role)
   const held = countLicenceHolders(state.employees.employees, role, tier);
   if (held >= holders) return true;
   const school = state.buildings.buildings.find(b => b.type === 'driving_center');

@@ -7,7 +7,7 @@ import {
   QUEST_T3_CLEAN_BLASTS, QUEST_T3_ROCK_KG, QUEST_T3_SAFETY_SCORE,
   QUEST_BUILDING_T2_BUILDINGS, QUEST_BUILDING_T2_CREW_HOUSED,
   QUEST_BUILDING_T3_BUILDINGS, QUEST_BUILDING_T3_CREW_HOUSED, QUEST_BUILDING_T3_SAFETY_SCORE,
-  QUEST_V2_FLEET_SIZE, QUEST_V2_ROCK_KG, QUEST_V3_FLEET_SIZE, QUEST_V3_ROCK_KG, QUEST_V3_SAFETY_SCORE,
+  QUEST_RACE_CAR_TRAVEL_KM, QUEST_V2_FLEET_SIZE, QUEST_V2_ROCK_KG, QUEST_V3_FLEET_SIZE, QUEST_V3_ROCK_KG, QUEST_V3_SAFETY_SCORE,
 } from '../config/balance.js';
 
 const QUESTS: readonly QuestDef[] = [
@@ -82,6 +82,14 @@ const QUESTS: readonly QuestDef[] = [
     ],
     reward: { kind: 'vehicle_tier', tier: 3 },
     requires: ['quest_vehicle_t2'],
+  },
+  {
+    id: 'quest_race_car',
+    giverKey: 'quest.giver.dealer',
+    titleKey: 'quest.race_car.title',
+    pitchKey: 'quest.race_car.pitch',
+    objectives: [{ kind: 'travel_km', target: QUEST_RACE_CAR_TRAVEL_KM }],
+    reward: { kind: 'travel_tier', tier: 2 },
   },
 ];
 
