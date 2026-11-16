@@ -42,6 +42,17 @@
       "role": "setup"
     },
     {
+      "command": "quest complete quest_explosive_t3",
+      "description": "Obliviax is tier 3: the quest that opens it is taken as done (#2280).",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "quest complete quest_explosive_t3"
+        }
+      ],
+      "role": "setup"
+    },
+    {
       "command": "drill_plan grid rows:3 cols:3 spacing:2 depth:6 start:42,15 diameter:0.089",
       "timeout": 60,
       "description": "Order a 3x3 grid by dragging (42,15)-(46,19) at 2 m spacing.",
