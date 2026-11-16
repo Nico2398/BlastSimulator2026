@@ -1,28 +1,19 @@
-// Grade-gated vehicle tiers on progression sites (#1928).
+// Quest-gated vehicle tiers on quest sites (#2282); the permit grade never matters.
 import type { VehicleTier } from '../entities/Vehicle.js';
-import { VEHICLE_TIER_UNLOCK_GRADE } from '../config/balance.js';
-import { gradeName, registerUnlockLine } from './MineGrade.js';
-import { t } from '../i18n/I18n.js';
+import type { GameState } from '../state/GameState.js';
+import type { QuestDef } from './Quests.js';
 
-/** Null when allowed (or grade is undefined: non-progression site); else the grade needed. */
-export function vehicleTierGate(grade: number | undefined, tier: VehicleTier): { needed: number } | null {
-  if (grade === undefined) return null;
-  const needed = VEHICLE_TIER_UNLOCK_GRADE[tier];
-  return grade >= needed ? null : { needed };
+/** Null when allowed (or the site has no quests); else the quest to complete. */
+export function vehicleTierGate(_state: Pick<GameState, 'quests'>, _tier: VehicleTier): QuestDef | null {
+  throw new Error('not implemented');
 }
 
-/** Dealer refusal text for a gated purchase or upgrade; null when allowed (or non-progression site). */
-export function vehicleTierRefusal(grade: number | undefined, tier: VehicleTier): string | null {
-  const gate = vehicleTierGate(grade, tier);
-  if (grade === undefined || gate === null) return null;
-  return t('vehicle.tier_locked', { current: gradeName(grade), needed: gradeName(gate.needed) });
+/** Dealer refusal text for a gated purchase or upgrade; null when allowed. */
+export function vehicleTierRefusal(_state: Pick<GameState, 'quests'>, _tier: VehicleTier): string | null {
+  throw new Error('not implemented');
 }
 
 /** Short lock label shown on gated UI controls. */
-export function vehicleTierLockLabel(needed: number): string {
-  return t('ui.fleet.tier_locked', { grade: gradeName(needed) });
-}
-
-for (const grade of new Set(Object.values(VEHICLE_TIER_UNLOCK_GRADE))) {
-  if (grade > 0) registerUnlockLine({ grade, key: `progression.unlock.vehicle_tier.${grade}` });
+export function vehicleTierLockLabel(_quest: QuestDef): string {
+  throw new Error('not implemented');
 }

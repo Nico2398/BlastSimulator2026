@@ -1,10 +1,10 @@
 // BlastSimulator2026 — Progression probe: pure helpers for the ladder strategy and grade-window verdicts (#1945)
 
+import type { GameState } from '../../src/core/state/GameState.js';
 import type { VehicleTier } from '../../src/core/entities/Vehicle.js';
 import {
   DRILL_HOLE_DIAMETER_OPTIONS_M,
   DRILL_HOLE_DIAMETER_SNAP_TOLERANCE_M,
-  VEHICLE_TIER_UNLOCK_GRADE,
 } from '../../src/core/config/balance.js';
 
 /** What a permit allows per blast: total charge (kg) and pattern area (m², one spacing × burden cell per hole). */
@@ -109,9 +109,9 @@ export function pickDiameter(rigMaxDiameterM: number): number {
   return fitting.length > 0 ? fitting[fitting.length - 1]! : options[0]!;
 }
 
-/** Tier unlocked by grade; every tier climbs the same 20° so no ramp gates it (#2045). */
-export function mayBuyVehicleTier(tier: VehicleTier, mineGrade: number): boolean {
-  return mineGrade >= VEHICLE_TIER_UNLOCK_GRADE[tier];
+/** Tier the dealer sells: its quest is done (or the site has none); every tier climbs the same 20° so no ramp gates it (#2045). */
+export function mayBuyVehicleTier(_tier: VehicleTier, _state: Pick<GameState, 'quests'>): boolean {
+  throw new Error('not implemented');
 }
 
 /** First affordable catalog entry not owned, keeping `reserve` cash back; null if none. */

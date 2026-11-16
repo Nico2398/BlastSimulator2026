@@ -3775,3 +3775,13 @@ export const QUEST_T3_CLEAN_BLASTS = 5;
 export const QUEST_T3_ROCK_KG = 500_000;
 /** Explosive T3 quest: safety score to hold. */
 export const QUEST_T3_SAFETY_SCORE = 60;
+/** Vehicle T2 quest: vehicles owned. */
+export const QUEST_V2_FLEET_SIZE = 3;
+/** Vehicle T2 quest: kg of rock broken. */
+export const QUEST_V2_ROCK_KG = 50_000;
+/** Vehicle T3 quest: vehicles owned. */
+export const QUEST_V3_FLEET_SIZE = 6;
+/** Vehicle T3 quest: kg of rock broken. */
+export const QUEST_V3_ROCK_KG = 250_000;
+/** Vehicle T3 quest: safety score to hold. */
+export const QUEST_V3_SAFETY_SCORE = 50;

@@ -52,13 +52,13 @@ const ROW_PART_CLASS = {
 
 type RowParts = Record<Exclude<keyof typeof ROW_PART_CLASS, 'load'>, HTMLElement> & { load: HTMLElement | null };
 
-/** Dealer grade lock on a tier button: tooltip refusal plus the short badge label. */
+/** Dealer quest lock on a tier button: tooltip refusal plus the short badge label. */
 interface TierLock { refusal: string; label: string }
 
-function tierLock(grade: number | undefined, tier: VehicleTier): TierLock | null {
-  const gate = vehicleTierGate(grade, tier);
-  const refusal = vehicleTierRefusal(grade, tier);
-  return gate && refusal ? { refusal, label: vehicleTierLockLabel(gate.needed) } : null;
+function tierLock(state: GameState, tier: VehicleTier): TierLock | null {
+  const quest = vehicleTierGate(state, tier);
+  const refusal = vehicleTierRefusal(state, tier);
+  return quest && refusal ? { refusal, label: vehicleTierLockLabel(quest) } : null;
 }
 
 const TIER_BTN_BASE_STYLE = 'display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px;border:1px solid var(--bsx-hairline);border-radius:9px;background:var(--bsx-card);color:var(--bsx-text-primary);text-align:left;width:100%;min-width:0;font:inherit'
@@ -340,7 +340,7 @@ export class FleetPanel extends PanelBase {
     btn.append(top, el('div', { attrs: { style: 'display:flex;align-items:center;justify-content:space-between;gap:8px' }, children: [
       el('span', { className: 'bs-fleet-tier-buy', text: t('ui.fleet.buy') }), cost,
     ] }));
-    this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state.grade?.grade, tier));
+    this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state, tier));
     btn.addEventListener('click', () => this.gameConsole?.(`vehicle buy ${role} tier:${tier}`));
     return btn;
   }
@@ -358,7 +358,7 @@ export class FleetPanel extends PanelBase {
     this.syncTierLockBadge(btn, lock);
   }
 
-  /** Adds, updates or removes the "Needs <grade>" badge on a dealership tier button. */
+  /** Adds, updates or removes the "Needs <quest>" badge on a dealership tier button. */
   private syncTierLockBadge(btn: HTMLButtonElement, lock: TierLock | null): void {
     let badge = btn.querySelector<HTMLElement>('.bs-fleet-tier-lock');
     if (!lock) { badge?.remove(); return; }
@@ -381,7 +381,7 @@ export class FleetPanel extends PanelBase {
       const role = btn.dataset['role'] as VehicleRole;
       const tier = Number(btn.dataset['tier']) as VehicleTier;
       const def = getVehicleDefByTier(role, tier);
-      this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state.grade?.grade, tier));
+      this.applyTierButtonState(btn, cash >= def.purchaseCost, def.purchaseCost, tierLock(state, tier));
       const line = btn.querySelector<HTMLElement>('.bs-fleet-tier-licence');
       if (line) line.textContent = this.licenceLineText(role, tier, countLicenceHolders(employees, role, tier));
     });

@@ -1493,7 +1493,6 @@ function earnLicence(s: ProbeSession, m: ReinvestMemory, role: VehicleRole, tier
  * tier-2 haulers stood driverless beside 300 t of ore waiting to be hauled).
  */
 function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
-  const grade = gradeOf(s);
   const rules: (BuyRule & { vehicleId: number; role: VehicleRole; tier: VehicleTier })[] = [];
   for (const role of LADDER_UPGRADE_ROLES) {
     // An unreserved vehicle whose driver (if any) already holds the next tier's licence: a mid-task swap would strand its holder.
@@ -1505,7 +1504,7 @@ function ladderEquipment(s: ProbeSession, m: LadderMemory): void {
       })
       .sort((a, b) => a.tier - b.tier)[0];
     const next = lowest ? ((lowest.tier + 1) as VehicleTier) : null;
-    if (!lowest || next === null || next > 3 || !mayBuyVehicleTier(next, grade)) continue;
+    if (!lowest || next === null || next > 3 || !mayBuyVehicleTier(next, s.state)) continue;
     const cost = computeVehicleUpgradeCost(role, lowest.tier);
     if (cost !== null) rules.push({ id: `${lowest.id}`, vehicleId: lowest.id, role, tier: next, cost });
   }

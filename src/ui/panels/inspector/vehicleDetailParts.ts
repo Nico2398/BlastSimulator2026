@@ -94,16 +94,16 @@ interface UpgradeState {
   available: boolean;
   affordable: boolean;
   cost: number | null;
-  /** Dealer refusal text when the next tier is above the mine grade; null when allowed. */
+  /** Dealer refusal text when the next tier is gated behind a quest; null when allowed. */
   locked?: string;
 }
 
 /** Next-tier upgrade availability and price; the single source for the Inspector. */
-export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number, grade?: number): UpgradeState {
+export function upgradeState(v: Pick<Vehicle, 'type' | 'tier'>, cash: number, site: Pick<GameState, 'quests'>): UpgradeState {
   const cost = computeVehicleUpgradeCost(v.type, v.tier);
   const next = nextVehicleTier(v.tier);
   const available = next !== null && cost !== null;
-  const refusal = next === null ? null : vehicleTierRefusal(grade, next);
+  const refusal = next === null ? null : vehicleTierRefusal(site, next);
   return {
     available, affordable: available && canAffordVehicleUpgrade(v, cash), cost: available ? cost : null,
     ...(refusal ? { locked: refusal } : {}),

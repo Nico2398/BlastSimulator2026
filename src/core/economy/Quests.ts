@@ -5,10 +5,11 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import type { VehicleTier } from '../entities/Vehicle.js';
 import { getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
 import { getAllQuests, getQuest } from './QuestCatalog.js';
 
-type QuestObjectiveKind = 'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score';
+type QuestObjectiveKind = 'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'fleet_size';
 
 interface QuestObjectiveDef {
   kind: QuestObjectiveKind;
@@ -16,10 +17,9 @@ interface QuestObjectiveDef {
 }
 
 /** What completing a quest makes purchasable. */
-interface QuestReward {
-  kind: 'explosive_tier';
-  tier: ExplosiveTier;
-}
+type QuestReward =
+  | { kind: 'explosive_tier'; tier: ExplosiveTier }
+  | { kind: 'vehicle_tier'; tier: VehicleTier };
 
 export interface QuestDef {
   id: string;
@@ -81,6 +81,7 @@ function objectiveProgress(state: GameState, kind: QuestObjectiveKind): number {
     case 'explosive_kg': return q?.explosiveKg ?? 0;
     case 'rock_kg': return q?.rockKg ?? 0;
     case 'safety_score': return state.scores.safety;
+    case 'fleet_size': return state.vehicles.vehicles.length;
   }
 }
 
@@ -162,4 +163,14 @@ export function explosiveLockedByQuest(state: Pick<GameState, 'quests'>, explosi
   if (tier === undefined || tier === 1) return null;
   const q = questForTier(tier);
   return q && !isQuestCompleted(state, q.id) ? q : null;
+}
+
+/** The quest whose reward opens vehicle `tier`, if any. */
+export function questForVehicleTier(_tier: VehicleTier): QuestDef | undefined {
+  throw new Error('not implemented');
+}
+
+/** Localized reward line of a quest, whatever its reward kind. */
+export function questRewardLine(_def: QuestDef): string {
+  throw new Error('not implemented');
 }
