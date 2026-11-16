@@ -5,6 +5,7 @@
 
 import type { GameState } from '../state/GameState.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
+import type { BuildingType, BuildingTier } from '../entities/Building.js';
 import { getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
 import { getAllQuests, getQuest } from './QuestCatalog.js';
 
@@ -162,4 +163,18 @@ export function explosiveLockedByQuest(state: Pick<GameState, 'quests'>, explosi
   if (tier === undefined || tier === 1) return null;
   const q = questForTier(tier);
   return q && !isQuestCompleted(state, q.id) ? q : null;
+}
+
+/** Whether `tier` of a building type may be placed or upgraded to; tier 1 always, every tier on a site without quests. */
+export function isBuildingTierUnlocked(
+  _state: Pick<GameState, 'buildings' | 'quests'>, _type: BuildingType, _tier: BuildingTier,
+): boolean {
+  throw new Error('not implemented');
+}
+
+/** The open quest gating `tier` of a building type; null when it is unlocked or the site has no quests. */
+export function buildingTierLockedByQuest(
+  _state: Pick<GameState, 'buildings' | 'quests'>, _type: BuildingType, _tier: BuildingTier,
+): QuestDef | null {
+  throw new Error('not implemented');
 }

@@ -3775,3 +3775,15 @@ export const QUEST_T3_CLEAN_BLASTS = 5;
 export const QUEST_T3_ROCK_KG = 500_000;
 /** Explosive T3 quest: safety score to hold. */
 export const QUEST_T3_SAFETY_SCORE = 60;
+/** Building T2 quest: buildings standing on the site. */
+export const QUEST_BUILDING_T2_BUILDINGS = 4;
+/** Building T2 quest: crew members with a bed. */
+export const QUEST_BUILDING_T2_CREW_HOUSED = 2;
+/** Building T3 quest: buildings standing on the site. */
+export const QUEST_BUILDING_T3_BUILDINGS = 8;
+/** Building T3 quest: crew members with a bed. */
+export const QUEST_BUILDING_T3_CREW_HOUSED = 4;
+/** Building T3 quest: safety score to hold. */
+export const QUEST_BUILDING_T3_SAFETY_SCORE = 60;
+/** Cash refunded for a Research Center found in a save, by its tier (the building no longer exists). */
+export const RESEARCH_CENTER_REFUND_BY_TIER: Record<1 | 2 | 3, number> = { 1: 25000, 2: 60000, 3: 120000 };
