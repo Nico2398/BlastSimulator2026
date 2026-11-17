@@ -1154,7 +1154,7 @@ describe('building pins publish the placed building footprint (#1646)', () => {
     expect(REGION.drill.x2 - REGION.drill.x1).toBe(8);
     expect(REGION.drill.z2 - REGION.drill.z1).toBe(8);
     expect(REGION.boxcut.x1).toBe(REGION.boxcut.x2);
-    expect(REGION.boxcut.z2).not.toBe(REGION.boxcut.z1);
+    expect(REGION.boxcut.z2).toBeGreaterThan(REGION.boxcut.z1);
     for (const r of [REGION.survey, REGION.drill, REGION.boxcut]) {
       expect((r as { centred?: boolean }).centred).toBeFalsy();
     }

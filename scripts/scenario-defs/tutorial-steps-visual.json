@@ -483,7 +483,7 @@
           "x1": 10,
           "z1": 23,
           "x2": 10,
-          "z2": 35
+          "z2": 41
         },
         {
           "type": "screenshot"
@@ -782,7 +782,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite stemming:2.5",
+      "command": "charge hole:* explosive:boomite stemming:2.8",
       "timeout": 90,
       "interaction": [
         {
@@ -797,7 +797,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "2.5 m"
+          "expectedValue": "2.8 m"
         },
         {
           "type": "clickSelector",

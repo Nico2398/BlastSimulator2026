@@ -4108,7 +4108,6 @@
   "mining.drill_plan.grid_all_blocked": "Every cell of that grid is under a building or construction site; nothing ordered.",
   "mining.drill_plan.confirm_replace": "A new grid replaces the current plan: {drilled} drilled hole(s) and {charged} charge(s) would be lost. Nothing changed. Repeat the command with confirm:true to replace it.",
   "mining.charge.missing_explosive": "Missing explosive. Usage: charge hole:1 explosive:boomite stemming:2.5m (each hole is filled up to the stemming)",
-  "mining.charge.explosive_not_available": "{explosive} is not available at {level}. Available: {available}",
   "mining.charge.column_exceeds_hole": "Charge of {amount} kg fills {column} m; with {stemming} m stemming it overflows the {depth} m hole. Maximum that fits: {max} kg.",
   "mining.charge.no_room": "No room for explosive: {stemming} m of stemming leaves nothing of the {depth} m hole to fill.",
   "mining.charge.invalid_amount": "Amount {amount} is not a charge: give a positive number of kg, or leave amount out to fill the hole up to the stemming.",
