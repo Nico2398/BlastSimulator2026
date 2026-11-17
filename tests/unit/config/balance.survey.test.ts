@@ -17,8 +17,8 @@ describe('SURVEY_COSTS (4.5)', () => {
     expect(SURVEY_COSTS).toBeDefined();
   });
 
-  it('SURVEY_COSTS has exactly four keys — one per survey method', () => {
-    expect(Object.keys(SURVEY_COSTS)).toHaveLength(4);
+  it('SURVEY_COSTS has exactly five keys — one per survey method', () => {
+    expect(Object.keys(SURVEY_COSTS)).toHaveLength(5);
   });
 
   it('SURVEY_COSTS contains the keys seismic, core_sample, and aerial', () => {
@@ -62,8 +62,8 @@ describe('SURVEY_DURATION_TICKS (4.5)', () => {
     expect(SURVEY_DURATION_TICKS).toBeDefined();
   });
 
-  it('SURVEY_DURATION_TICKS has exactly four keys — one per survey method', () => {
-    expect(Object.keys(SURVEY_DURATION_TICKS)).toHaveLength(4);
+  it('SURVEY_DURATION_TICKS has exactly five keys — one per survey method', () => {
+    expect(Object.keys(SURVEY_DURATION_TICKS)).toHaveLength(5);
   });
 
   it('SURVEY_DURATION_TICKS contains the keys seismic, core_sample, and aerial', () => {

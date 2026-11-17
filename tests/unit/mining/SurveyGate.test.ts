@@ -27,8 +27,10 @@ describe('SurveyGate (#2279)', () => {
       expect(surveyMethodGate(0, 'seismic')).toBeNull();
     });
 
-    it.each([1, 2, 3, 5])('opens every method but prospection at grade %i', (grade) => {
-      for (const method of SURVEY_METHODS.filter(m => m !== 'prospection')) expect(surveyMethodGate(grade, method)).toBeNull();
+    it.each([1, 2, 3, 5])('opens every method but prospection and the detector at grade %i', (grade) => {
+      for (const method of SURVEY_METHODS.filter(m => m !== 'prospection' && m !== 'meteorite_detector')) {
+        expect(surveyMethodGate(grade, method)).toBeNull();
+      }
     });
 
     it.each([0, 1])('locks prospection at grade %i and names grade 2 as the opener (#2286)', (grade) => {
@@ -41,6 +43,18 @@ describe('SurveyGate (#2279)', () => {
 
     it('prospection is open on a site with no grade (#2286)', () => {
       expect(surveyMethodGate(undefined, 'prospection')).toBeNull();
+    });
+
+    it.each([0, 1, 2])('locks the meteorite detector at grade %i and names grade 3 as the opener (#2291)', (grade) => {
+      expect(surveyMethodGate(grade, 'meteorite_detector')).toEqual({ needed: 3 });
+    });
+
+    it.each([3, 4, 5])('opens the meteorite detector at grade %i (#2291)', (grade) => {
+      expect(surveyMethodGate(grade, 'meteorite_detector')).toBeNull();
+    });
+
+    it('the meteorite detector is open on a site with no grade (#2291)', () => {
+      expect(surveyMethodGate(undefined, 'meteorite_detector')).toBeNull();
     });
 
     it('opens every method on a site with no grade (non-progression)', () => {
@@ -73,6 +87,19 @@ describe('SurveyGate (#2279)', () => {
     it('prospection refusal is null at G2 and with no grade (#2286)', () => {
       expect(surveyMethodRefusal(2, 'prospection')).toBeNull();
       expect(surveyMethodRefusal(undefined, 'prospection')).toBeNull();
+    });
+
+    it('detector refusal at G2 names both the current and the G3 opening grade (#2291)', () => {
+      const text = surveyMethodRefusal(2, 'meteorite_detector');
+      expect(text).not.toBeNull();
+      expect(text).toContain(gradeName(2));
+      expect(text).toContain(gradeName(3));
+      expect(gradeName(2)).not.toBe(gradeName(3));
+    });
+
+    it('detector refusal is null at G3 and with no grade (#2291)', () => {
+      expect(surveyMethodRefusal(3, 'meteorite_detector')).toBeNull();
+      expect(surveyMethodRefusal(undefined, 'meteorite_detector')).toBeNull();
     });
 
     it('is non-empty text, not a locale key', () => {
@@ -145,6 +172,13 @@ describe('SurveyGate (#2279)', () => {
         expect(dict['ui.survey.method_locked']).toBeTypeOf('string');
         expect(dict['ui.survey.method_locked']).toContain('{grade}');
       }
+    });
+
+    it.each(['survey.meteorite_detector', 'ui.survey.note_meteorite_detector'])('%s exists in en and fr and differs between them (#2291)', (key) => {
+      expect(E[key], `en ${key}`).toBeTypeOf('string');
+      expect(F[key], `fr ${key}`).toBeTypeOf('string');
+      expect(E[key]!.length).toBeGreaterThan(0);
+      expect(F[key]).not.toBe(E[key]);
     });
 
     it('the fr strings differ from the en strings', () => {

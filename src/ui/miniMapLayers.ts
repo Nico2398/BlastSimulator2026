@@ -6,6 +6,7 @@
 import type { GameState } from '../core/state/GameState.js';
 import type { NavGrid, NavCellType } from '../core/nav/NavGrid.js';
 import type { ProspectedIsland } from '../core/mining/SurveyProspection.js';
+import type { DetectorReading } from '../core/mining/SurveyDetector.js';
 import { getOre } from '../core/world/OreCatalog.js';
 
 export const MAP_SIZE = 120; // px
@@ -17,6 +18,7 @@ const COLOR_BUILDING = '#a06030';
 const COLOR_HOLE = '#4040d0';
 const COLOR_CREW = '#6ad0f0';
 const COLOR_VEHICLE = '#c0c040';
+const COLOR_DETECTOR_CONE = '#ff5ad2';
 
 /** Id of a drawn mini-map layer. */
 export type MiniMapLayerId = 'rock' | 'ore' | 'building' | 'vehicle' | 'crew' | 'hole';
@@ -310,16 +312,38 @@ export function prospectedIslandsOf(state: GameState): readonly ProspectedIsland
 export function miniMapProjection(
   world: { minX: number; minZ: number; sizeX: number; sizeZ: number },
   islands: readonly { x: number; z: number; radius: number }[],
+  readings: readonly { originX: number; originZ: number; reading: DetectorReading }[] = [],
 ): MapProjection {
   let minX = world.minX;
   let minZ = world.minZ;
   let maxX = world.minX + world.sizeX;
   let maxZ = world.minZ + world.sizeZ;
+  // A detector cone is widened for the same way: its origin, the far corners and middle of its outer arc,
+  // and any axis extreme the arc crosses.
+  for (const { originX, originZ, reading } of readings) {
+    const lo = reading.bearing - reading.halfAngle;
+    const hi = reading.bearing + reading.halfAngle;
+    const axisAngles: number[] = [];
+    for (let k = Math.ceil(lo / (Math.PI / 2)); k * (Math.PI / 2) <= hi; k++) axisAngles.push(k * (Math.PI / 2));
+    for (const angle of [lo, reading.bearing, hi, ...axisAngles]) {
+      const px = originX + Math.cos(angle) * reading.maxDistance;
+      const pz = originZ + Math.sin(angle) * reading.maxDistance;
+      minX = Math.min(minX, px, originX);
+      maxX = Math.max(maxX, px, originX);
+      minZ = Math.min(minZ, pz, originZ);
+      maxZ = Math.max(maxZ, pz, originZ);
+    }
+  }
   for (const i of islands) {
     minX = Math.min(minX, i.x - i.radius);
     maxX = Math.max(maxX, i.x + i.radius);
     minZ = Math.min(minZ, i.z - i.radius);
     maxZ = Math.max(maxZ, i.z + i.radius);
+  }
+  if (readings.length > 0) {
+    // A cone is an arc: one scale on both axes keeps its bearing and its band true on the map.
+    const scale = MAP_SIZE / Math.max(maxX - minX, maxZ - minZ);
+    return { originX: minX, originZ: minZ, scaleX: scale, scaleZ: scale };
   }
   return { originX: minX, originZ: minZ, scaleX: MAP_SIZE / (maxX - minX), scaleZ: MAP_SIZE / (maxZ - minZ) };
 }
@@ -339,5 +363,31 @@ export function drawProspectedIslands(
     ctx.arc(projectX(proj, island.x), projectZ(proj, island.z), Math.max(2, island.radius * proj.scaleX), 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+  }
+}
+
+/** Every meteorite-detector reading of every result, with the point it was taken from (#2291). */
+export function detectorReadingsOf(state: GameState): { originX: number; originZ: number; reading: DetectorReading }[] {
+  return state.surveyResults.flatMap((r) => (r.reading ? [{ originX: r.centerX, originZ: r.centerZ, reading: r.reading }] : []));
+}
+
+/** Paint every detector reading as a cone clipped to its distance band (#2291). */
+export function drawDetectorCones(ctx: CanvasRenderingContext2D, state: GameState, proj: MapProjection): void {
+  for (const { originX, originZ, reading } of detectorReadingsOf(state)) {
+    const cx = projectX(proj, originX);
+    const cz = projectZ(proj, originZ);
+    const from = reading.bearing - reading.halfAngle;
+    const to = reading.bearing + reading.halfAngle;
+    ctx.beginPath();
+    ctx.arc(cx, cz, reading.maxDistance * proj.scaleX, from, to);
+    ctx.arc(cx, cz, reading.minDistance * proj.scaleX, to, from, true);
+    ctx.closePath();
+    ctx.fillStyle = COLOR_DETECTOR_CONE;
+    ctx.globalAlpha = 0.3;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = COLOR_DETECTOR_CONE;
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 }
