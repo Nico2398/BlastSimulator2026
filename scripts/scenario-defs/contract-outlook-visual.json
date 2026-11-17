@@ -260,7 +260,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:14,6 diameter:0.089",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 start:8,12 diameter:0.089",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -291,10 +291,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 14,
-          "z1": 6,
-          "x2": 18,
-          "z2": 10
+          "x1": 8,
+          "z1": 12,
+          "x2": 12,
+          "z2": 16
         },
         {
           "type": "screenshot"
@@ -311,7 +311,7 @@
           "holeCount": 0
         }
       },
-      "description": "#1197/#1231: start relocated 10,10 -> 14,6 (dragTiles rectangle moved the same 4,-4 offset, 10,10-14,14 -> 14,6-18,10) -- issue #1197's diagonal corner-cutting rule (isDiagonalCornerClear, Pathfinding.ts) closes an illegal diagonal hop past a blocked/void corner that the old solver silently allowed, and the original (10,10) grid's own blast crater left its debris in a NavGrid region that only that illegal hop ever made reachable: direct-traced (a standalone repro harness driving createRunner/runCommand through this exact command sequence, then NavGrid.computeClimbReachableSet from the debris_hauler/rock_fragmenter drivers' own real post-blast positions) shows every one of the ~217 pending haul_debris/fragment_debris targets sitting in a climb-disconnected pocket from where the crew ends up standing -- confirmed permanent, not slow, by running 2000+ extra ticks with zero storedMassKg movement. Debris landing in a pocket no ground crew can reach is a normal, player-owned outcome, not a defect (#1302; blast physics alone decides where debris lands) -- see blast-debris-stranded-ramp.json for that case. This file only needs a blast whose debris a crew can actually haul. (14,6) was chosen by testing several start positions with the same repro harness: post-blast, its debris is in the SAME large connected component as the freight_warehouse (reach size 3043 vs the old site's 1508, direct-traced), and a full run of this file's own hire/build/haul sequence against the new site reaches storedMassKg > 0 by tick 106 and grows past 1500kg by tick ~465 -- comfortably over the 330kg this file's own rubble_disposal contract needs. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below. spacing corrected from 4 to 3 (same Finding #42 class as the depth fix just above, found while chasing issue #553's diameter mismatch): this step never clicks the grid tool's spacing stepper either, so the real drag always used the panel's own DEFAULT_SPACING_M=3 (Drill.ts) -- the declared spacing:4 was never what the real click sent, and with rows/cols landing the same 2x2 either way (round(4/3)+1 == round(4/4)+1 == 2), it only silently shifted where the 4 holes actually sit, not how many -- a small amount of extra/less driller travel between real hole positions that the diameter fix alone didn't account for. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent."
+      "description": "#2318: tutorial_pit is on the progression ladder (20 degree vehicle climb limit): the drill rig cannot reach the steep wall at 14,6, so start relocated 14,6 -> 8,12 (dragTiles 14,6-18,10 -> 8,12-12,16) on the vehicle-reachable NW plateau. #1197/#1231: start relocated 10,10 -> 14,6 (dragTiles rectangle moved the same 4,-4 offset, 10,10-14,14 -> 14,6-18,10) -- issue #1197's diagonal corner-cutting rule (isDiagonalCornerClear, Pathfinding.ts) closes an illegal diagonal hop past a blocked/void corner that the old solver silently allowed, and the original (10,10) grid's own blast crater left its debris in a NavGrid region that only that illegal hop ever made reachable: direct-traced (a standalone repro harness driving createRunner/runCommand through this exact command sequence, then NavGrid.computeClimbReachableSet from the debris_hauler/rock_fragmenter drivers' own real post-blast positions) shows every one of the ~217 pending haul_debris/fragment_debris targets sitting in a climb-disconnected pocket from where the crew ends up standing -- confirmed permanent, not slow, by running 2000+ extra ticks with zero storedMassKg movement. Debris landing in a pocket no ground crew can reach is a normal, player-owned outcome, not a defect (#1302; blast physics alone decides where debris lands) -- see blast-debris-stranded-ramp.json for that case. This file only needs a blast whose debris a crew can actually haul. (14,6) was chosen by testing several start positions with the same repro harness: post-blast, its debris is in the SAME large connected component as the freight_warehouse (reach size 3043 vs the old site's 1508, direct-traced), and a full run of this file's own hire/build/haul sequence against the new site reaches storedMassKg > 0 by tick 106 and grows past 1500kg by tick ~465 -- comfortably over the 330kg this file's own rubble_disposal contract needs. depth corrected from 8 to 6 (Ground rule #15/Finding #42's class, the whole-suite audit before Phase 3): this step never clicks the grid tool's depth stepper (data-field=\"depth\"), so the real drag always produces the panel's own 6m default regardless of what's declared. This file's own expect blocks only assert hole/charge counts around the affected blast (depth-insensitive), so this is a metadata-only correction -- verified both modes still pass unchanged. #553: drill_plan now only orders holes -- holeCount stays 0 until the driller actually drives the drill_rig to each one and drills it, proven by the wait step below. spacing corrected from 4 to 3 (same Finding #42 class as the depth fix just above, found while chasing issue #553's diameter mismatch): this step never clicks the grid tool's spacing stepper either, so the real drag always used the panel's own DEFAULT_SPACING_M=3 (Drill.ts) -- the declared spacing:4 was never what the real click sent, and with rows/cols landing the same 2x2 either way (round(4/3)+1 == round(4/4)+1 == 2), it only silently shifted where the 4 holes actually sit, not how many -- a small amount of extra/less driller travel between real hole positions that the diameter fix alone didn't account for. diameter:0.089 added (issue #553 shared-mechanism finding, same root cause as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission alone kept the drill_rig busy (and paying fuelCostPerTick) for extra ticks in command mode that the real click's grid never spent."
     },
     {
       "command": "wait_until field:orderedHoleCount equals:0 max_ticks:600",
@@ -468,7 +468,7 @@
       "role": "observe"
     },
     {
-      "command": "blast",
+      "command": "blast detonate",
       "interaction": [
         {
           "type": "ensureStep",
@@ -480,16 +480,30 @@
         },
         {
           "type": "waitForSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
+          "selector": "[data-action=\"preflight-detonate\"]"
         },
         {
           "type": "clickSelector",
-          "selector": ".bs-confirm-overlay .bs-btn-danger"
-        },
+          "selector": "[data-action=\"preflight-detonate\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "equals": {
+          "deathCount": 0
+        }
+      },
+      "description": "#2318: the crew stands on the rock being shot after charging it; an immediate `blast` killed both employees (deathCount 2). `blast detonate` arms the detonation and the crew evacuates first, as in blast-detonate-auto-fire.json."
+    },
+    {
+      "command": "wait_until field:holeCount equals:0 max_ticks:600",
+      "interaction": [
         {
-          "type": "clickIfPresent",
-          "selector": "[data-action=\"preflight-fire-anyway\"]",
-          "timeoutMs": 3000
+          "type": "waitUntil",
+          "field": "holeCount",
+          "equals": 0,
+          "maxTicks": 600,
+          "timeoutMs": 300000
         },
         {
           "type": "waitForSelector",
@@ -500,13 +514,15 @@
           "selector": "[data-action=\"report-close\"]"
         }
       ],
-      "role": "player",
+      "role": "setup",
       "expect": {
         "equals": {
           "holeCount": 0,
-          "chargedCount": 0
+          "chargedCount": 0,
+          "deathCount": 0
         }
-      }
+      },
+      "timeout": 330
     },
     {
       "command": "finances",
@@ -544,7 +560,7 @@
           "selector": "#bs-employee-panel [data-role=\"driver\"]"
         }
       ],
-      "description": "#553: qualificationCount/proficiencyTotal bumped by 1 each over the pre-#553 baseline -- the driller (employee #2) now also carries the driving.drill_rig licence added above. #592: qualificationCount/proficiencyTotal dropped from 4/12 to 2/6 -- the blast a few steps above kills the driller (employee #2, holding blasting:5 + driving.drill_rig:1 -- confirmed via direct trace: `alive:false` on employee #2 immediately after the `blast` step), and qualificationCount/proficiencyTotal are now computed over living employees only (issue #592 -- a dead employee's frozen qualifications used to permanently pollute this aggregate). Only the surveyor (geology:5) is alive going into this hire, so 5 + this new driver's own driving.truck:1 = 6.",
+      "description": "#553: qualificationCount/proficiencyTotal bumped by 1 each over the pre-#553 baseline -- the driller (employee #2) now also carries the driving.drill_rig licence added above. #592: qualificationCount/proficiencyTotal dropped from 4/12 to 2/6 -- the blast a few steps above kills the driller (employee #2, holding blasting:5 + driving.drill_rig:1 -- confirmed via direct trace: `alive:false` on employee #2 immediately after the `blast` step), and qualificationCount/proficiencyTotal are now computed over living employees only (issue #592 -- a dead employee's frozen qualifications used to permanently pollute this aggregate). Only the surveyor (geology:5) is alive going into this hire, so 5 + this new driver's own driving.truck:1 = 6. #2318: re-derived from a real run. The blast no longer kills the crew (see the blast detonate step), so the surveyor and driller still count in the living-roster aggregates.",
       "role": "player",
       "expect": {
         "decreased": [
@@ -552,8 +568,8 @@
         ],
         "equals": {
           "employeeCount": 3,
-          "qualificationCount": 3,
-          "proficiencyTotal": 7
+          "qualificationCount": 6,
+          "proficiencyTotal": 14
         }
       }
     },
@@ -571,7 +587,7 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 11
+          "proficiencyTotal": 18
         }
       },
       "role": "bootstrap"
@@ -655,8 +671,8 @@
         ],
         "equals": {
           "employeeCount": 4,
-          "qualificationCount": 5,
-          "proficiencyTotal": 13
+          "qualificationCount": 8,
+          "proficiencyTotal": 20
         }
       }
     },
@@ -675,7 +691,7 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 17
+          "proficiencyTotal": 24
         }
       }
     },
@@ -694,7 +710,7 @@
           "cash": 0
         },
         "equals": {
-          "proficiencyTotal": 22
+          "proficiencyTotal": 29
         }
       }
     },
@@ -714,14 +730,14 @@
           "selector": "#bs-vehicle-panel [data-vtype=\"rock_fragmenter\"][data-tier=\"1\"]"
         }
       ],
-      "description": "#553: vehicle #2 -- #1 was the drill_rig purchased above, destroyed by the blast. Bought (and crewed, below) before the debris_hauler on purpose: newly purchased vehicles spawn staggered off the grid centre (VehicleCommands.ts), which on tutorial_pit's small map lands right in the single-file approach to the blast crater -- an idle vehicle parked there blocks any other vehicle needing the same cell (two vehicles never share one, EntityMovementTick.ts's isCellOccupiedByOtherVehicle). Buying and crewing the rock_fragmenter first, then waiting for it to actually depart its spawn tile before the debris_hauler ever exists, means neither vehicle is ever parked in the other's way.",
+      "description": "#553: vehicle #2 -- #1 was the drill_rig purchased above, destroyed by the blast. Bought (and crewed, below) before the debris_hauler on purpose: newly purchased vehicles spawn staggered off the grid centre (VehicleCommands.ts), which on tutorial_pit's small map lands right in the single-file approach to the blast crater -- an idle vehicle parked there blocks any other vehicle needing the same cell (two vehicles never share one, EntityMovementTick.ts's isCellOccupiedByOtherVehicle). Buying and crewing the rock_fragmenter first, then waiting for it to actually depart its spawn tile before the debris_hauler ever exists, means neither vehicle is ever parked in the other's way. #2318: drill_rig and charging_truck survive the blast now, so vehicleCount counts them (2 + fragmenter = 3; 4 with the debris_hauler).",
       "role": "player",
       "expect": {
         "decreased": [
           "cash"
         ],
         "equals": {
-          "vehicleCount": 1
+          "vehicleCount": 3
         }
       }
     },
@@ -776,7 +792,7 @@
           "cash"
         ],
         "equals": {
-          "vehicleCount": 2
+          "vehicleCount": 4
         }
       }
     },
@@ -892,10 +908,11 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
+        "increased": [
           "cash"
         ]
-      }
+      },
+      "description": "#2318: expect flipped decreased -> increased cash: with the whole fleet alive, haulers deliver to the open contract inside this window and the payout outweighs wages/fuel."
     },
     {
       "command": "event choose 0",
@@ -980,7 +997,7 @@
     },
     {
       "command": "tick 120",
-      "description": "Long enough for the rock_fragmenter to clear the boulders blocking the debris_hauler driver's own action window, and for the driver to then haul the first cleared fragment all the way to the freight_warehouse. #611: widened from tick 10 to tick 20 -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking rather than only inside the bounded top-N reachability window, so an employee licensed for both vehicle roles in this file (driver #4, driving.truck + driving.excavator) reaches and reserves-ahead a haul_debris action for the debris_hauler (vehicle #3) sooner, then keeps working its own rock_fragmenter queue for longer before finally freeing up to drive the haul itself -- first pickup now lands around tick 169 (measured via direct trace) instead of within the original tick-10 round ending at 167, a couple of ticks too early to observe. 60 ticks reaches roughly tick 217 (#1365 widened the pad from 20 to 60), well past the first delivery. #1091-followup: the 'increased: storedMassKg' proof moved off this step -- #1090's dispatch-cost reordering now lands the freight_warehouse build (the wait_until step above) far earlier relative to this file's own tick budget, so by the time this step runs storage already sits at 1837.5/2000kg (pre#1531 T1 capacity; now 25000kg) (direct-traced, command mode) and stays flat for hundreds of further ticks: the only fragments left on the ground are all bigger than the 162.5kg of headroom remaining, so nothing further can be hauled in until the rubble_disposal delivery below frees capacity. The proof moved to the new tick-20 step right after that delivery, where headroom genuinely reopens. #1817: widened 60 -> 120 ticks: demand-weighted haul ranking sends the debris_hauler to farther fragments of the ore an open offer is short of first, so in interaction mode (different tick/UI trajectory) the first load reached storage after tick 267 and the contract steps below found no stock (traced: stored 0 at tick 267, 4462kg at 327; command mode 8925kg). Hauling itself is unchanged, only later.",
+      "description": "Long enough for the rock_fragmenter to clear the boulders blocking the debris_hauler driver's own action window, and for the driver to then haul the first cleared fragment all the way to the freight_warehouse. #611: widened from tick 10 to tick 20 -- selectBestActionForEmployee's isClaimable pre-filter (issue #611) now applies over the whole candidate pool before ranking rather than only inside the bounded top-N reachability window, so an employee licensed for both vehicle roles in this file (driver #4, driving.truck + driving.excavator) reaches and reserves-ahead a haul_debris action for the debris_hauler (vehicle #3) sooner, then keeps working its own rock_fragmenter queue for longer before finally freeing up to drive the haul itself -- first pickup now lands around tick 169 (measured via direct trace) instead of within the original tick-10 round ending at 167, a couple of ticks too early to observe. 60 ticks reaches roughly tick 217 (#1365 widened the pad from 20 to 60), well past the first delivery. #1091-followup: the 'increased: storedMassKg' proof moved off this step -- #1090's dispatch-cost reordering now lands the freight_warehouse build (the wait_until step above) far earlier relative to this file's own tick budget, so by the time this step runs storage already sits at 1837.5/2000kg (pre#1531 T1 capacity; now 25000kg) (direct-traced, command mode) and stays flat for hundreds of further ticks: the only fragments left on the ground are all bigger than the 162.5kg of headroom remaining, so nothing further can be hauled in until the rubble_disposal delivery below frees capacity. The proof moved to the new tick-20 step right after that delivery, where headroom genuinely reopens. #1817: widened 60 -> 120 ticks: demand-weighted haul ranking sends the debris_hauler to farther fragments of the ore an open offer is short of first, so in interaction mode (different tick/UI trajectory) the first load reached storage after tick 267 and the contract steps below found no stock (traced: stored 0 at tick 267, 4462kg at 327; command mode 8925kg). Hauling itself is unchanged, only later. #2318: expect flipped decreased -> increased cash: with the whole fleet alive, haulers deliver to the open contract inside this window and the payout outweighs wages/fuel.",
       "interaction": [
         {
           "type": "command",
@@ -989,7 +1006,7 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
+        "increased": [
           "cash"
         ]
       }

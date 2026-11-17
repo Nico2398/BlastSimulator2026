@@ -260,10 +260,15 @@ describe('Tutorial Level — Contract Delivery', () => {
 
     const { cashBeforeBlast } = executeTutorialBlast();
 
-    // No instant payout: cash right before the blast is unchanged after it
-    // (hiring, drilling, and charging spend cash — that's expected — but the
-    // blast itself must not credit anything).
-    expect(ctx.state!.cash).toBe(cashBeforeBlast);
+    // No instant payout: cash right before the blast drops only by the blast
+    // notification permit fee (a progression site pays one per blast) and
+    // never rises — hiring, drilling, and charging spend cash earlier, but the
+    // blast itself must not credit anything.
+    const permitFee = ctx.state!.finances.transactions
+      .filter(tx => tx.category === 'permits' && tx.description.includes('Blast Notification'))
+      .reduce((sum, tx) => sum + tx.amount, 0);
+    expect(permitFee).toBeGreaterThan(0);
+    expect(ctx.state!.cash).toBe(cashBeforeBlast - permitFee);
     // collectedOre is byte-identical (deep equal) to its pre-blast value —
     // a blast alone must not populate it.
     expect(ctx.state!.collectedOre).toEqual(collectedOreBefore);

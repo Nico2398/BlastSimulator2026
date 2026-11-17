@@ -216,7 +216,7 @@ describe('barren rock is hauled to the opening heap without a no_spoil_heap bloc
   });
 
   it('tutorial_pit: first blast produces barren fragments and no haul order is blocked no_spoil_heap', () => {
-    const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
+    const { run, state } = drillChargeAndBlast(12, 14, 3, 5_000_000);
     expect(state.logistics.fragments.length).toBeGreaterThan(0);
     run('employee hire role:driver');
     run('vehicle buy debris_hauler');

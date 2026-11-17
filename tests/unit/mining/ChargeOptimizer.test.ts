@@ -13,7 +13,7 @@ import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { permitLimitsFor } from '../../../src/core/economy/PermitLimits.js';
-import { resolveExplosivesFor } from '../../../src/core/campaign/Level.js';
+import { applyLevelPreset, getLevel, resolveExplosivesFor } from '../../../src/core/campaign/Level.js';
 import { mixedRockGrid, mixedRockHoles, gridFingerprint } from '../../helpers/optimizerFixtures.js';
 import { setHoleWater } from '../../helpers/holeWater.js';
 
@@ -363,6 +363,7 @@ describe('optimizerOptionsFor', () => {
   it('follows a level that offers fewer explosives', () => {
     const state = stateWithHoles();
     state.campaign.activeLevelId = 'tutorial_pit';
+    applyLevelPreset(state, getLevel('tutorial_pit')!.preset!);
     expect(optimizerOptionsFor(state).explosiveIds).toEqual(resolveExplosivesFor(state));
     expect(optimizerOptionsFor(state).explosiveIds.length).toBeLessThan(ALL_IDS.length);
   });

@@ -121,7 +121,7 @@
       }
     },
     {
-      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:18,10 diameter:0.089",
+      "command": "drill_plan grid rows:1 cols:1 spacing:3 depth:6 start:9,26 diameter:0.089",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -152,10 +152,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 18,
-          "z1": 10,
-          "x2": 18,
-          "z2": 10
+          "x1": 9,
+          "z1": 26,
+          "x2": 9,
+          "z2": 26
         },
         {
           "type": "screenshot"
@@ -172,7 +172,7 @@
           "holeCount": 0
         }
       },
-      "description": "A single hole at (18,10). With charge amount:3 stemming:2 this blast leaves the three cells (18,9), (19,10), (18,10) in a pocket the ground crew cannot reach (traced in tests/integration/blast-debris-reachability.integration.test.ts). Stranded debris is a normal outcome the player owns (#1302), not a defect: the blast physics decides where debris lands."
+      "description": "A single hole at (9,26), on the north-west plateau the tier-1 vehicles can climb to (tutorial_pit starts at grade 0 tier 1, so vehicles climb 20 degrees at most). The shot digs a crater floor the ground crew cannot climb out of (the integration test tests/integration/blast-debris-reachability.integration.test.ts traces the 2.75 kg shot's three cut-off cells (9,25), (9,26), (10,26)). Stranded debris is a normal outcome the player owns (#1302), not a defect: the blast physics decides where debris lands."
     },
     {
       "command": "wait_until field:orderedHoleCount equals:0 max_ticks:600",
@@ -583,7 +583,7 @@
     },
     {
       "command": "tick 30",
-      "description": "Capture the pip screenshot for visual inspection: hauler and driver are ready but the pocket is cut off, so the topbar should show the neutral OUT OF REACH pip and no per-piece warn toasts. The expect asserts only that wages ran (cash decreased).",
+      "description": "Capture the pip screenshot for visual inspection: hauler and driver are ready but the pocket is cut off, so the topbar should show the neutral OUT OF REACH pip and no per-piece warn toasts. The expect asserts only that the hauler is already at work on the reachable debris (storedMassKg increased) while the pocket's stays put. Cash is not asserted: the tutorial contract pays out as soon as the first load is delivered.",
       "interaction": [
         {
           "type": "command",
@@ -595,8 +595,8 @@
       ],
       "role": "setup",
       "expect": {
-        "decreased": [
-          "cash"
+        "increased": [
+          "storedMassKg"
         ]
       }
     }

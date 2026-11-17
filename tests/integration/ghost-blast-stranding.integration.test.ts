@@ -11,7 +11,7 @@ import { computeClimbComponents } from '../../src/core/nav/NavGridReachability.j
 import { NAV_CLEARANCE_EMPLOYEE_CELLS } from '../../src/core/config/balance.js';
 import type { GameState } from '../../src/core/state/GameState.js';
 
-const POCKET = { x: 18, z: 10 };
+const POCKET = { x: 9, z: 26 };
 
 /** A main-ground cell on the warehouse's side of the blast, found from the live nav grid. */
 function mainGroundCell(state: GameState): { x: number; z: number } {
@@ -26,7 +26,7 @@ function mainGroundCell(state: GameState): { x: number; z: number } {
 
 describe('ghost colour after a real blast (#1306)', () => {
   it('an actor stranded by the blast turns the order red within a tick; back on main ground it is blue again', () => {
-    const { run, state } = drillChargeAndBlast(18, 10, 3);
+    const { run, state } = drillChargeAndBlast(9, 26, 2.75);
     // The driller who fired the shot does not survive it: the crew is hired after.
     expect(state.employees.employees.every(e => !e.alive)).toBe(true);
     expect(run('employee hire role:driver')).toMatchObject({ success: true });
@@ -53,7 +53,7 @@ describe('ghost colour after a real blast (#1306)', () => {
   });
 
   it('a queued ramp is red on every layer while its crew is cut off, and blue on every layer once connected', () => {
-    const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
+    const { run, state } = drillChargeAndBlast(9, 26, 2.75, 5_000_000);
     crewRockDigger(run, state);
     const digger = state.vehicles.vehicles.find(v => v.type === 'rock_digger')!;
     const driver = state.employees.employees.at(-1)!;
@@ -64,7 +64,7 @@ describe('ghost colour after a real blast (#1306)', () => {
       driver.fatigue = 100;
     };
     place(POCKET);
-    expect(run('build_ramp start:12,3 end:2,3 depth:5')).toMatchObject({ success: true });
+    expect(run('build_ramp start:9,10 end:9,24 depth:4')).toMatchObject({ success: true });
 
     const ramp = state.plannedRamps.at(-1)!;
     expect(ramp.segments.length).toBeGreaterThan(1);

@@ -8,19 +8,19 @@
 // work the player explicitly ordered), and resumes on its own once the player
 // connects the pocket (here: a ramp).
 //
-// Fixture (empirically traced on tutorial_pit): a single-hole blast at (18,10)
-// (rows:1 cols:1 spacing:3 depth:6 diameter:0.089) with charge amount:5
-// stemming:2 leaves exactly 10 NavGrid cells (KERNEL_POCKET_CELLS below: the 9
-// POCKET_CELLS of blastFixtures plus (20,10) since the energy spreads by the
-// per-hole kernel) —
-// amount:3 was used before the blast floored to grade (#1723): its extra
-// pit-floor debris then parked a fragmenter on the pocket's rim cell, so the
-// fixture moved to the 5 kg pocket, whose debris stays inside the pit —
-// climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the freight_warehouse's
-// approach cell, while most of the map stays reachable. The SAME site with
-// amount:1 leaves nothing disconnected (non-regression guard). A ramp
-// `start:27,9 end:17,9 depth:5`, carved by a crewed rock_digger, connects the
-// pocket.
+// Fixture (empirically traced on tutorial_pit, which starts at grade 0 tier 1: vehicles
+// climb only 20 degrees (VEHICLE_MAX_SLOPE_RATIO), so the shot sits on the north-west
+// plateau the vehicles can reach, at (9,26), clear of the pit wall): a single-hole blast
+// at (9,26) (rows:1 cols:1 spacing:3 depth:6 diameter:0.089) with charge amount:2.75
+// stemming:2 digs a crater whose floor is exactly 3 NavGrid cells (the POCKET_CELLS of
+// blastFixtures) — climb-disconnected (NAV_CLEARANCE_VEHICLE_CELLS) from the
+// freight_warehouse's approach cell, while most of the map stays reachable. A heavier
+// charge heaps more rock in the crater than the crew can load from the ramp's foot
+// (rock stacked more than a 1.5 m step above it, left unworked and unstamped), so the
+// fixture keeps the 2.75 kg shot. The SAME site with amount:1 leaves nothing
+// disconnected (non-regression guard). A ramp `start:9,10 end:9,26 depth:5`, carved by
+// a crewed rock_digger, connects the pocket: 16 m, because a vehicle climbs 20 degrees
+// at most, so a ramp needs about 2.75 m of length per metre of depth.
 //
 // Drives the real console command layer (createRunner): no DOM, no Three.js.
 
@@ -50,11 +50,10 @@ import { clearRubble, terrainStrandedDebris } from '../helpers/rubble.js';
 import { CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
 
 /**
- * The NavGrid cells the (18,10) amount:5 shot leaves climb-disconnected from the freight_warehouse's approach cell,
- * traced with `siteVehicleReach` once the reachable debris is hauled: blastFixtures' POCKET_CELLS (#1723) and, since
- * the energy spreads by the per-hole kernel, the cell east of the hole's pit.
+ * The NavGrid cells the (9,26) amount:2.75 shot leaves climb-disconnected from the freight_warehouse's approach cell,
+ * traced with `siteVehicleReach` once the reachable debris is hauled: blastFixtures' POCKET_CELLS, the crater floor.
  */
-const KERNEL_POCKET_CELLS: ReadonlySet<string> = new Set([...POCKET_CELLS, '20,10']);
+const KERNEL_POCKET_CELLS: ReadonlySet<string> = POCKET_CELLS;
 function isPocketCell(x: number, z: number): boolean {
   return KERNEL_POCKET_CELLS.has(`${x},${z}`);
 }
@@ -139,7 +138,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
     "stamps debris_out_of_reach (never target_unreachable) on exactly the pocket's debris, leaves it queued where physics put it, while the reachable majority is hauled",
     () => {
       // Generous cash: wages over the long wait must not bankrupt the mine, which freezes it (#1313).
-      const { run, state } = drillChargeAndBlast(18, 10, 5, 5_000_000);
+      const { run, state } = drillChargeAndBlast(9, 26, 2.75, 5_000_000);
       const placedAtBlast = new Map(state.logistics.fragments.map(f => [f.fragment.id, { ...f.fragment.position }]));
       expect(placedAtBlast.size).toBeGreaterThan(0);
       crewHaulingAndBuildDepot(run, state);
@@ -199,7 +198,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
     'starts hauling stranded debris once a ramp connects the pocket, and the terrain strands none of it again',
     () => {
       // Generous cash: wages over the long wait for the plateau must not starve the ramp order.
-      const { run, state } = drillChargeAndBlast(18, 10, 5, 5_000_000);
+      const { run, state } = drillChargeAndBlast(9, 26, 2.75, 5_000_000);
       crewHaulingAndBuildDepot(run, state);
       crewRockDigger(run, state); // crewed up front; it has no work until the ramp is ordered
       tickUntilOnlyStrandedDebrisRemains(run, state);
@@ -216,7 +215,7 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
       // Barren rock lands on the spoil heap, ore in the warehouse (#1530): count both.
       const hauledKg = (): number => state.logistics.storedMassKg + totalSpoilKg(state.buildings.buildings);
       const storedBeforeRamp = hauledKg();
-      expect(run('build_ramp start:27,9 end:17,9 depth:5')).toMatchObject({ success: true });
+      expect(run('build_ramp start:9,10 end:9,26 depth:5')).toMatchObject({ success: true });
       tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 800);
       expect(state.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
 
@@ -248,11 +247,11 @@ describe('Blast debris left in an unreachable NavGrid pocket is a normal, player
   );
 
   it(
-    'stamps nothing on the SAME (18,10) site with a smaller charge (amount:1) that never breaks out (non-regression)',
+    'stamps nothing on the SAME (9,26) site with a smaller charge (amount:1) that never breaks out (non-regression)',
     () => {
       // Since #1774 the 1 kg charge's rock stays sealed under its cap and gets no order at all, so
       // nothing can be stamped out of reach; and no 3 kg+ charge here is free of the pocket.
-      const { run, state, grid } = drillChargeAndBlast(18, 10, 1);
+      const { run, state, grid } = drillChargeAndBlast(9, 26, 1);
       crewHaulingAndBuildDepot(run, state);
       const onGround = state.logistics.fragments.filter(f => f.state === 'on_ground');
       expect(onGround.length).toBeGreaterThan(0);
@@ -408,6 +407,12 @@ describe('Rock sealed under an intact cap is not debris work (#1774)', () => {
 
 const FLAT_ROCK = { composition: { rocks: [{ rockId: 'sandite', coefficient: 1.0 }] }, density: 1, oreDensities: {}, fractureModifier: 1 };
 
+/**
+ * Row of the 3x3 patterns' centre on the flat site, at x 18. Nearer the north edge than the site's middle, so the 17 m ramp
+ * a tier-1 site's 20 degree limit asks for (6 m of depth) still fits on the 32 m site south of a 4 m pattern's crater.
+ */
+const FLAT_PATTERN_Z = 8;
+
 /** Levels the whole site to the surface found at (18,10), so the blast starts from a flat site the crew can drive across. */
 function flattenSite(ctx: MiningContext): number {
   const grid = ctx.grid!;
@@ -472,7 +477,7 @@ function drillGridFillAndBlast(opts: {
 function blastFlatPattern(spacing: number): PatternBlast {
   let preSurfaceY = 0;
   const startX = 18 - spacing;
-  const startZ = 10 - spacing;
+  const startZ = FLAT_PATTERN_Z - spacing;
   const { run, state, ctx } = drillGridFillAndBlast({
     rows: 3, cols: 3, spacing, startX, startZ,
     flatten: c => { preSurfaceY = flattenSite(c); },
@@ -512,20 +517,20 @@ describe('A 3x3 pattern floors to a flush crater at any spacing (#1740)', () => 
         // A ramp from the flat rim down to the floor: no crater debris may stay out of reach for want of a way down.
         // Rubble blocks vehicles, so the pile itself is worked from its edge and its inner rock reads
         // debris_out_of_reach until then; the claim here is about the terrain, so rubble is set aside (`terrainStrandedDebris`).
-        expect(computeVoxelColumnSurfaceY(grid, 18, 10)).toBe(floorY);
+        expect(computeVoxelColumnSurfaceY(grid, 18, FLAT_PATTERN_Z)).toBe(floorY);
         crewHaulingAndBuildDepot(run, state);
         crewRockDigger(run, state);
         // The site is 32 m square: the ramp climbs out of the crater to the south rim, ending on the crater's last floor row.
-        let rampEndZ = 10;
+        let rampEndZ = FLAT_PATTERN_Z;
         while (computeVoxelColumnSurfaceY(grid, 18, rampEndZ + 1) === floorY) rampEndZ++;
-        expect(run(`build_ramp start:18,${rampEndZ + 12} end:18,${rampEndZ} depth:${preSurfaceY - floorY}`)).toMatchObject({ success: true });
+        expect(run(`build_ramp start:18,${rampEndZ + 17} end:18,${rampEndZ} depth:${preSurfaceY - floorY}`)).toMatchObject({ success: true });
         tickUntilFresh(run, state, () => !state.pendingActions.some(a => a.type === 'dig_ramp_segment'), 1500);
         expect(state.pendingActions.filter(a => a.type === 'dig_ramp_segment')).toHaveLength(0);
 
         // Classification runs at the start of each employee tick: give it a pass after the last segment.
         // Debris thrown outside the pattern may land on the surrounding site; the ramp must serve the crater itself.
         const inCrater = (a: PendingAction): boolean =>
-          a.targetX >= 18 - spacing && a.targetX <= 18 + spacing && a.targetZ >= 10 - spacing && a.targetZ <= 10 + spacing;
+          a.targetX >= 18 - spacing && a.targetX <= 18 + spacing && a.targetZ >= FLAT_PATTERN_Z - spacing && a.targetZ <= FLAT_PATTERN_Z + spacing;
         const strandedInCrater = (): number => terrainStrandedDebris(state).filter(inCrater).length;
         tickUntilFresh(run, state, () => false, 2);
         tickUntilFresh(run, state, () => strandedInCrater() === 0, 1500); // the crew classifies a few pieces per tick

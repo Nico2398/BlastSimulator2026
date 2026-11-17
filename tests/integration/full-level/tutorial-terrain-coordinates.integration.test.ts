@@ -207,12 +207,12 @@ describe('Tutorial Level Terrain Coordinates (Issue #333, #1008)', () => {
     expect(ctx.grid).not.toBeNull();
 
     // Act: build ramp command from mining.ts
-    // depth:5 stays within RAMP_CUT_SLOPE_RATIO for a 10m run (#1152) — this
+    // depth:5 needs length >= 15 m for a progression site's 20-degree vehicle climb — this
     // test is about coordinate placement, not slope.
     const result: CommandResult = buildRampCommand(ctx as any, [], {
       origin: '10,16',
       direction: 'south',
-      length: '10',
+      length: '15',
       depth: '5',
     });
 

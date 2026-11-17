@@ -309,13 +309,13 @@ describe('Tutorial Level — Full Walkthrough', () => {
     // Payment should be positive (> 0)
     expect(deliverResult.output).not.toContain('Payment: $0');
 
-    // 23. Build a ramp at (12,12) going south for 10m
-    // depth:5 stays within RAMP_CUT_SLOPE_RATIO for a 10m run (#1152) —
+    // 23. Build a ramp at (12,12) going south for 15m
+    // depth:5 needs length >= 15 m for the 20-degree vehicle climb —
     // this step is exercising a second ramp order, not testing slope.
     const rampResult = buildRampCommand(ctx as any, [], {
       origin: '12,12',
       direction: 'south',
-      length: '10',
+      length: '15',
       depth: '5',
     });
     expect(rampResult.success).toBe(true);
