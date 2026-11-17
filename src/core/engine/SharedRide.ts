@@ -3,7 +3,7 @@
 // together: one drives, the others sit in its passenger seats. This module holds the
 // pieces both the planner (PlanItinerary.ts) and the locomotion tick (Locomotion.ts)
 // share — who is about to drive a shuttle, how many seats are spoken for, the short
-// bounded wait the driver holds for boarders, and the passengers' carried position.
+// It reads itineraries, and only ever splices the driver's boarding hold into one — it plans none, so the planner may import it freely.
 // It reads itineraries and never plans one, so the planner may import it freely.
 
 import type { GameState } from '../state/GameState.js';

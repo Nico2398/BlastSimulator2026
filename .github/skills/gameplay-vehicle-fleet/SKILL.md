@@ -155,8 +155,8 @@ surface ramp segment while one on the road is free. With none that can reach, th
 
 ```ts
 interface Leg {
-  mode: 'foot' | 'drive';
-  vehicleId: number | null;        // set for 'drive'; also for a 'foot' leg ending in a board
+  mode: 'foot' | 'drive' | 'ride'; // 'ride' = a passenger's inert leg, carried by the driver's drive
+  vehicleId: number | null;        // set for 'drive' and 'ride'; also for a 'foot' leg ending in a board
   destX: number; destZ: number;
   arrival: 'exact' | 'adjacent';   // 'adjacent' = Chebyshev distance <= 1
   onArrive: ArrivalStep;
@@ -165,7 +165,7 @@ interface Leg {
 
 type ArrivalStep =
   | { kind: 'none' }
-  | { kind: 'board';  vehicleId: number }
+  | { kind: 'board';  vehicleId: number; passenger?: boolean }   // passenger: take a passenger seat
   | { kind: 'alight' }
   | { kind: 'enter_building'; buildingId: number }   // go inside, from a cell on its ring
   | { kind: 'effect'; effectId: string };   // haul load/unload, boulder split
