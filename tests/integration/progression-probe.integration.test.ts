@@ -80,3 +80,34 @@ describe('ladder strategy (#1945)', () => {
     expect(toJson(runMatrix(o), o)).toBe(toJson(runMatrix(o), o));
   }, 120000);
 });
+
+describe('ladder frontier probe (#2322)', () => {
+  const fromG2: ProbeRunConfig = {
+    seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'ladder', horizon: 300, startGrade: 2,
+  };
+
+  it('a ladder starting at grade 2 never throws and ends with null or a run-loop reason', () => {
+    let r!: RunResult;
+    expect(() => { r = runProbe(fromG2); }).not.toThrow();
+    expect(r.config).toEqual(fromG2);
+    if (r.endReason !== null) expect(r.endReason).toMatch(/^(opening_failed:\w+|stalled|game_over:.+)$/);
+    expect(r.metrics.gradeReachedTick[2]).toBeDefined();
+  }, 60000);
+
+  it('a ladder starting at grade 2 is deterministic: two runs serialize identically', () => {
+    const o = parseArgs(['--quick', '--horizon', '300', '--strategy', 'ladder']);
+    expect(toJson([runProbe(fromG2)], o)).toBe(toJson([runProbe(fromG2)], o));
+  }, 120000);
+
+  it('a ladder run from the start reaches grade 1 inside its window and reports quest, frontier and earnings metrics', () => {
+    const r = runProbe({ seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'ladder', horizon: 1200 });
+    const g1 = r.metrics.gradeReachedTick[1];
+    expect(g1).toBeDefined();
+    expect(g1!).toBeLessThan(1200);
+    expect(r.metrics.questTicks).toBeDefined();
+    expect(r.metrics.frontierTicks).toBeDefined();
+    expect(r.metrics.gradeEarnPerTick).toBeDefined();
+    for (const v of Object.values(r.metrics.gradeEarnPerTick!)) expect(Number.isFinite(v)).toBe(true);
+    for (const t of Object.values(r.metrics.frontierTicks!)) expect(t).toBeLessThanOrEqual(r.endTick);
+  }, 120000);
+});
