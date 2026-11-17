@@ -6,7 +6,7 @@
 * drill_rig        — "Pokey McPoke": a shopping cart carrying a ladder mast, egg-beater drill, pencil bit.
 * building_destroyer — "Wrecking Rascal": a ride-on mower with a plank-and-nails blade, bowling-ball crane, rake ripper.
 * charging_truck  — "Pour-Bucket Pete": a blue barrel on a rusty go-kart, kitchen funnel, garden-hose coil and rose nozzle.
-* travel_vehicle   — "Rattle Bus": a dented, open-sided crew minibus, every seat on show, grinning grille.
+* travel_vehicle   — "Rushbus Shuttle": a dented, open-sided crew minibus, every seat on show, grinning grille.
 * rock_fragmenter  — "Cracky": a wheelbarrow-cart with a see-saw sledgehammer, crate hopper, pedal-crank flywheel.
 """
 from __future__ import annotations
@@ -1188,7 +1188,7 @@ def _minibus_seat(name: str, x: float, y: float, m) -> list[bpy.types.Object]:
 
 
 def build_travel_shuttle(m) -> None:
-    """Rattle Bus: a dented, cheerful crew minibus with no side walls above the belt line, so every seat
+    """Rushbus Shuttle: a dented, cheerful crew minibus with no side walls above the belt line, so every seat
     shows — driver up front, five passengers behind. Roof on four posts, a luggage box lashed on top,
     a mismatched door panel, a bumper hanging by tape, headlight eyes and a toothy grin."""
     body = []

@@ -5,7 +5,7 @@ real windows. `TintBody` is the Caterpillar-yellow paint the game recolours
 per instance. Nodes the runtime animates: Wheel* (spin on the Y axis while
 moving), plus role-specific ones (Bed, Boom, Mast, Blade…).
 
-travel_vehicle — Turbo Tuesday: garish single-seat racer, one driver seat, tail spoiler, sponsor stickers (tier 2 only).
+travel_vehicle — Zoom-Zoom Race Car: garish single-seat racer, one driver seat, tail spoiler, sponsor stickers (tier 2 only).
 charging_truck — bulk-emulsion tank truck: round tank behind a cab, swing boom with a hose and nozzle.
 """
 from __future__ import annotations
@@ -692,7 +692,7 @@ SPONSORS = (0xE8232B, 0x1F5FD6, 0x2BBF4A, 0xF03CC8, 0xFFFFFF)
 
 
 def build_travel_race_car(m) -> None:
-    """Turbo Tuesday: a garish single-seat racer. Open cockpit with one bucket seat, pointed nose, tail
+    """Zoom-Zoom Race Car: a garish single-seat racer. Open cockpit with one bucket seat, pointed nose, tail
     wing on struts, covered in mismatched sponsor stickers and a big number roundel."""
     spons = [material(f'Sponsor{i}', c, roughness=0.5) for i, c in enumerate(SPONSORS)]
     body = []
