@@ -36,8 +36,15 @@ function unlockedCampaign() {
   return campaign;
 }
 
+/** Levels still off the ladder: tutorial_pit until #2318 moves its scenarios and ramp region to G0 rules. */
+const OFF_LADDER = ['tutorial_pit'];
+
+function ladderLevels(): LevelDef[] {
+  return getAllLevels().filter(l => !OFF_LADDER.includes(l.id));
+}
+
 function allLevelDefs(): LevelDef[] {
-  return [...getAllLevels(), sandboxLevelDef(SANDBOX_DEFAULTS)];
+  return [...ladderLevels(), sandboxLevelDef(SANDBOX_DEFAULTS)];
 }
 
 function presetOf(id: string): LevelPreset {
@@ -52,7 +59,11 @@ function expectedExplosives(completed: readonly string[]): string[] {
 }
 
 describe('LevelPreset shape (#2292)', () => {
-  it('every campaign level and the sandbox def declare a preset', () => {
+  it('only the levels named in OFF_LADDER lack a preset (#2318)', () => {
+    expect(getAllLevels().filter(l => l.preset === undefined).map(l => l.id)).toEqual(OFF_LADDER);
+  });
+
+  it('every other campaign level and the sandbox def declare a preset', () => {
     for (const level of allLevelDefs()) {
       expect(level.preset, level.id).toBeDefined();
       expect(typeof level.preset!.grade, level.id).toBe('number');
@@ -104,11 +115,11 @@ describe('LevelPreset shape (#2292)', () => {
 });
 
 describe('level presets reproduce the old explosive and tier rules (#2292)', () => {
-  it('tutorial_pit: G0 tier 1, no quest completed', () => {
-    const p = presetOf('tutorial_pit');
-    expect(p.grade).toBe(0);
-    expect(p.tier).toBe(1);
-    expect(p.completedQuests).toEqual([]);
+  it('tutorial_pit keeps its pre-ladder rules until #2318: no preset, tier 1 explosives only', () => {
+    const level = getLevel('tutorial_pit')!;
+    expect(level.preset).toBeUndefined();
+    expect(level.legacy?.manualContracts).toBe(true);
+    for (const id of level.legacy!.availableExplosives) expect(getExplosive(id)!.tier, id).toBe(1);
   });
 
   it('dusty_hollow: no explosive quest, every vehicle, building and race-car quest', () => {
@@ -246,8 +257,8 @@ describe('applyLevelPreset (#2292)', () => {
   });
 });
 
-describe('createGameForLevel opens every level on the ladder (#2292)', () => {
-  for (const level of getAllLevels()) {
+describe('createGameForLevel opens every ladder level on its preset (#2292)', () => {
+  for (const level of ladderLevels()) {
     it(`${level.id}: grade, tier and completed quests come from its preset`, () => {
       const s = createGameForLevel(unlockedCampaign(), level.id)!;
       expect(s).not.toBeNull();
@@ -272,7 +283,7 @@ describe('createGameForLevel opens every level on the ladder (#2292)', () => {
   }
 
   it('a grade-only override keeps the preset tier', () => {
-    const s = createGameForLevel(unlockedCampaign(), 'tutorial_pit', undefined, { grade: 1 })!;
+    const s = createGameForLevel(unlockedCampaign(), 'dusty_hollow', undefined, { grade: 1 })!;
     expect(s.grade!.grade).toBe(1);
     expect(s.grade!.tier).toBe(1);
   });
@@ -299,14 +310,17 @@ describe('createGameForLevel opens every level on the ladder (#2292)', () => {
   });
 });
 
-describe('tutorial preset (#2292)', () => {
-  const tutorial = () => createGameForLevel(createCampaignState(), 'tutorial_pit')!;
+describe('tutorial level while off the ladder (#2318)', () => {
+  const tutorial = () => {
+    const s = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
+    s.campaign.activeLevelId = 'tutorial_pit';
+    return s;
+  };
 
-  it('opens at G0 tier 1 with no quest completed', () => {
+  it('opens with no grade and no quest state', () => {
     const s = tutorial();
-    expect(s.grade!.grade).toBe(0);
-    expect(s.grade!.tier).toBe(1);
-    expect(s.quests!.completed).toEqual([]);
+    expect(s.grade).toBeUndefined();
+    expect(s.quests).toBeUndefined();
   });
 
   it('only tier 1 explosives are purchasable', () => {
@@ -315,36 +329,23 @@ describe('tutorial preset (#2292)', () => {
     for (const id of ids) expect(getExplosive(id)!.tier, id).toBe(1);
   });
 
-  it('automatic ore sale is on when the player has not chosen', () => {
+  it('no automatic sale or rubble clearance until the player chooses', () => {
     const s = tutorial();
-    expect(s.contracts.autoSell).toBeUndefined();
-    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(true);
+    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(false);
+    expect(autoFulfilmentEnabled(s, 'autoClearRubble')).toBe(false);
   });
 
   it('the player explicit autoSell choice wins either way', () => {
     const s = tutorial();
-    s.contracts.autoSell = false;
-    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(false);
     s.contracts.autoSell = true;
     expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(true);
-  });
-
-  it('G0 sells no stored ore automatically', () => {
-    const s = tutorial();
-    s.collectedOre['dirtite'] = 500;
-    s.collectedOre['rustite'] = 500;
-    const cash = s.cash;
-    expect(autoSellUnclaimedOre(s, s.tickCount)).toEqual([]);
-    expect(s.cash).toBe(cash);
-  });
-
-  it('autoClearRubble defaults on, as on every other level', () => {
-    expect(autoFulfilmentEnabled(tutorial(), 'autoClearRubble')).toBe(true);
+    s.contracts.autoSell = false;
+    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(false);
   });
 });
 
-describe('autoFulfilmentEnabled on every level (#2292)', () => {
-  for (const level of getAllLevels()) {
+describe('autoFulfilmentEnabled on every ladder level (#2292)', () => {
+  for (const level of ladderLevels()) {
     it(`${level.id}: automatic sale and rubble clearance default on`, () => {
       const s = createGameForLevel(unlockedCampaign(), level.id)!;
       expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(true);

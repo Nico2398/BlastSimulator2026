@@ -1308,7 +1308,7 @@ describe('Campaign level presets (#2292)', () => {
     return c;
   }
 
-  for (const level of getAllLevels()) {
+  for (const level of getAllLevels().filter(l => l.preset !== undefined)) {
     it(`campaign start ${level.id} opens at its preset grade, tier and completed quests`, () => {
       const c = unlockedCtx();
       const result = campaignStartCommand(c, [], { level: level.id });
@@ -1322,12 +1322,11 @@ describe('Campaign level presets (#2292)', () => {
     });
   }
 
-  it('the tutorial opens at G0 tier 1 with no completed quest and tier 1 explosives only', () => {
+  it('the tutorial, still off the ladder (#2318), opens with no grade and tier 1 explosives only', () => {
     const c = makeCtx();
     expect(campaignStartCommand(c, [], { level: 'tutorial_pit' }).success).toBe(true);
-    expect(c.state!.grade!.grade).toBe(0);
-    expect(c.state!.grade!.tier).toBe(1);
-    expect(c.state!.quests!.completed).toEqual([]);
+    expect(c.state!.grade).toBeUndefined();
+    expect(c.state!.quests).toBeUndefined();
     for (const id of resolveExplosivesFor(c.state!)) expect(getExplosive(id)!.tier, id).toBe(1);
   });
 
@@ -1366,7 +1365,7 @@ describe('Campaign level presets (#2292)', () => {
 
     it('grade:1 tier:2 applies both', () => {
       const c = makeCtx();
-      expect(campaignStartCommand(c, [], { level: 'tutorial_pit', grade: '1', tier: '2' }).success).toBe(true);
+      expect(campaignStartCommand(c, [], { level: 'dusty_hollow', grade: '1', tier: '2' }).success).toBe(true);
       expect(c.state!.grade!.grade).toBe(1);
       expect(c.state!.grade!.tier).toBe(2);
     });

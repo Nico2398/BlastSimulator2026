@@ -75,8 +75,8 @@ describe('explosive gate depends only on completed quests (#2292)', () => {
     expect(resolveExplosivesFor(siteWith([X2], 'no_such_level'))).toEqual(resolveExplosivesFor(siteWith([X2])));
   });
 
-  it('every level answers with the explosives its own completed quests open', () => {
-    for (const level of getAllLevels()) {
+  it('every ladder level answers with the explosives its own completed quests open', () => {
+    for (const level of getAllLevels().filter(l => l.preset !== undefined)) {
       const s = createGameForLevel(unlockedCampaign(), level.id)!;
       const completed = s.quests!.completed;
       const expected = getAllExplosives()
@@ -174,12 +174,8 @@ describe('building tier gate depends only on completed quests (#2292)', () => {
 describe('level start states gate tiers by their preset quests (#2292)', () => {
   const start = (id: string) => createGameForLevel(unlockedCampaign(), id)!;
 
-  it('the tutorial locks every explosive, vehicle and building tier above 1', () => {
-    const s = start('tutorial_pit');
-    expect(vehicleTierGate(s, 2)).not.toBeNull();
-    expect(vehicleTierGate(s, 3)).not.toBeNull();
-    expect(vehicleLock(s, 'travel_vehicle', 2)).not.toBeNull();
-    for (const type of MULTI_TIER()) expect(isBuildingTierUnlocked(s, type, 2), type).toBe(false);
+  it('the tutorial, still off the ladder (#2318), has no quest state to gate by', () => {
+    expect(start('tutorial_pit').quests).toBeUndefined();
   });
 
   for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) {
