@@ -29,7 +29,7 @@ import { iconEl, type IconName } from '../icons.js';
 import { LocaleTextRegistry } from '../localeText.js';
 import { formatMoney, formatPricePerKg, insufficientFundsText, wholeKg } from '../../core/economy/formatMoney.js';
 import { AUTO_SALE_PRICE_FACTOR } from '../../core/config/balance.js';
-import { autoFulfilmentEnabled, resolveContractOres } from '../../core/campaign/Level.js';
+import { resolveContractOres } from '../../core/campaign/Level.js';
 import { getProfitShortfall } from '../../core/campaign/LevelObjective.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import { lockedBuyerTiers, makeBuyerBadge, makeMarketStrip, type MarketStripInput } from './ContractsMarketStrip.js';
@@ -216,7 +216,7 @@ export class ContractsPanel extends PanelBase {
       history: state.contracts.completedHistory.map(c => c.id),
       neg: state.contracts.lastNegotiation,
       sel: Object.values(this.selections).map(x => `${x.filter}|${x.sort}`),
-      auto: [autoFulfilmentEnabled(state, 'autoSell'), autoFulfilmentEnabled(state, 'autoClearRubble')],
+      auto: [state.contracts.autoSell !== false, state.contracts.autoClearRubble !== false],
       grade: state.grade?.grade, heapKg: Math.round(totalSpoilRoomKg(state.buildings.buildings)),
       managerLevel: bestAvailableManagerLevel(state.employees.employees),
       market: market && {
@@ -460,7 +460,7 @@ export class ContractsPanel extends PanelBase {
 
   private makeAutoStrip(state: GameState): HTMLElement {
     const toggle = (target: 'sell' | 'rubble', key: 'autoSell' | 'autoClearRubble', labelKey: string, hintKey: string): HTMLElement => {
-      const on = autoFulfilmentEnabled(state, key);
+      const on = state.contracts[key] !== false;
       const btn = button(on ? 'primary' : 'ghost', t(on ? 'ui.contracts.auto_on' : 'ui.contracts.auto_off'), {
         dataAction: `auto-${target}-toggle`,
         onClick: () => this.gameConsole?.(`contract auto ${target} ${on ? 'off' : 'on'}`),
@@ -485,7 +485,7 @@ export class ContractsPanel extends PanelBase {
 
   private makeOreStockStrip(state: GameState): HTMLElement | null {
     const grade = state.grade?.grade;
-    const autoOn = autoFulfilmentEnabled(state, 'autoSell');
+    const autoOn = state.contracts.autoSell !== false;
     const rows = Object.entries(state.collectedOre).filter(([, kg]) => kg > 0.5).map(([oreId, kg]) => {
       const status = oreStockStatus(oreId, grade, autoOn);
       const name = getOre(oreId) ? t(getOre(oreId)!.nameKey) : oreId;

@@ -33,7 +33,7 @@ import { formatDollars, insufficientFundsText } from '../../core/economy/formatM
 import { Random } from '../../core/math/Random.js';
 import { t } from '../../core/i18n/I18n.js';
 import { requireGame, resolveContractPriceMultiplier } from './commandUtils.js';
-import { autoFulfilmentEnabled, resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
+import { resolveContractOres, resolveScriptedOreSale } from '../../core/campaign/Level.js';
 import { saturationReader, oreSaturationTrend, formatTrendPct } from '../../core/economy/OreSaturation.js';
 import { oreContractBasePrice } from '../../core/economy/Market.js';
 import { buyerTierNameKey } from '../../core/economy/BuyerTiers.js';
@@ -210,8 +210,8 @@ export function contractCommand(
       const target = args[1];
       if (target === undefined) {
         return { success: true, output: [
-          t('economy.contract.auto_line', { name: t('economy.contract.auto_sell_name'), state: t(autoFulfilmentEnabled(state, 'autoSell') ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
-          t('economy.contract.auto_line', { name: t('economy.contract.auto_rubble_name'), state: t(autoFulfilmentEnabled(state, 'autoClearRubble') ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
+          t('economy.contract.auto_line', { name: t('economy.contract.auto_sell_name'), state: t(state.contracts.autoSell !== false ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
+          t('economy.contract.auto_line', { name: t('economy.contract.auto_rubble_name'), state: t(state.contracts.autoClearRubble !== false ? 'economy.contract.auto_on' : 'economy.contract.auto_off') }),
           autoSellOresLine(state.grade?.grade),
         ].join('\n') };
       }

@@ -14,7 +14,7 @@ import { optimizerOptionsFor } from '../../../core/mining/ChargeOptimizer.js';
 import { formatMoney } from '../../../core/economy/formatMoney.js';
 import type { GameState } from '../../../core/state/GameState.js';
 import { getExplosive } from '../../../core/world/ExplosiveCatalog.js';
-import { getLevel, isExplosiveAvailableFor, legacyRulesOf } from '../../../core/campaign/Level.js';
+import { isExplosiveAvailableFor } from '../../../core/campaign/Level.js';
 import { explosiveLockedByQuest } from '../../../core/economy/Quests.js';
 
 export function chargeCommand(
@@ -71,29 +71,11 @@ export function chargeCommand(
   return { success: true, output: `Charge ordered for ${holeId}: ${explosiveId} ${result.charge.amountKg}kg, stemming ${stemming}m` };
 }
 
-/**
- * Failure when `explosiveId` is a catalog explosive the level, still on its own explosive list (#2318), does not offer.
- */
-function levelExplosiveFailure(levelId: string | null, explosiveId: string): CommandResult | null {
-  const legacy = legacyRulesOf(levelId);
-  if (!legacy || legacy.availableExplosives.includes(explosiveId)) return null;
-  return {
-    success: false,
-    output: t('mining.charge.explosive_not_available', {
-      explosive: explosiveName(explosiveId),
-      level: levelId && getLevel(levelId) ? t(getLevel(levelId)!.nameKey) : (levelId ?? ''),
-      available: legacy.availableExplosives.map(explosiveName).join(', '),
-    }),
-  };
-}
-
-/**
- * Failure when the site may not buy `explosiveId`: names the quest that opens it (#2280), or the level's own list (#2318).
- */
+/** Failure when the site may not buy `explosiveId`: names the quest that opens it (#2280). */
 export function explosiveFailure(state: GameState, explosiveId: string): CommandResult | null {
   if (!getExplosive(explosiveId) || isExplosiveAvailableFor(state, explosiveId)) return null;
   const quest = explosiveLockedByQuest(state, explosiveId);
-  if (!quest) return levelExplosiveFailure(state.campaign.activeLevelId, explosiveId);
+  if (!quest) return null;
   return {
     success: false,
     output: t('mining.charge.explosive_locked_quest', { explosive: explosiveName(explosiveId), quest: t(quest.titleKey) }),

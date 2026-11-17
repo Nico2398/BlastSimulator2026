@@ -204,7 +204,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     titleKey: 'tutorial.step_boxcut.title',
     textKey: 'tutorial.step_boxcut',
     highlightTarget: TOOLBAR_TARGET.build,
-    commands: ['build_ramp start:10,23 end:10,35 depth:6'],
+    commands: ['build_ramp start:10,23 end:10,41 depth:6'],
     waitsOnWork: true,
     // #1210: tracks the player's own ramp order(s), not NavGrid classification
     // — a pre-existing ramp elsewhere, or any other mechanism that produces a

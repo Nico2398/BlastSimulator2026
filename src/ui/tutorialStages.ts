@@ -235,7 +235,7 @@ export const REGION = {
   // dug *before* anything is blasted, so the first shot has a face to break
   // toward and a void for the rock to fall into. One line, not a corridor of
   // candidate lines: the console hint names this exact ramp.
-  boxcut: { x1: 10, z1: 23, x2: 10, z2: 35, exact: true },
+  boxcut: { x1: 10, z1: 23, x2: 10, z2: 41, exact: true },
   // Site derived from isTutorialSiteHazardClear/TUTORIAL_SITE_* — see git
   // history on this file for the stranding-class postmortems (#1008,
   // #1008-followup) this superseded. #1170: moved west of the box-cut
