@@ -6,6 +6,7 @@
 * drill_rig        — "Pokey McPoke": a shopping cart carrying a ladder mast, egg-beater drill, pencil bit.
 * building_destroyer — "Wrecking Rascal": a ride-on mower with a plank-and-nails blade, bowling-ball crane, rake ripper.
 * charging_truck  — "Pour-Bucket Pete": a blue barrel on a rusty go-kart, kitchen funnel, garden-hose coil and rose nozzle.
+* travel_vehicle   — "Rushbus Shuttle": a dented, open-sided crew minibus, every seat on show, grinning grille.
 * rock_fragmenter  — "Cracky": a wheelbarrow-cart with a see-saw sledgehammer, crate hopper, pedal-crank flywheel.
 """
 from __future__ import annotations
@@ -1175,7 +1176,99 @@ def build_charging_truck(m) -> None:
         fat_wheel(name, r, 0.24, (x, y, r), m)
 
 
+def _minibus_seat(name: str, x: float, y: float, m) -> list[bpy.types.Object]:
+    """A bench seat facing +X: cushion on the floor, backrest behind it."""
+    cushion = box(f'{name}.Cushion', (0.4, 0.38, 0.12), loc=(x, y, 0.58))
+    bevel(cushion, 0.04, 3)
+    assign(cushion, m['cream'])
+    back = box(f'{name}.Back', (0.1, 0.38, 0.46), loc=(x - 0.17, y, 0.84))
+    bevel(back, 0.04, 3)
+    assign(back, m['cream'])
+    return [cushion, back]
+
+
+def build_travel_shuttle(m) -> None:
+    """Rushbus Shuttle: a dented, cheerful crew minibus with no side walls above the belt line, so every seat
+    shows — driver up front, five passengers behind. Roof on four posts, a luggage box lashed on top,
+    a mismatched door panel, a bumper hanging by tape, headlight eyes and a toothy grin."""
+    body = []
+    floor = box('Floor', (2.8, 1.1, 0.12), loc=(0, 0, 0.42))
+    bevel(floor, 0.04, 3)
+    assign(floor, m['dark'])
+    body.append(floor)
+    hood = box('Hood', (0.7, 1.1, 0.42), loc=(1.1, 0, 0.72))
+    bevel(hood, 0.1, 4)
+    assign(hood, m['body'])
+    body.append(hood)
+    for side in (-1, 1):
+        wall = box('Belt', (1.9, 0.07, 0.34), loc=(-0.5, side * 0.535, 0.65))
+        bevel(wall, 0.03, 3)
+        assign(wall, m['body'])
+        body.append(wall)
+    tail = box('Tail', (0.1, 1.1, 0.5), loc=(-1.35, 0, 0.72))
+    bevel(tail, 0.04, 3)
+    assign(tail, m['body'])
+    body.append(tail)
+    # Mismatched replacement door panel and a dent.
+    body.append(rust_patch('Door.Panel', (0.55, 0.02, 0.28), (-0.15, 0.58, 0.65), m))
+    body.append(rust_patch('Dent', (0.4, 0.02, 0.2), (-0.9, -0.58, 0.68), m))
+    # Cheerful face: headlight eyes and a toothy grin.
+    for side in (-1, 1):
+        eye = sphere('Head.Eye', 0.1, loc=(1.42, side * 0.33, 0.8), scale=(0.6, 1, 1), segments=14, rings=8)
+        assign(eye, m['lamp'])
+        body.append(eye)
+    grin = box('Grin', (0.06, 0.62, 0.1), loc=(1.46, 0, 0.55))
+    bevel(grin, 0.025, 2)
+    assign(grin, m['dark'])
+    body.append(grin)
+    for i in range(4):
+        tooth = box('Grin.Tooth', (0.07, 0.09, 0.07), loc=(1.48, -0.21 + i * 0.14, 0.56))
+        assign(tooth, m['white'])
+        body.append(tooth)
+    # The bumper sags, held on by duct tape.
+    bumper = box('Bumper', (0.14, 1.2, 0.14), loc=(1.5, 0, 0.4), rot=(0, math.radians(5), 0))
+    bevel(bumper, 0.05, 3)
+    assign(bumper, m['steel'])
+    body.append(bumper)
+    body.append(tape_band('Bumper.Tape', 0.08, (1.45, 0.4, 0.44), axis='Y', width=0.1, m=m))
+    # Windscreen and roof on four posts.
+    screen = box('Windscreen', (0.05, 1.0, 0.4), loc=(0.72, 0, 1.12), rot=(0, math.radians(-14), 0))
+    bevel(screen, 0.015, 2)
+    assign(screen, m['glass'])
+    body.append(screen)
+    for x in (0.72, -1.3):
+        for side in (-1, 1):
+            post = cylinder('Post', 0.045, 0.86, loc=(x, side * 0.52, 0.93), segments=10)
+            assign(post, m['body'])
+            body.append(post)
+    roof = box('Roof', (2.2, 1.24, 0.09), loc=(-0.3, 0, 1.4))
+    bevel(roof, 0.04, 3)
+    assign(roof, m['body'])
+    body.append(roof)
+    luggage = box('Luggage', (0.6, 0.6, 0.12), loc=(-0.6, 0.05, 1.5), rot=(0, 0, math.radians(8)))
+    bevel(luggage, 0.04, 3)
+    assign(luggage, m['wood'])
+    body.append(luggage)
+    for dx in (-0.2, 0.2):
+        rope = box('Luggage.Rope', (0.04, 0.64, 0.14), loc=(-0.6 + dx, 0.05, 1.5), rot=(0, 0, math.radians(8)))
+        assign(rope, m['rope'])
+        body.append(rope)
+    # Seats: the driver in front, then two benches of two, then a back row of two.
+    body += _minibus_seat('DriverSeat', 0.4, 0.28, m)
+    for i, (x, y) in enumerate(((0.4, -0.28), (-0.15, 0.28), (-0.15, -0.28), (-0.7, 0.28), (-0.7, -0.28)), 1):
+        body += _minibus_seat(f'PassengerSeat{i}', x, y, m)
+    wheelbar = torus('Steering', 0.12, 0.02, loc=(0.62, 0.28, 0.98), rot=(0, math.radians(60), 0),
+                     major_segments=16, minor_segments=6)
+    assign(wheelbar, m['plastic'])
+    body.append(wheelbar)
+    pivot('Body', (0, 0, 0), body)
+    for name, x, y in (('WheelFL', 0.95, 0.63), ('WheelFR', 0.95, -0.63),
+                       ('WheelRL', -0.95, 0.63), ('WheelRR', -0.95, -0.63)):
+        fat_wheel(name, 0.3, 0.22, (x, y, 0.3), m)
+
+
 BUILDERS = {
+    'travel_vehicle': build_travel_shuttle,
     'debris_hauler': build_debris_hauler,
     'rock_digger': build_rock_digger,
     'drill_rig': build_drill_rig,
@@ -1186,6 +1279,7 @@ BUILDERS = {
 
 
 BODY_PAINT = {
+    'travel_vehicle': 0xE8B93A,      # tired school-bus yellow
     'debris_hauler': 0x5C7A3A,       # municipal-skip green
     'rock_digger': 0x5C7B9A,         # faded wheelbarrow blue
     'drill_rig': 0x8A8F96,           # shopping-cart zinc

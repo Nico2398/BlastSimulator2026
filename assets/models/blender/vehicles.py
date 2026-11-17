@@ -5,6 +5,7 @@ real windows. `TintBody` is the Caterpillar-yellow paint the game recolours
 per instance. Nodes the runtime animates: Wheel* (spin on the Y axis while
 moving), plus role-specific ones (Bed, Boom, Mast, Blade…).
 
+travel_vehicle — Zoom-Zoom Race Car: garish single-seat racer, one driver seat, tail spoiler, sponsor stickers (tier 2 only).
 charging_truck — bulk-emulsion tank truck: round tank behind a cab, swing boom with a hose and nozzle.
 """
 from __future__ import annotations
@@ -19,6 +20,8 @@ from common import (
 )
 
 ROLES = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck']
+# Roles sold in two tiers only (tier 1 in vehicles_t1.py, tier 2 here): the travel vehicle, shuttle then race car.
+TWO_TIER_ROLES = ['travel_vehicle']
 
 
 def _materials() -> dict[str, bpy.types.Material]:
@@ -685,7 +688,94 @@ def hydraulic(name: str, a: Vector, b: Vector, radius: float, m) -> list[bpy.typ
     return [barrel, rod]
 
 
+SPONSORS = (0xE8232B, 0x1F5FD6, 0x2BBF4A, 0xF03CC8, 0xFFFFFF)
+
+
+def build_travel_race_car(m) -> None:
+    """Zoom-Zoom Race Car: a garish single-seat racer. Open cockpit with one bucket seat, pointed nose, tail
+    wing on struts, covered in mismatched sponsor stickers and a big number roundel."""
+    spons = [material(f'Sponsor{i}', c, roughness=0.5) for i, c in enumerate(SPONSORS)]
+    body = []
+    tub = box('Tub', (1.5, 0.62, 0.3), loc=(0, 0, 0.38))
+    bevel(tub, 0.08, 4)
+    assign(tub, m['body'])
+    body.append(tub)
+    nose = capsule('Nose', 0.2, 1.1, loc=(0.95, 0, 0.36), axis='X', segments=20, rings=10)
+    assign(nose, m['body'])
+    body.append(nose)
+    cone = cylinder('Nose.Tip', 0.2, 0.5, loc=(1.5, 0, 0.3), axis='X', segments=20, radius2=0.07)
+    assign(cone, m['red'])
+    body.append(cone)
+    engine = capsule('Engine', 0.24, 1.0, loc=(-0.85, 0, 0.5), axis='X', segments=20, rings=10)
+    assign(engine, m['body'])
+    body.append(engine)
+    for side in (-1, 1):
+        pod = box('Pod', (1.0, 0.3, 0.28), loc=(-0.05, side * 0.46, 0.34))
+        bevel(pod, 0.1, 4)
+        assign(pod, m['red'])
+        body.append(pod)
+        intake = box('Pod.Intake', (0.04, 0.22, 0.18), loc=(0.46, side * 0.46, 0.36))
+        assign(intake, m['dark'])
+        body.append(intake)
+    # The lone driver seat: bucket, backrest and headrest.
+    cushion = box('DriverSeat.Cushion', (0.4, 0.38, 0.1), loc=(-0.05, 0, 0.55))
+    bevel(cushion, 0.04, 3)
+    assign(cushion, m['stripe'])
+    back = box('DriverSeat.Back', (0.1, 0.4, 0.4), loc=(-0.3, 0, 0.66))
+    bevel(back, 0.04, 3)
+    assign(back, m['stripe'])
+    head = sphere('DriverSeat.Head', 0.09, loc=(-0.3, 0, 0.78), segments=12, rings=8)
+    assign(head, m['stripe'])
+    body += [cushion, back, head]
+    hoop = torus('RollHoop', 0.2, 0.03, loc=(-0.45, 0, 0.6), rot=(math.radians(90), 0, 0),
+                 major_segments=18, minor_segments=6)
+    assign(hoop, m['chrome'])
+    body.append(hoop)
+    wheelbar = torus('Steering', 0.1, 0.02, loc=(0.3, 0, 0.62), rot=(0, math.radians(60), 0),
+                     major_segments=14, minor_segments=6)
+    assign(wheelbar, m['dark'])
+    body.append(wheelbar)
+    # Wings: a low front wing and a tall rear spoiler on struts with endplates.
+    fwing = box('FrontWing', (0.28, 1.35, 0.05), loc=(1.45, 0, 0.14))
+    bevel(fwing, 0.02, 2)
+    assign(fwing, m['red'])
+    body.append(fwing)
+    spoiler = box('Spoiler.Wing', (0.34, 1.2, 0.05), loc=(-1.4, 0, 0.8))
+    bevel(spoiler, 0.02, 2)
+    assign(spoiler, m['red'])
+    body.append(spoiler)
+    for side in (-1, 1):
+        plate = box('Spoiler.Plate', (0.4, 0.04, 0.24), loc=(-1.4, side * 0.6, 0.78))
+        bevel(plate, 0.015, 2)
+        assign(plate, m['stripe'])
+        body.append(plate)
+        strut = box('Spoiler.Strut', (0.05, 0.05, 0.36), loc=(-1.32, side * 0.2, 0.62))
+        assign(strut, m['dark'])
+        body.append(strut)
+    # Sponsor stickers on both flanks, the bonnet and the wing, plus a number roundel.
+    for i, (x, w) in enumerate(((0.5, 0.4), (0.05, 0.3), (-0.55, 0.36), (-1.0, 0.3))):
+        for side in (-1, 1):
+            st = box('Sticker', (w, 0.02, 0.13), loc=(x, side * 0.615, 0.44 + 0.02 * ((i + side) % 2)))
+            assign(st, spons[(i + (side > 0)) % len(spons)])
+            body.append(st)
+    for i, (x, y) in enumerate(((0.95, 0.0), (1.2, 0.0))):
+        st = box('Sticker.Hood', (0.22, 0.26 - 0.08 * i, 0.02), loc=(x, y, 0.565 - 0.05 * i))
+        assign(st, spons[(i + 2) % len(spons)])
+        body.append(st)
+    wing_st = box('Sticker.Wing', (0.2, 0.5, 0.012), loc=(-1.4, 0, 0.83))
+    assign(wing_st, spons[4])
+    body.append(wing_st)
+    roundel = cylinder('Number', 0.14, 0.03, loc=(0.0, 0.64, 0.5), axis='Y', segments=20)
+    assign(roundel, spons[4])
+    body.append(roundel)
+    pivot('Body', (0, 0, 0), body)
+    for name, x, y, r, w in (('WheelFL', 0.95, 0.62, 0.28, 0.3), ('WheelFR', 0.95, -0.62, 0.28, 0.3),
+                             ('WheelRL', -0.95, 0.62, 0.3, 0.34), ('WheelRR', -0.95, -0.62, 0.3, 0.34)):
+        wheel(name, r, w, (x, y, r), m)
+
+
 BUILDERS = {
+    'travel_vehicle': build_travel_race_car,
     'debris_hauler': build_debris_hauler,
     'rock_digger': build_rock_digger,
     'drill_rig': build_drill_rig,
