@@ -74,8 +74,8 @@ describe('Level 1 — Win (debug command, bare site)', () => {
     ctx.state!.cash += TRUCK_CHARGING_PAYROLL_HEADROOM;
     ctx.state!.finances.cash = ctx.state!.cash;
 
-    // Perform a blast at (10,10)
-    const blastOutput = performBlast(ctx, 10, 10);
+    // Perform a blast at (20,20): ground the rig reaches under the progression slope limit (#2292)
+    const blastOutput = performBlast(ctx, 20, 20);
     expect(blastOutput).toContain('BLAST REPORT');
     // Wait a few ticks
     tickWithEvents(ctx, 5);

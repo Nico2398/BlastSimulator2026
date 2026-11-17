@@ -16,8 +16,10 @@ import { ensureScriptedOreSale, generateContracts } from '../../core/economy/Con
 import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
 import { resolveContractOres } from '../../core/campaign/Level.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
-import { sanitizeFiniteOverride, parseOptionalStaffedFlag, staffedSuffix } from './commandUtils.js';
+import { sanitizeFiniteOverride, parseOptionalStaffedFlag, parseLadderStart, staffedSuffix } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
+import { vehicleMaxSlopeRatio } from '../../core/entities/Vehicle.js';
+import { extraContractOffers } from '../../core/economy/MineGrade.js';
 import { mergeCampaignIntoProfile, resetCampaignProfile } from '../../persistence/CampaignProfile.js';
 import type { GameState } from '../../core/state/GameState.js';
 
@@ -152,7 +154,13 @@ export function campaignStartCommand(
   // Absent: the level's own site. true: the global staffed roster. false: bare.
   const startingSite = resolveStartingSite(target?.startingSite, flags.staffed);
 
-  const newState = createGameForLevel(campaign, levelId, flags.staffed);
+  // `grade:N` / `tier:M`, as `sandbox start` takes them: the level's preset, started further up the ladder.
+  const ladder = parseLadderStart(named);
+  if (ladder.error) {
+    return { success: false, output: ladder.error };
+  }
+
+  const newState = createGameForLevel(campaign, levelId, flags.staffed, ladder.start);
   if (!newState) {
     const lvl = getLevel(levelId);
     if (!lvl) return { success: false, output: t('campaign.start_unknown_level', { levelId }) };
@@ -194,6 +202,8 @@ export function campaignStartCommand(
     ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
     ...(level.oreGradeScale !== undefined ? { oreGradeScale: level.oreGradeScale } : {}),
     startingCrew: true,
+    // A ladder site's vehicles climb the one vehicle limit, so the spawn pad is planned for it (#2044, #2045).
+    ...(ctx.state.grade ? { vehicleSlopeRatio: vehicleMaxSlopeRatio(true) } : {}),
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
     ...(level.rallyPoint ? { rallyPoint: level.rallyPoint } : {}),
     ...(level.startingBuildingsNear ? { startingBuildingsNear: level.startingBuildingsNear } : {}),
@@ -204,7 +214,7 @@ export function campaignStartCommand(
 
   // Generate initial contracts so they're available immediately
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
-  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state), ctx.state.grade?.grade);
+  generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state), ctx.state.grade?.grade, undefined, extraContractOffers(ctx.state.grade));
   ensureScriptedOreSale(ctx.state.contracts, level.scriptedOreSale, level.contractPriceMultiplier);
 
   // Report the cash actually in hand, not the level default — an override that

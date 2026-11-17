@@ -175,10 +175,10 @@ describe('post-blast stability hook (#1941)', () => {
     expect(findOverheightFaces(gridSurface(rig.grid), { minX: rig.pit.minX - 2, maxX: rig.pit.maxX + 2, minZ: rig.pit.minZ - 2, maxZ: rig.pit.maxZ + 2 }).length).toBeGreaterThan(0);
   });
 
-  it('campaign level dusty_hollow: the same overheight wall never slumps', () => {
+  it('campaign level dusty_hollow is on the ladder (#2292): the same overheight wall slumps', () => {
     const rig = blastBesidePit('campaign start level:dusty_hollow staffed:true');
-    expect(rig.state.grade).toBeUndefined();
-    expect(rig.slumps).toEqual([]);
+    expect(rig.state.grade).toBeDefined();
+    expect(rig.slumps.length).toBeGreaterThan(0);
   });
 });
 

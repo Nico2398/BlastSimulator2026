@@ -13,7 +13,7 @@ import type { VoxelGrid } from '../../../src/core/world/VoxelGrid.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { permitLimitsFor } from '../../../src/core/economy/PermitLimits.js';
-import { resolveAvailableExplosives } from '../../../src/core/campaign/Level.js';
+import { resolveExplosivesFor } from '../../../src/core/campaign/Level.js';
 import { mixedRockGrid, mixedRockHoles, gridFingerprint } from '../../helpers/optimizerFixtures.js';
 import { setHoleWater } from '../../helpers/holeWater.js';
 
@@ -356,14 +356,14 @@ describe('optimizerOptionsFor', () => {
   it('offers the active level\'s explosives, and no stemming: the optimizer sweeps it per hole', () => {
     const state = stateWithHoles();
     const options = optimizerOptionsFor(state);
-    expect(options.explosiveIds).toEqual(resolveAvailableExplosives(state.campaign.activeLevelId));
+    expect(options.explosiveIds).toEqual(resolveExplosivesFor(state));
     expect(options).not.toHaveProperty('stemmingM');
   });
 
   it('follows a level that offers fewer explosives', () => {
     const state = stateWithHoles();
     state.campaign.activeLevelId = 'tutorial_pit';
-    expect(optimizerOptionsFor(state).explosiveIds).toEqual(resolveAvailableExplosives('tutorial_pit'));
+    expect(optimizerOptionsFor(state).explosiveIds).toEqual(resolveExplosivesFor(state));
     expect(optimizerOptionsFor(state).explosiveIds.length).toBeLessThan(ALL_IDS.length);
   });
 

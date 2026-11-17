@@ -21,7 +21,7 @@ import {
   recordSandboxStarterSurvey,
 } from '../../../src/core/campaign/Sandbox.js';
 import { isValidOreGradeScale } from '../../../src/core/economy/OreGrade.js';
-import { getLevel, getAllLevels } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels, applyLevelPreset, resolveExplosivesFor } from '../../../src/core/campaign/Level.js';
 import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { DEFAULT_GRID_SIZE, SANDBOX_DATUM, DUSTY_HOLLOW_STARTING_SITE, SANDBOX_DIGGER_KIT_DRIVER, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SANDBOX_ORE_GRADE_SCALE, ORE_GRADE_SCALE_DEFAULT } from '../../../src/core/config/balance.js';
@@ -226,9 +226,11 @@ describe('sandboxLevelDef', () => {
     }
   });
 
-  it('grants the full explosive catalog, never a partial list', () => {
+  it('starts with the tier 1 explosives; the quests open the rest (#2292)', () => {
     const level = sandboxLevelDef(clampSandboxConfig({}));
-    expect(level.availableExplosives).toEqual(getAllExplosives().map(e => e.id));
+    const state = createGame({ seed: 1 });
+    applyLevelPreset(state, level.preset);
+    expect(resolveExplosivesFor(state)).toEqual(getAllExplosives().filter(e => e.tier === 1).map(e => e.id));
   });
 
   it('is deterministic — the same config always yields the same level', () => {

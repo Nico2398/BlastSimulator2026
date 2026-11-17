@@ -3,11 +3,12 @@
 // 4 levels with progressive difficulty — Human approved names, descriptions, and curve.
 
 import type { GameState } from '../state/GameState.js';
-import { explosiveLockedByQuest } from '../economy/Quests.js';
+import { createQuestState, explosiveLockedByQuest } from '../economy/Quests.js';
+import { createGradeState } from '../economy/MineGrade.js';
 import type { WeatherState } from '../weather/WeatherCycle.js';
 import { factorFor } from '../events/ActiveModifiers.js';
 import { getAllExplosives } from '../world/ExplosiveCatalog.js';
-import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_CASH, SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD, SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape } from '../config/balance.js';
+import { ORE_PRICES, TUTORIAL_HIRING_SCRIPT, TUTORIAL_ORE_SALE_OFFER, type ScriptedCandidate, type ScriptedOreSaleOffer, TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE, GRUMPSTONE_RIDGE_STARTING_SITE, TRERANIUM_DEPTHS_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_CASH, SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD, SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE, TUTORIAL_STARTING_SITE, TUTORIAL_RALLY_POINT, TUTORIAL_STARTING_BUILDINGS_NEAR, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, type StartingSiteComposition, type PitMaskShape, MINE_LAST_NAMED_GRADE } from '../config/balance.js';
 import { oresOfPermitGrade } from '../world/OreCatalog.js';
 import type { BoardConfig } from '../economy/Board.js';
 import type { MarketId } from '../economy/Market.js';
@@ -46,8 +47,6 @@ export interface LevelDef {
   gridZ: number;
   /** Starting cash in dollars. */
   startingCash: number;
-  /** Explosive IDs available at this level (subset of catalog). */
-  availableExplosives: string[];
   /**
    * Cumulative profit needed to complete the level (unlock threshold).
    * Real open-pit quarry profitability: ~$1–10 per ton, we scale to game units.
@@ -89,18 +88,58 @@ export interface LevelDef {
   hiringScript?: readonly ScriptedCandidate[];
   /** Fixed ore-sale offer guaranteed on the contract board; omitted = none (#1600). */
   scriptedOreSale?: ScriptedOreSaleOffer;
-  /** True when the level teaches contracts by hand: automatic ore sales and rubble clearances default off (#2145). */
-  manualContracts?: boolean;
   /** Market pricing this level; omitted = 'legacy' (#1681). */
   market?: MarketId;
-  /** Turns the mine-grade progression ladder on; omitted = off (#1921). */
-  progression?: boolean;
+  /** Where the site starts on the ladder: grade, tier and the quests already completed (#2292). */
+  preset?: LevelPreset;
+  /** Pre-ladder rules a level not yet on the ladder keeps: no grade, no quests (tutorial only, TODO(#2318)). */
+  legacy?: LegacyLevelRules;
+}
+
+/** The rules a level off the ladder keeps until #2318: its own explosive list and manual contracts. */
+export interface LegacyLevelRules {
+  availableExplosives: readonly string[];
+  manualContracts: boolean;
+}
+
+/** A level's start on the one progression ladder (#2292). */
+export interface LevelPreset {
+  grade: number;
+  tier: 1 | 2 | 3;
+  completedQuests: readonly string[];
+}
+
+/** Start grade/tier a console command may pin over a level's preset. */
+export interface LadderStartOverride {
+  grade?: number;
+  tier?: number;
+}
+
+/** Give `state` its grade and quest state from `preset`, with `override` pinning grade and/or tier (#2292). */
+export function applyLevelPreset(state: GameState, preset: LevelPreset, override?: LadderStartOverride): void {
+  const grade = createGradeState();
+  grade.grade = override?.grade ?? preset.grade;
+  // Endless classes past the last named grade have one tier.
+  grade.tier = override?.tier !== undefined && grade.grade <= MINE_LAST_NAMED_GRADE ? override.tier : preset.tier;
+  state.grade = grade;
+  const quests = createQuestState();
+  quests.completed = [...preset.completedQuests];
+  state.quests = quests;
 }
 
 /** Market of the active level; 'legacy' by default (#1681). */
 export function resolveMarketId(state: GameState): MarketId {
   return state.contracts.market ?? 'legacy';
 }
+
+// ── Presets (#2292): where each level starts on the one ladder ──
+
+const EXPLOSIVE_T2: readonly string[] = ['quest_explosive_t2'];
+const EXPLOSIVE_T3: readonly string[] = ['quest_explosive_t2', 'quest_explosive_t3'];
+/** Every vehicle and building tier quest (and the race car): the old ungated fleet and building tiers. */
+const FLEET_AND_BUILDING_QUESTS: readonly string[] = [
+  'quest_vehicle_t2', 'quest_vehicle_t3', 'quest_building_t2', 'quest_building_t3', 'quest_race_car',
+];
 
 // ── Level catalog ──
 
@@ -112,9 +151,10 @@ const LEVELS: readonly LevelDef[] = [
     // No events. Bonus contracts. Player-proof score decay.
     // ────────────────────────────────────────────────────────
     id: 'tutorial_pit',
+    // TODO(#2318): the tutorial's scenarios and ramp region are not yet G0 rules; it keeps the pre-ladder rules until they are.
+    legacy: { availableExplosives: ['pop_rock', 'boomite'], manualContracts: true },
     hiringScript: TUTORIAL_HIRING_SCRIPT,       // Same four hires on every run (#1600)
     scriptedOreSale: TUTORIAL_ORE_SALE_OFFER,   // sell-ore never waits on the random board (#1600)
-    manualContracts: true,                      // the scripted ore sale teaches contracts: no automatic selling (#2145)
     startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
     rallyPoint: TUTORIAL_RALLY_POINT,                       // Flat plateau, clear of the blast and the building pins
     startingBuildingsNear: TUTORIAL_STARTING_BUILDINGS_NEAR, // The heap on flat ground west of the box cut, clear of the blast
@@ -172,7 +212,6 @@ const LEVELS: readonly LevelDef[] = [
     // #1895: bumped $400,000 -> $500,000 for the payroll a charge order's delivery wait
     // idled away; the wait is gone (#2143) and the margin is left unchanged.
     startingCash: 500000,
-    availableExplosives: ['pop_rock', 'boomite'],
     // #2154: retuned with TUTORIAL_CONTRACT_PRICE_MULTIPLIER after the warehouse step left
     // the guided part: its first sale earns ~$48,000 of operating profit, under this
     // threshold, while free play still reaches it and one winning offer exists.
@@ -192,6 +231,7 @@ const LEVELS: readonly LevelDef[] = [
     // Opens staffed and equipped, with a warehouse and a spoil heap (DUSTY_HOLLOW_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'dusty_hollow',
+    preset: { grade: 0, tier: 1, completedQuests: FLEET_AND_BUILDING_QUESTS },
     nameKey: 'level.dusty_hollow.name',
     descKey: 'level.dusty_hollow.desc',
     biome: 'desert_badlands',
@@ -201,7 +241,6 @@ const LEVELS: readonly LevelDef[] = [
     datum: 22,
     gridZ: 96,
     startingCash: 50000,
-    availableExplosives: ['pop_rock', 'boomite', 'krackle'],
     // Unlock threshold: $80k of operating profit (income minus running costs;
     // capital purchases do not count).
     unlockThreshold: 80000,
@@ -220,6 +259,7 @@ const LEVELS: readonly LevelDef[] = [
     // Opens with a free crew, fleet, rock digger, warehouse and spoil heap (GRUMPSTONE_RIDGE_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'grumpstone_ridge',
+    preset: { grade: 0, tier: 1, completedQuests: [...EXPLOSIVE_T2, ...FLEET_AND_BUILDING_QUESTS] },
     nameKey: 'level.grumpstone_ridge.name',
     descKey: 'level.grumpstone_ridge.desc',
     biome: 'alpine_granite',
@@ -232,7 +272,6 @@ const LEVELS: readonly LevelDef[] = [
     // walking and driving before the first hole is done, so the first sale lands ~tick 720 with cash ~$180k below
     // the start. The old $75k (no free crew then) cannot carry that payroll; $210k leaves ~$30k spare.
     startingCash: 210000,
-    availableExplosives: ['pop_rock', 'boomite', 'krackle', 'big_bada_boom', 'shatternite'],
     // Unlock threshold: $250k. Real mountain quarry margins are tighter.
     unlockThreshold: 250000,
     eventFreqMultiplier: 1.0,    // Normal event rate
@@ -252,6 +291,7 @@ const LEVELS: readonly LevelDef[] = [
     // Opens with a free crew, fleet, rock digger, warehouse and spoil heap (TRERANIUM_DEPTHS_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'treranium_depths',
+    preset: { grade: 0, tier: 1, completedQuests: [...EXPLOSIVE_T3, ...FLEET_AND_BUILDING_QUESTS] },
     nameKey: 'level.treranium_depths.name',
     descKey: 'level.treranium_depths.desc',
     biome: 'tropical_karst',
@@ -263,11 +303,6 @@ const LEVELS: readonly LevelDef[] = [
     // $125k (#1672): first sale lands ~tick 420 (deep ore needs 24 m holes of obliviax), ~$104k below the start;
     // 100k dipped under zero just before the sale. The margin is the ~$21k a fumbled first shot costs.
     startingCash: 125000,
-    availableExplosives: [
-      'pop_rock', 'boomite', 'krackle',
-      'big_bada_boom', 'shatternite', 'rumblox',
-      'obliviax', 'dynatomics',
-    ],
     // Unlock threshold: $800k. Rare-earth margins are high but so are costs.
     unlockThreshold: 800000,
     eventFreqMultiplier: 2.0,    // Frequent chaos
@@ -286,6 +321,7 @@ const LEVELS: readonly LevelDef[] = [
     // Opens with the digger kit plus a tier-1 freight warehouse (SHAREHOLDER_SUMMIT_STARTING_SITE).
     // ────────────────────────────────────────────────────────
     id: 'shareholder_summit',
+    preset: { grade: 0, tier: 1, completedQuests: EXPLOSIVE_T3 },
     nameKey: 'level.shareholder_summit.name',
     descKey: 'level.shareholder_summit.desc',
     biome: 'volcanic_flats',
@@ -295,11 +331,6 @@ const LEVELS: readonly LevelDef[] = [
     datum: 35,
     gridZ: 160,
     startingCash: SHAREHOLDER_SUMMIT_STARTING_CASH,
-    availableExplosives: [
-      'pop_rock', 'boomite', 'krackle',
-      'big_bada_boom', 'shatternite', 'rumblox',
-      'obliviax', 'dynatomics',
-    ],
     unlockThreshold: SHAREHOLDER_SUMMIT_PROFIT_TARGET,
     eventFreqMultiplier: 2.0,
     contractPriceMultiplier: SHAREHOLDER_SUMMIT_CONTRACT_PRICE_MULTIPLIER,
@@ -309,7 +340,6 @@ const LEVELS: readonly LevelDef[] = [
     oreDeposits: true,
     oreGradeScale: SANDBOX_ORE_GRADE_SCALE,
     market: SANDBOX_MARKET,
-    progression: true,
     board: SHAREHOLDER_SUMMIT_BOARD,
     startingSite: SHAREHOLDER_SUMMIT_STARTING_SITE,
   },
@@ -372,35 +402,16 @@ function siteYieldedOres(state: GameState): readonly string[] {
   return yields(siteRockIds(generated.dominantRocks, world.mixedRockHardness ?? false));
 }
 
-/**
- * Explosive ids purchasable/usable at the given level. Null or unknown level
- * id (sandbox) yields the full catalog; a known level yields its
- * `availableExplosives` filtered by catalog membership.
- */
-export function resolveAvailableExplosives(activeLevelId: string | null): readonly string[] {
-  const all = getAllExplosives().map(e => e.id);
-  const level = activeLevelId ? getLevel(activeLevelId) : undefined;
-  if (!level) return all;
-  return level.availableExplosives.filter(id => all.includes(id));
-}
-
-/**
- * Explosive ids the site may buy. A progression site (quests, #2280) offers tier 1 plus the tiers its completed
- * quests opened; any other site keeps its level's `availableExplosives`.
- */
+/** Explosive ids the site may buy: tier 1 plus the tiers its completed quests opened. */
 export function resolveExplosivesFor(state: Pick<GameState, 'quests' | 'campaign'>): readonly string[] {
-  if (!state.quests) return resolveAvailableExplosives(state.campaign.activeLevelId);
+  const legacy = state.quests ? undefined : legacyRulesOf(state.campaign.activeLevelId);
+  if (legacy) return legacy.availableExplosives;
   return getAllExplosives().filter(e => explosiveLockedByQuest(state, e.id) === null).map(e => e.id);
 }
 
 /** True when the site may use `explosiveId` (`resolveExplosivesFor`). */
 export function isExplosiveAvailableFor(state: Pick<GameState, 'quests' | 'campaign'>, explosiveId: string): boolean {
   return resolveExplosivesFor(state).includes(explosiveId);
-}
-
-/** True when `explosiveId` may be used at the given level. */
-export function isExplosiveAvailable(activeLevelId: string | null, explosiveId: string): boolean {
-  return resolveAvailableExplosives(activeLevelId).includes(explosiveId);
 }
 
 /** The active level's scripted hiring pool, or undefined for seeded candidates (#1600). */
@@ -415,10 +426,14 @@ export function resolveScriptedOreSale(state: GameState): ScriptedOreSaleOffer |
   return levelId ? getLevel(levelId)?.scriptedOreSale : undefined;
 }
 
-/** Whether an automatic contract behaviour is on: the player's explicit choice, else the level's default (#2145). */
+/** Whether an automatic contract behaviour is on: the player's explicit choice, else on, except where a level not yet on the ladder asks for manual contracts (#2318). */
 export function autoFulfilmentEnabled(state: GameState, key: 'autoSell' | 'autoClearRubble'): boolean {
   const explicit = state.contracts[key];
   if (explicit !== undefined) return explicit;
-  const levelId = state.campaign.activeLevelId;
-  return !(levelId && getLevel(levelId)?.manualContracts);
+  return !legacyRulesOf(state.campaign.activeLevelId)?.manualContracts;
+}
+
+/** The pre-ladder rules of a level that keeps them (#2318); undefined on the ladder and for no level. */
+export function legacyRulesOf(levelId: string | null): LegacyLevelRules | undefined {
+  return levelId ? getLevel(levelId)?.legacy : undefined;
 }

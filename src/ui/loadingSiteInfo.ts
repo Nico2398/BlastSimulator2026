@@ -1,7 +1,9 @@
 // BlastSimulator2026 — Loading screen content (eyebrow/subtitle/briefing) builders.
 // Pure: level data in, LoadingSiteInfo out, so the briefing rows are unit-testable.
 
-import type { LevelDef } from '../core/campaign/Level.js';
+import { resolveExplosivesFor, type LevelDef } from '../core/campaign/Level.js';
+import { createQuestState } from '../core/economy/Quests.js';
+import type { GameState } from '../core/state/GameState.js';
 import { sandboxLevelDef, type SandboxConfig } from '../core/campaign/Sandbox.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 import type { LoadingBriefingRow, LoadingSiteInfo } from './LoadingScreen.js';
@@ -20,11 +22,18 @@ const BIOME_CATEGORY_KEY: Record<string, string> = {
 };
 const DEFAULT_BIOME_CATEGORY_KEY = 'ui.portfolio.biome.mountain';
 
+/** Explosives a level opens with: its own list while off the ladder, else tier 1 plus its preset quests' tiers. */
+function explosiveCount(level: LevelDef): number {
+  if (level.legacy) return level.legacy.availableExplosives.length;
+  const completed = level.preset ? [...level.preset.completedQuests] : [];
+  return resolveExplosivesFor({ quests: { ...createQuestState(), completed }, campaign: { activeLevelId: null } as GameState['campaign'] }).length;
+}
+
 /** Briefing rows every site shows: starting cash, then available explosives. */
 function briefingBase(level: LevelDef): LoadingBriefingRow[] {
   return [
     { labelKey: 'loading.brief.starting_cash', value: `$${formatMoney(level.startingCash)}` },
-    { labelKey: 'loading.brief.explosives', value: String(level.availableExplosives.length) },
+    { labelKey: 'loading.brief.explosives', value: String(explosiveCount(level)) },
   ];
 }
 

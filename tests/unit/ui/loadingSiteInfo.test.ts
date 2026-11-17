@@ -40,7 +40,7 @@ describe('loadingSiteInfo briefing', () => {
 
   it('explosives row counts available explosives', () => {
     const base = getAllLevels()[0]!;
-    const level = { ...base, availableExplosives: base.availableExplosives.slice(0, 1) };
+    const level = { ...base, legacy: { availableExplosives: ['pop_rock'], manualContracts: false } };
     const row = (buildLoadingSiteInfo(level).briefing ?? []).find(r => r.labelKey === 'loading.brief.explosives');
     expect(row?.value).toBe('1');
   });

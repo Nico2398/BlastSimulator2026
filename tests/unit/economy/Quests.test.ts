@@ -23,7 +23,7 @@ import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
-import { resolveExplosivesFor, isExplosiveAvailableFor, resolveAvailableExplosives } from '../../../src/core/campaign/Level.js';
+import { getLevel, resolveExplosivesFor, isExplosiveAvailableFor, legacyRulesOf } from '../../../src/core/campaign/Level.js';
 import { getAllExplosives, explosivesOfTier } from '../../../src/core/world/ExplosiveCatalog.js';
 import { optimizerOptionsFor } from '../../../src/core/mining/ChargeOptimizer.js';
 import { autoChargeHole, chargePatternHoles } from '../../../src/core/mining/ChargeOrder.js';
@@ -853,19 +853,20 @@ describe('explosive availability on progression and other sites (#2280 C7)', () 
     expect([...resolveExplosivesFor(s)].sort()).toEqual(ids(getAllExplosives()).sort());
   });
 
-  it('the progression site ignores the level availableExplosives list', () => {
+  it('the progression site ignores a legacy level list', () => {
     const s = questSite();
     s.campaign.activeLevelId = null;
     expect([...resolveExplosivesFor(s)].sort()).toEqual(ids(explosivesOfTier(1)).sort());
   });
 
-  it('a non-progression site keeps its level list', () => {
+  it('a bare site opens the full catalog, except a tutorial that keeps its own list (#2318)', () => {
     const s = createGame({ seed: 42, mineType: 'desert' });
     s.campaign.activeLevelId = 'dusty_hollow';
-    expect([...resolveExplosivesFor(s)]).toEqual([...resolveAvailableExplosives('dusty_hollow')]);
-    s.campaign.activeLevelId = null;
-    expect([...resolveExplosivesFor(s)]).toEqual([...resolveAvailableExplosives(null)]);
     expect(resolveExplosivesFor(s)).toHaveLength(getAllExplosives().length);
+    s.campaign.activeLevelId = null;
+    expect(resolveExplosivesFor(s)).toHaveLength(getAllExplosives().length);
+    s.campaign.activeLevelId = 'tutorial_pit';
+    expect([...resolveExplosivesFor(s)]).toEqual([...legacyRulesOf('tutorial_pit')!.availableExplosives]);
   });
 
   it('isExplosiveAvailableFor: locked until the quest completes on a progression site', () => {
@@ -878,10 +879,10 @@ describe('explosive availability on progression and other sites (#2280 C7)', () 
     expect(isExplosiveAvailableFor(s, 'obliviax')).toBe(false);
   });
 
-  it('isExplosiveAvailableFor on a non-progression site follows the level list', () => {
+  it('isExplosiveAvailableFor on a tutorial site that keeps its own list follows that list (#2318)', () => {
     const s = createGame({ seed: 42, mineType: 'desert' });
-    s.campaign.activeLevelId = 'dusty_hollow';
-    expect(isExplosiveAvailableFor(s, 'krackle')).toBe(true);
+    s.campaign.activeLevelId = 'tutorial_pit';
+    expect(isExplosiveAvailableFor(s, 'boomite')).toBe(true);
     expect(isExplosiveAvailableFor(s, 'dynatomics')).toBe(false);
   });
 
@@ -1036,16 +1037,16 @@ describe('where quest state is created (#2280 C6)', () => {
 });
 
 describe('quest state on a campaign level (#2280 C6)', () => {
-  it('a level that opts in to progression starts with quest state', () => {
+  it('a level starts with the quest state its preset completed (#2292)', () => {
     const campaign = createCampaignState();
     campaign.levels['shareholder_summit']!.unlocked = true;
     const state = createGameForLevel(campaign, 'shareholder_summit')!;
     expect(state.grade).toBeDefined();
-    expect(state.quests).toEqual(createQuestState());
+    expect(state.quests).toEqual({ ...createQuestState(), completed: [...getLevel('shareholder_summit')!.preset!.completedQuests] });
   });
 
-  it('a level without progression has no quest state', () => {
-    const state = createGameForLevel(createCampaignState(), 'dusty_hollow')!;
+  it('a level still off the ladder (#2318) has no quest state', () => {
+    const state = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
     expect(state.grade).toBeUndefined();
     expect(state.quests).toBeUndefined();
   });

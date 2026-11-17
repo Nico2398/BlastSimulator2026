@@ -21,17 +21,15 @@ import { getAllBiomes, getBiome } from '../../core/world/BiomeCatalog.js';
 import { createGame, createWorldState } from '../../core/state/GameState.js';
 import { generateContracts } from '../../core/economy/Contract.js';
 import { stateRubbleStockKg } from '../../core/economy/SpoilHeaps.js';
-import { resolveContractOres } from '../../core/campaign/Level.js';
+import { applyLevelPreset, resolveContractOres } from '../../core/campaign/Level.js';
 import { Random } from '../../core/math/Random.js';
 import { regenerateGrid } from './world.js';
 import { resolveStarterDeposit } from '../../core/world/StarterDeposit.js';
 import { vehicleMaxSlopeRatio } from '../../core/entities/Vehicle.js';
 import { isStaffedComposition, resolveStartingSite } from '../../core/state/StartingBuildings.js';
-import { staffedSuffix, parseOptionalStaffedFlag } from './commandUtils.js';
+import { staffedSuffix, parseOptionalStaffedFlag, parseLadderStart } from './commandUtils.js';
 import { t } from '../../core/i18n/I18n.js';
-import { createQuestState } from '../../core/economy/Quests.js';
-import { createGradeState, extraContractOffers, LAST_NAMED_GRADE } from '../../core/economy/MineGrade.js';
-import { MINE_TIERS_PER_GRADE } from '../../core/config/balance.js';
+import { extraContractOffers } from '../../core/economy/MineGrade.js';
 import { isValidOreGradeScale } from '../../core/economy/OreGrade.js';
 
 /** Named console args → a partial config. Unset keys keep their defaults. Unknown keys (size, cash, …) are ignored. */
@@ -67,24 +65,6 @@ function parseOreGradeArg(raw: string | undefined): { scale?: number; error?: st
     return { error: t('sandbox.invalid_ore_grade', { value: raw }) };
   }
   return { scale: value };
-}
-
-function parseStartTierArg(raw: string | undefined): { tier?: number; error?: string } {
-  if (raw === undefined) return {};
-  const value = Number(raw);
-  if (raw.trim() === '' || !Number.isInteger(value) || value < 1 || value > MINE_TIERS_PER_GRADE) {
-    return { error: t('sandbox.invalid_tier', { value: raw, max: MINE_TIERS_PER_GRADE }) };
-  }
-  return { tier: value };
-}
-
-function parseStartGradeArg(raw: string | undefined): { grade?: number; error?: string } {
-  if (raw === undefined) return {};
-  const value = Number(raw);
-  if (raw.trim() === '' || !Number.isInteger(value) || value < 0) {
-    return { error: t('sandbox.invalid_grade', { value: raw }) };
-  }
-  return { grade: value };
 }
 
 /**
@@ -124,14 +104,9 @@ export function sandboxCommand(
     return { success: false, output: oreGrade.error };
   }
 
-  const startGrade = parseStartGradeArg(named['grade']);
-  if (startGrade.error) {
-    return { success: false, output: startGrade.error };
-  }
-
-  const startTier = parseStartTierArg(named['tier']);
-  if (startTier.error) {
-    return { success: false, output: startTier.error };
+  const start = parseLadderStart(named);
+  if (start.error) {
+    return { success: false, output: start.error };
   }
 
   const config = clampSandboxConfig(requested);
@@ -162,7 +137,7 @@ export function sandboxCommand(
     startingCrew: true,
     fleetMustStayMobile: true,
     // Every vehicle climbs the one vehicle limit, so the spawn pad is planned for it (#2044, #2045).
-    ...(level.progression ? { vehicleSlopeRatio: vehicleMaxSlopeRatio(true) } : {}),
+    vehicleSlopeRatio: vehicleMaxSlopeRatio(true),
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
   };
   regenerateGrid(ctx, gridParams);
@@ -174,14 +149,8 @@ export function sandboxCommand(
   }
 
   if (level.market) ctx.state.contracts.market = level.market;
-  if (level.progression) {
-    ctx.state.grade = createGradeState();
-    ctx.state.quests = createQuestState();
-    // `grade:N` starts the site at permit grade N (scenarios reach later grades without playing the ladder).
-    if (startGrade.grade !== undefined) ctx.state.grade.grade = startGrade.grade;
-    // `tier:M` picks the tier within a named grade; endless classes have one.
-    if (startTier.tier !== undefined && ctx.state.grade.grade <= LAST_NAMED_GRADE) ctx.state.grade.tier = startTier.tier;
-  }
+  // `grade:N` / `tier:M` start the site on a later rung (scenarios reach later grades without playing the ladder).
+  applyLevelPreset(ctx.state, level.preset, start.start);
   const contractRng = new Random(ctx.state.seed + ctx.state.tickCount);
   generateContracts(ctx.state.contracts, contractRng, ctx.state.tickCount, level.contractPriceMultiplier, resolveContractOres(ctx.state), stateRubbleStockKg(ctx.state), ctx.state.grade?.grade, undefined, extraContractOffers(ctx.state.grade));
 
