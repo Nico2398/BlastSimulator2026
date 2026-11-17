@@ -17,7 +17,10 @@ import {
   returnToWorldMap,
   getBestStars,
 } from '../../src/core/campaign/Campaign.js';
-import { getLevel, getAllLevels } from '../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels, resolveContractOres, resolveExplosivesFor } from '../../src/core/campaign/Level.js';
+import { sandboxCommand } from '../../src/console/commands/sandbox.js';
+import { orePermitGrade } from '../../src/core/world/OreCatalog.js';
+import { MINE_LAST_NAMED_GRADE } from '../../src/core/config/balance.js';
 import { DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER } from '../../src/core/config/balance.js';
 import {
   createLevelStats,
@@ -1294,5 +1297,198 @@ describe('ecology responds to how the mine is run (#1691)', () => {
     const stats = createLevelStats();
     snapshotStats(stats, state);
     expect(calculateStarRating(stats, 0).details.ecologyPass).toBe(false);
+  });
+});
+
+// ── Level presets (#2292) ───────────────────────────────────────────────────
+
+describe('Campaign level presets (#2292)', () => {
+  /** A fresh context with every campaign level unlocked on the profile. */
+  function unlockedCtx(): GameContext {
+    const c = makeEmptyGameContext();
+    for (const entry of Object.values(c.campaignProfile.campaign.levels)) entry.unlocked = true;
+    return c;
+  }
+
+  for (const level of getAllLevels()) {
+    it(`campaign start ${level.id} opens at its preset grade, tier and completed quests`, () => {
+      const c = unlockedCtx();
+      const result = campaignStartCommand(c, [], { level: level.id });
+      expect(result.success).toBe(true);
+      const state = c.state!;
+      expect(state.grade).toBeDefined();
+      expect(state.quests).toBeDefined();
+      expect(state.grade!.grade).toBe(level.preset!.grade);
+      expect(state.grade!.tier).toBe(level.preset!.tier);
+      expect([...state.quests!.completed].sort()).toEqual([...level.preset!.completedQuests].sort());
+    });
+  }
+
+  it('the tutorial opens at G0 tier 1 with no completed quest and tier 1 explosives only', () => {
+    const c = makeCtx();
+    expect(campaignStartCommand(c, [], { level: 'tutorial_pit' }).success).toBe(true);
+    expect(c.state!.grade!.grade).toBe(0);
+    expect(c.state!.grade!.tier).toBe(1);
+    expect(c.state!.quests!.completed).toEqual([]);
+    for (const id of resolveExplosivesFor(c.state!)) expect(getExplosive(id)!.tier, id).toBe(1);
+  });
+
+  it('dusty_hollow buys tier 1 explosives only and has every vehicle and building tier quest done', () => {
+    const c = makeCtx();
+    expect(campaignStartCommand(c, [], { level: 'dusty_hollow' }).success).toBe(true);
+    for (const id of resolveExplosivesFor(c.state!)) expect(getExplosive(id)!.tier, id).toBe(1);
+    for (const q of ['quest_vehicle_t2', 'quest_vehicle_t3', 'quest_building_t2', 'quest_building_t3', 'quest_race_car']) {
+      expect(c.state!.quests!.completed).toContain(q);
+    }
+  });
+
+  it('treranium_depths opens with explosive tiers 2 and 3 completed', () => {
+    const c = unlockedCtx();
+    expect(campaignStartCommand(c, [], { level: 'treranium_depths' }).success).toBe(true);
+    expect(c.state!.quests!.completed).toContain('quest_explosive_t2');
+    expect(c.state!.quests!.completed).toContain('quest_explosive_t3');
+  });
+
+  describe('grade: and tier: overrides', () => {
+    it('grade:2 starts the site at grade 2 and leaves the preset tier and quests', () => {
+      const c = makeCtx();
+      const result = campaignStartCommand(c, [], { level: 'dusty_hollow', grade: '2' });
+      expect(result.success).toBe(true);
+      expect(c.state!.grade!.grade).toBe(2);
+      expect(c.state!.grade!.tier).toBe(getLevel('dusty_hollow')!.preset!.tier);
+      expect([...c.state!.quests!.completed].sort()).toEqual([...getLevel('dusty_hollow')!.preset!.completedQuests].sort());
+    });
+
+    it('tier:3 starts the site at tier 3 of grade 0', () => {
+      const c = makeCtx();
+      expect(campaignStartCommand(c, [], { level: 'dusty_hollow', tier: '3' }).success).toBe(true);
+      expect(c.state!.grade!.grade).toBe(0);
+      expect(c.state!.grade!.tier).toBe(3);
+    });
+
+    it('grade:1 tier:2 applies both', () => {
+      const c = makeCtx();
+      expect(campaignStartCommand(c, [], { level: 'tutorial_pit', grade: '1', tier: '2' }).success).toBe(true);
+      expect(c.state!.grade!.grade).toBe(1);
+      expect(c.state!.grade!.tier).toBe(2);
+    });
+
+    it('a tier above the last named grade is ignored, as sandbox start does', () => {
+      const c = makeCtx();
+      const above = MINE_LAST_NAMED_GRADE + 1;
+      expect(campaignStartCommand(c, [], { level: 'dusty_hollow', grade: String(above), tier: '3' }).success).toBe(true);
+      expect(c.state!.grade!.grade).toBe(above);
+      expect(c.state!.grade!.tier).toBe(1);
+    });
+
+    it('an override on a late level keeps that level\'s completed quests', () => {
+      const c = unlockedCtx();
+      expect(campaignStartCommand(c, [], { level: 'treranium_depths', grade: '1' }).success).toBe(true);
+      expect(c.state!.grade!.grade).toBe(1);
+      expect(c.state!.quests!.completed).toContain('quest_explosive_t3');
+    });
+
+    it('matches what sandbox start gives for the same grade and tier', () => {
+      const camp = makeCtx();
+      campaignStartCommand(camp, [], { level: 'dusty_hollow', grade: '2', tier: '3' });
+      const sand = makeEmptyGameContext();
+      sandboxCommand(sand, ['start'], { grade: '2', tier: '3' });
+      expect(camp.state!.grade!.grade).toBe(sand.state!.grade!.grade);
+      expect(camp.state!.grade!.tier).toBe(sand.state!.grade!.tier);
+    });
+
+    it('generates the contract board for the resulting grade', () => {
+      const c = makeCtx();
+      expect(campaignStartCommand(c, [], { level: 'dusty_hollow', grade: '1' }).success).toBe(true);
+      const offers = c.state!.contracts.available.filter(o => o.type !== 'rubble_disposal');
+      expect(offers.length).toBeGreaterThan(0);
+      const grade1Ores = resolveContractOres(c.state!);
+      expect(grade1Ores.length).toBeGreaterThan(0);
+      for (const offer of offers) {
+        expect(orePermitGrade(offer.materialId), offer.materialId).toBe(1);
+        expect(grade1Ores).toContain(offer.materialId);
+      }
+    });
+
+    it('grade 0 board offers grade 0 ores only', () => {
+      const c = makeCtx();
+      expect(campaignStartCommand(c, [], { level: 'dusty_hollow' }).success).toBe(true);
+      const offers = c.state!.contracts.available.filter(o => o.type !== 'rubble_disposal');
+      expect(offers.length).toBeGreaterThan(0);
+      for (const offer of offers) expect(orePermitGrade(offer.materialId), offer.materialId).toBe(0);
+    });
+  });
+
+  describe('invalid grade: and tier: are refused with the state untouched', () => {
+    const bad: Array<[string, Record<string, string>, RegExp]> = [
+      ['grade:-1', { grade: '-1' }, /grade/i],
+      ['grade:abc', { grade: 'abc' }, /grade/i],
+      ['grade:1.5', { grade: '1.5' }, /grade/i],
+      ['grade: (empty)', { grade: '' }, /grade/i],
+      ['tier:0', { tier: '0' }, /tier/i],
+      ['tier:4', { tier: '4' }, /tier/i],
+      ['tier:x', { tier: 'x' }, /tier/i],
+      ['tier: (empty)', { tier: '' }, /tier/i],
+    ];
+    for (const [label, named, pattern] of bad) {
+      it(`${label} fails with output and changes nothing`, () => {
+        const c = makeCtx();
+        const before = c.state;
+        const result = campaignStartCommand(c, [], { level: 'dusty_hollow', ...named });
+        expect(result.success).toBe(false);
+        expect(result.output).toMatch(pattern);
+        expect(c.state).toBe(before);
+        expect(c.state!.campaign.activeLevelId).toBeNull();
+      });
+    }
+
+    it('a refused override on a fresh context starts no game', () => {
+      const c = makeEmptyGameContext();
+      expect(campaignStartCommand(c, [], { level: 'tutorial_pit', grade: '-1' }).success).toBe(false);
+      expect(c.state).toBeNull();
+    });
+
+    it('a refused override leaves the campaign profile level locked state alone', () => {
+      const c = makeCtx();
+      const before = JSON.stringify(c.campaignProfile.campaign);
+      campaignStartCommand(c, [], { level: 'dusty_hollow', tier: '9' });
+      expect(JSON.stringify(c.campaignProfile.campaign)).toBe(before);
+    });
+  });
+
+  describe('sandbox start keeps its behaviour', () => {
+    it('starts at G0 tier 1 with no completed quest', () => {
+      const c = makeEmptyGameContext();
+      expect(sandboxCommand(c, ['start'], {}).success).toBe(true);
+      expect(c.state!.grade!.grade).toBe(0);
+      expect(c.state!.grade!.tier).toBe(1);
+      expect(c.state!.quests!.completed).toEqual([]);
+    });
+
+    it('grade:2 tier:2 pins both', () => {
+      const c = makeEmptyGameContext();
+      expect(sandboxCommand(c, ['start'], { grade: '2', tier: '2' }).success).toBe(true);
+      expect(c.state!.grade!.grade).toBe(2);
+      expect(c.state!.grade!.tier).toBe(2);
+    });
+
+    it('ignores a tier above the last named grade', () => {
+      const c = makeEmptyGameContext();
+      expect(sandboxCommand(c, ['start'], { grade: String(MINE_LAST_NAMED_GRADE + 1), tier: '3' }).success).toBe(true);
+      expect(c.state!.grade!.tier).toBe(1);
+    });
+
+    it('refuses grade:-1 and tier:4', () => {
+      const c = makeEmptyGameContext();
+      expect(sandboxCommand(c, ['start'], { grade: '-1' }).success).toBe(false);
+      expect(sandboxCommand(c, ['start'], { tier: '4' }).success).toBe(false);
+      expect(c.state).toBeNull();
+    });
+
+    it('buys tier 1 explosives only', () => {
+      const c = makeEmptyGameContext();
+      sandboxCommand(c, ['start'], {});
+      for (const id of resolveExplosivesFor(c.state!)) expect(getExplosive(id)!.tier, id).toBe(1);
+    });
   });
 });
