@@ -202,8 +202,8 @@ export function campaignStartCommand(
     ...(level.oreDeposits !== undefined ? { oreDeposits: level.oreDeposits } : {}),
     ...(level.oreGradeScale !== undefined ? { oreGradeScale: level.oreGradeScale } : {}),
     startingCrew: true,
-    // Every vehicle climbs the one vehicle limit, so the spawn pad is planned for it (#2044, #2045).
-    vehicleSlopeRatio: vehicleMaxSlopeRatio(true),
+    // A ladder site's vehicles climb the one vehicle limit, so the spawn pad is planned for it (#2044, #2045).
+    ...(ctx.state.grade ? { vehicleSlopeRatio: vehicleMaxSlopeRatio(true) } : {}),
     ...(startingSite ? { startingBuildings: startingSite.buildings } : {}),
     ...(level.rallyPoint ? { rallyPoint: level.rallyPoint } : {}),
     ...(level.startingBuildingsNear ? { startingBuildingsNear: level.startingBuildingsNear } : {}),
