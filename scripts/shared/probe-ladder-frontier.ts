@@ -26,7 +26,7 @@ export function frontierSurveysWanted(method: FrontierSurveyMethod): number {
   return method === 'prospection' ? 1 : LADDER_DETECTOR_READINGS;
 }
 
-export interface FrontierSurveyInput {
+interface FrontierSurveyInput {
   method: FrontierSurveyMethod | null;
   /** Surveys of that method already completed. */
   completed: number;
@@ -117,7 +117,7 @@ export function expeditionOrigin(target: { x: number; z: number }, span: number)
   return { x: Math.floor(target.x - span / 2), z: Math.floor(target.z - span / 2) };
 }
 
-export interface FrontierBuyInput {
+interface FrontierBuyInput {
   grade: number;
   shuttles: number;
   cash: number;
@@ -131,7 +131,7 @@ export function decideShuttle(input: FrontierBuyInput): 'buy' | 'skip' {
   return grade >= TRAVEL_VEHICLE_UNLOCK_GRADE && shuttles === 0 && cash - cost >= reserve ? 'buy' : 'skip';
 }
 
-export interface ExpeditionInput {
+interface ExpeditionInput {
   hasTarget: boolean;
   shuttles: number;
   cash: number;

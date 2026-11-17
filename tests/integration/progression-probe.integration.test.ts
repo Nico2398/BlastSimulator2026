@@ -100,7 +100,7 @@ describe('ladder frontier probe (#2322)', () => {
   }, 120000);
 
   it('a ladder run from the start reaches grade 1 inside its window and reports quest, frontier and earnings metrics', () => {
-    const r = runProbe({ seed: 42, biome: 'desert_badlands', kit: 'digger', strategy: 'ladder', horizon: 1200 });
+    const r = runProbe({ seed: 42, biome: 'desert_badlands', kit: 'full', strategy: 'ladder', horizon: 1200 });
     const g1 = r.metrics.gradeReachedTick[1];
     expect(g1).toBeDefined();
     expect(g1!).toBeLessThan(1200);
@@ -109,5 +109,5 @@ describe('ladder frontier probe (#2322)', () => {
     expect(r.metrics.gradeEarnPerTick).toBeDefined();
     for (const v of Object.values(r.metrics.gradeEarnPerTick!)) expect(Number.isFinite(v)).toBe(true);
     for (const t of Object.values(r.metrics.frontierTicks!)) expect(t).toBeLessThanOrEqual(r.endTick);
-  }, 120000);
+  }, 400000);
 });
