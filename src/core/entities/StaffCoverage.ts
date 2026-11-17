@@ -71,7 +71,9 @@ export function staffCoverage(
     return d;
   };
   for (const v of vehicles) {
-    const d = need(ROLE_LICENCE_REQUIRED[v.type]);
+    const licence = ROLE_LICENCE_REQUIRED[v.type];
+    if (licence === null) continue; // no licence to staff (the travel role)
+    const d = need(licence);
     d.roles.add(v.type);
     d.vehicles++;
     d.levelNeeded = Math.max(d.levelNeeded, v.tier);

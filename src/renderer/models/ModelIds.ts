@@ -7,7 +7,7 @@ import type { EmployeeRole } from '../../core/entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../../core/entities/Vehicle.js';
 import { BUILDING_TIERS, isSingleTierType, type BuildingTier, type BuildingType } from '../../core/entities/Building.js';
 import { BUILDING_DEFS } from '../../core/entities/BuildingDefs.js';
-import { getAllVehicleRoles } from '../../core/entities/Vehicle.js';
+import { getAllVehicleRoles, vehicleRoleMaxTier } from '../../core/entities/Vehicle.js';
 
 export const EMPLOYEE_ROLES: readonly EmployeeRole[] = ['driller', 'blaster', 'driver', 'surveyor', 'manager'];
 
@@ -81,7 +81,13 @@ export function workerModelId(role: EmployeeRole): string {
 export const VEHICLE_TIERS: readonly VehicleTier[] = [1, 2, 3];
 
 export function vehicleModelId(role: VehicleRole, tier: VehicleTier): string {
+  // TODO(#2289): public/models/vehicle_travel_vehicle_t{1,2}.glb are copies of the debris hauler's until the travel vehicles get their own models.
   return `vehicle_${role}_t${tier}`;
+}
+
+/** The tiers of `role` that have a model (the travel role stops at tier 2). */
+export function vehicleModelTiers(role: VehicleRole): readonly VehicleTier[] {
+  return VEHICLE_TIERS.filter(tier => tier <= vehicleRoleMaxTier(role));
 }
 
 export function buildingModelId(type: BuildingType, tier: BuildingTier): string {
@@ -93,7 +99,7 @@ export function allModelIds(): string[] {
   const ids: string[] = [];
   for (const role of EMPLOYEE_ROLES) ids.push(workerModelId(role));
   for (const role of getAllVehicleRoles()) {
-    for (const tier of VEHICLE_TIERS) ids.push(vehicleModelId(role, tier));
+    for (const tier of vehicleModelTiers(role)) ids.push(vehicleModelId(role, tier));
   }
   for (const type of Object.keys(BUILDING_DEFS) as BuildingType[]) {
     // A single-tier type has one model (tier 1); the game aliases its higher tiers onto it.

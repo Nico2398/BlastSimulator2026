@@ -8,6 +8,7 @@ import {
   destroyVehicle,
   getAllVehicleRoles,
   getVehicleDefByTier,
+  vehicleRoleMaxTier,
   computeScrapResidualValue,
   canAssignDriver,
   vehicleDriverId,
@@ -82,8 +83,10 @@ export function vehicleCommand(
       if (tier === null) {
         return { success: false, output: t('vehicle.buy_usage_tier') };
       }
-      // Dealer quest gate (quest sites only), before cash and before the mutation.
-      const refusal = vehicleTierRefusal(state, tier);
+      const maxTier = vehicleRoleMaxTier(type);
+      if (tier > maxTier) return { success: false, output: t('vehicle.buy_tier_max', { type, max: maxTier }) };
+      // Dealer lock (quest or grade), before cash and before the mutation.
+      const refusal = vehicleTierRefusal(state, tier, type);
       if (refusal) return { success: false, output: refusal };
       // Checked before purchaseVehicle, which *mutates* — it pushes the
       // vehicle and bumps nextId before it can report a cost. Same predicate
@@ -183,9 +186,9 @@ export function vehicleCommand(
       const vehicle = state.vehicles.vehicles.find(v => v.id === id);
       if (!vehicle) return { success: false, output: t('vehicle.not_found', { id }) };
       const cost = computeVehicleUpgradeCost(vehicle.type, vehicle.tier);
-      const nextTier = nextVehicleTier(vehicle.tier);
+      const nextTier = nextVehicleTier(vehicle.tier, vehicle.type);
       if (cost === null || nextTier === null) return { success: false, output: t('vehicle.upgrade_max_tier', { id }) };
-      const refusal = vehicleTierRefusal(state, nextTier);
+      const refusal = vehicleTierRefusal(state, nextTier, vehicle.type);
       if (refusal) return { success: false, output: refusal };
       // Cash is checked before upgradeVehicle, which mutates tier and hp.
       if (!canAffordVehicleUpgrade(vehicle, state.cash)) {

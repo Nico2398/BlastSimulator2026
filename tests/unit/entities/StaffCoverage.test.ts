@@ -54,3 +54,15 @@ describe('staffCoverage', () => {
     expect(lines.map(l => [l.skill, l.status])).toEqual([['driving.truck', 'missing'], ['driving.drill_rig', 'ok']]);
   });
 });
+
+describe('staffCoverage — the travel role needs no licence (#2285)', () => {
+  it('a fleet of only travel vehicles creates no coverage line, whatever the roster', () => {
+    expect(staffCoverage([{ type: 'travel_vehicle', tier: 1 }, { type: 'travel_vehicle', tier: 2 }], [], [])).toEqual([]);
+  });
+
+  it('a travel vehicle beside a drill rig adds nothing to the drill rig line', () => {
+    const lines = staffCoverage([{ type: 'travel_vehicle', tier: 2 }, { type: 'drill_rig', tier: 1 }], [emp(1, [['driving.drill_rig']])], []);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ skill: 'driving.drill_rig', vehicles: 1, roles: ['drill_rig'], status: 'ok' });
+  });
+});

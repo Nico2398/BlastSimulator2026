@@ -87,7 +87,7 @@ function makeAction(overrides: Partial<PendingAction> & { id: number }): Pending
 function hireLicensedDriller(state: GameState, role: VehicleRole, x = 0, z = 0): Employee {
   const rng = new Random(SEED);
   const { employee } = hireEmployee(state.employees, 'driller', rng, x, z);
-  assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED[role], 1);
+  assignSkill(state.employees, employee.id, ROLE_LICENCE_REQUIRED[role]!, 1);
   return employee;
 }
 

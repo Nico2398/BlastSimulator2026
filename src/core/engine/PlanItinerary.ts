@@ -10,7 +10,7 @@ import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback, type RampFlowField } from '../nav/Pathfinding.js';
 import { rampFlowField } from '../mining/RampFlow.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_LOAD_TICKS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_LOAD_TICKS, TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
@@ -823,7 +823,11 @@ export function findCheapestTransportItinerary(
 ): Itinerary | null {
   let best: Itinerary | null = null;
 
+  const distToTarget = Math.hypot(resolved.targetX - employee.x, resolved.targetZ - employee.z);
+
   for (const role of getAllVehicleRoles()) {
+    // A short trip is walked: no one fetches a travel vehicle for it (#2285).
+    if (role === 'travel_vehicle' && distToTarget <= TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS) continue;
     const vehicle = findFreeVehicleForRole(state, role, employee);
     if (!vehicle) continue;
 

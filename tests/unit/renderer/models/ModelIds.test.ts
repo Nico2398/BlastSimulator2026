@@ -17,17 +17,24 @@ describe('ModelIds', () => {
     expect(buildingModelId('living_quarters', 3)).toBe('building_living_quarters_t3');
   });
 
-  it('enumerates every asset once: 5 workers, 6 × 3 vehicles, 7 × 3 buildings plus the one-tier spoil heap and four vanity projects, the ruin, and the props', () => {
+  it('enumerates every asset once: 5 workers, 6 × 3 work vehicles plus 2 travel vehicles, 7 × 3 buildings plus the one-tier spoil heap and four vanity projects, the ruin, and the props', () => {
     const ids = allModelIds();
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter(id => id.startsWith('worker_'))).toHaveLength(EMPLOYEE_ROLES.length);
-    expect(ids.filter(id => id.startsWith('vehicle_'))).toHaveLength(18);
+    expect(ids.filter(id => id.startsWith('vehicle_'))).toHaveLength(6 * 3 + 2);
     expect(ids.filter(id => /^building_.*_t[123]$/.test(id))).toHaveLength(23);
     expect(ids).toContain(BUILDING_RUIN_MODEL_ID);
     const props = propModelIds();
     // Each tree ships with its decimated far copy.
     expect(props).toHaveLength(TREE_FAMILIES.length * TREE_VARIANTS * 2 + BUSH_VARIANTS + ROCK_VARIANTS + HOUSE_VARIANTS + GRASS_VARIANTS + FLOWER_VARIANTS + 1);
-    expect(ids).toHaveLength(5 + 18 + 23 + 1 + props.length);
+    expect(ids).toHaveLength(5 + (6 * 3 + 2) + 23 + 1 + props.length);
+  });
+
+  it('lists the travel vehicle at tiers 1 and 2 only: no tier-3 model (#2285)', () => {
+    const ids = allModelIds();
+    expect(ids).toContain('vehicle_travel_vehicle_t1');
+    expect(ids).toContain('vehicle_travel_vehicle_t2');
+    expect(ids).not.toContain('vehicle_travel_vehicle_t3');
   });
 
   it('lists the spoil heap at tier 1 only, since it is a single-tier building', () => {

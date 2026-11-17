@@ -13,6 +13,8 @@ import {
   unlockedExplosiveTier,
   explosiveLockedByQuest,
   questForVehicleTier,
+  questForTravelTier,
+  recordTravelCells,
   questRewardLine,
   type QuestState,
 } from '../../../src/core/economy/Quests.js';
@@ -36,6 +38,7 @@ import {
   QUEST_T3_CLEAN_BLASTS, QUEST_T3_ROCK_KG, QUEST_T3_SAFETY_SCORE,
   QUEST_V2_FLEET_SIZE, QUEST_V2_ROCK_KG,
   QUEST_V3_FLEET_SIZE, QUEST_V3_ROCK_KG, QUEST_V3_SAFETY_SCORE,
+  CELLS_PER_KM, QUEST_RACE_CAR_TRAVEL_KM,
 } from '../../../src/core/config/balance.js';
 import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 
@@ -45,6 +48,7 @@ const B2 = 'quest_building_t2';
 const B3 = 'quest_building_t3';
 const V2 = 'quest_vehicle_t2';
 const V3 = 'quest_vehicle_t3';
+const RACE = 'quest_race_car';
 
 /** `n` placeholder vehicles: the fleet_size objective counts the list and reads nothing else. */
 function setFleet(s: GameState, n: number): void {
@@ -60,6 +64,7 @@ function meetQuest(s: GameState, id: string): void {
       case 'clean_blasts': s.quests!.cleanBlasts = o.target; break;
       case 'explosive_kg': s.quests!.explosiveKg = o.target; break;
       case 'safety_score': s.scores.safety = o.target; break;
+      case 'travel_km': s.quests!.travelCells = o.target * CELLS_PER_KM; break;
     }
   }
 }
@@ -96,12 +101,15 @@ describe('quest catalog (#2280 C2, C4)', () => {
   beforeAll(() => setLocale('en'));
 
   it('lists the explosive, vehicle and building quests', () => {
-    expect(getAllQuests().map(q => q.id).sort()).toEqual([B2, B3, T2, T3, V2, V3].sort());
+    expect(getAllQuests().map(q => q.id).sort()).toEqual([B2, B3, RACE, T2, T3, V2, V3].sort());
   });
 
   it('each quest rewards the tier kind of its giver', () => {
     for (const q of getAllQuests()) {
-      const expected = q.id === B2 || q.id === B3 ? 'building_tier' : q.id === V2 || q.id === V3 ? 'vehicle_tier' : 'explosive_tier';
+      const expected = q.id === B2 || q.id === B3 ? 'building_tier'
+        : q.id === V2 || q.id === V3 ? 'vehicle_tier'
+        : q.id === RACE ? 'travel_tier'
+        : 'explosive_tier';
       expect(q.reward.kind, q.id).toBe(expected);
     }
   });
@@ -429,14 +437,14 @@ describe('vehicle quests in saves (#2282)', () => {
   it('a save round-trips completed vehicle quests', () => {
     const s = createGame({ seed: 42, mineType: 'desert' });
     s.grade = createGradeState();
-    s.quests = { completed: [V2], cleanBlasts: 0, explosiveKg: 0, rockKg: 7 };
+    s.quests = { completed: [V2], cleanBlasts: 0, explosiveKg: 0, rockKg: 7, travelCells: 0 };
     expect(deserialize(serialize(s)).quests?.completed).toEqual([V2]);
   });
 });
 
 describe('createQuestState (#2280 C6)', () => {
   it('starts with nothing completed and every counter at zero', () => {
-    expect(createQuestState()).toEqual({ completed: [], cleanBlasts: 0, explosiveKg: 0, rockKg: 0 });
+    expect(createQuestState()).toEqual({ completed: [], cleanBlasts: 0, explosiveKg: 0, rockKg: 0, travelCells: 0 });
   });
 
   it('returns a fresh object each time', () => {
@@ -918,7 +926,7 @@ describe('explosive availability on progression and other sites (#2280 C7)', () 
 
 describe('sanitizeQuestState (#2280 C6)', () => {
   it('round-trips a valid state', () => {
-    const q: QuestState = { completed: [T2], cleanBlasts: 3, explosiveKg: 120.5, rockKg: 9_999 };
+    const q: QuestState = { completed: [T2], cleanBlasts: 3, explosiveKg: 120.5, rockKg: 9_999, travelCells: 0 };
     expect(sanitizeQuestState(q)).toEqual(q);
   });
 
@@ -950,13 +958,13 @@ describe('quest state in saves (#2280 C6)', () => {
   function progressionSave(): GameState {
     const s = createGame({ seed: 42, mineType: 'desert' });
     s.grade = createGradeState();
-    s.quests = { completed: [T2], cleanBlasts: 3, explosiveKg: 250.5, rockKg: 12_345 };
+    s.quests = { completed: [T2], cleanBlasts: 3, explosiveKg: 250.5, rockKg: 12_345, travelCells: 0 };
     return s;
   }
 
   it('round-trips completed quests and every counter', () => {
     const loaded = deserialize(serialize(progressionSave()));
-    expect(loaded.quests).toEqual({ completed: [T2], cleanBlasts: 3, explosiveKg: 250.5, rockKg: 12_345 });
+    expect(loaded.quests).toEqual({ completed: [T2], cleanBlasts: 3, explosiveKg: 250.5, rockKg: 12_345, travelCells: 0 });
   });
 
   it('a fresh quest state round-trips', () => {
@@ -1040,5 +1048,139 @@ describe('quest state on a campaign level (#2280 C6)', () => {
     const state = createGameForLevel(createCampaignState(), 'dusty_hollow')!;
     expect(state.grade).toBeUndefined();
     expect(state.quests).toBeUndefined();
+  });
+});
+
+describe('race-car quest (#2285 C6)', () => {
+  it('is given by the dealer, has no prerequisite and one travel_km objective at the balance target', () => {
+    const q = getQuest(RACE)!;
+    expect(q).toBeDefined();
+    expect(q.giverKey).toBe('quest.giver.dealer');
+    expect(q.requires ?? []).toEqual([]);
+    expect(q.objectives).toHaveLength(1);
+    expect(q.objectives[0]!.kind).toBe('travel_km');
+    expect(q.objectives[0]!.target).toBe(QUEST_RACE_CAR_TRAVEL_KM);
+  });
+
+  it('questForTravelTier(2) is the race-car quest; questForVehicleTier(2) is still the work-fleet quest', () => {
+    expect(questForTravelTier(2)?.id).toBe(RACE);
+    expect(questForVehicleTier(2)?.id).toBe(V2);
+    expect(questForVehicleTier(3)?.id).toBe(V3);
+  });
+
+  it('its reward line is a real, localized sentence in en and fr', () => {
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      const line = questRewardLine(getQuest(RACE)!);
+      expect(line, locale).not.toMatch(/quest\.reward|\{\w+\}/);
+      expect(line.length, locale).toBeGreaterThan(0);
+    }
+    setLocale('en');
+  });
+
+  it('every race-car string resolves in en and fr without a raw key', () => {
+    for (const locale of ['en', 'fr'] as const) {
+      setLocale(locale);
+      const q = getQuest(RACE)!;
+      for (const key of [q.giverKey, q.titleKey, q.pitchKey]) expect(t(key), `${locale} ${key}`).not.toBe(key);
+    }
+    setLocale('en');
+  });
+});
+
+describe('QuestState.travelCells (#2285 C6)', () => {
+  it('createQuestState starts at 0 and is fresh each time', () => {
+    expect(createQuestState().travelCells).toBe(0);
+    const a = createQuestState();
+    a.travelCells = 5;
+    expect(createQuestState().travelCells).toBe(0);
+  });
+
+  it('sanitizeQuestState keeps a valid count and reads absent, negative, non-finite or non-numeric as 0', () => {
+    const base = { completed: [], cleanBlasts: 0, explosiveKg: 0, rockKg: 0 };
+    expect(sanitizeQuestState({ ...base, travelCells: 321 })!.travelCells).toBe(321);
+    expect(sanitizeQuestState({ ...base })!.travelCells).toBe(0);
+    for (const bad of [-4, NaN, Infinity, 'far', null, {}]) {
+      expect(sanitizeQuestState({ ...base, travelCells: bad })!.travelCells, String(bad)).toBe(0);
+    }
+  });
+
+  it('an old save without travelCells loads with 0', () => {
+    const s = questSite();
+    const parsed = JSON.parse(serialize(s)) as Record<string, unknown>;
+    delete (parsed['quests'] as Record<string, unknown>)['travelCells'];
+    expect(deserialize(JSON.stringify(parsed)).quests!.travelCells).toBe(0);
+  });
+
+  it('a save round-trips the count', () => {
+    const s = questSite();
+    s.quests!.travelCells = 432;
+    expect(deserialize(serialize(s)).quests!.travelCells).toBe(432);
+  });
+});
+
+describe('recordTravelCells (#2285 C6)', () => {
+  it('adds the driven cells to the running total', () => {
+    const q = createQuestState();
+    recordTravelCells(q, 1);
+    recordTravelCells(q, 12);
+    recordTravelCells(q, 0.5);
+    expect(q.travelCells).toBeCloseTo(13.5);
+  });
+
+  it('is a no-op without quest state', () => {
+    expect(() => recordTravelCells(undefined, 40)).not.toThrow();
+  });
+
+  it('never subtracts: zero adds nothing', () => {
+    const q = createQuestState();
+    recordTravelCells(q, 0);
+    expect(q.travelCells).toBe(0);
+  });
+});
+
+describe('travel_km objective (#2285 C6)', () => {
+  const travelObjective = (s: GameState) => questObjectiveStatuses(s, getQuest(RACE)!).find(o => o.kind === 'travel_km')!;
+
+  it('progress is travelCells / CELLS_PER_KM, in kilometres', () => {
+    const s = questSite();
+    expect(travelObjective(s).current).toBe(0);
+    s.quests!.travelCells = CELLS_PER_KM / 4;
+    expect(travelObjective(s).current).toBeCloseTo(0.25);
+    expect(travelObjective(s).met).toBe(false);
+  });
+
+  it('is met exactly at the target distance, and not one cell before', () => {
+    const s = questSite();
+    s.quests!.travelCells = QUEST_RACE_CAR_TRAVEL_KM * CELLS_PER_KM - 1;
+    expect(travelObjective(s).met).toBe(false);
+    s.quests!.travelCells = QUEST_RACE_CAR_TRAVEL_KM * CELLS_PER_KM;
+    expect(travelObjective(s).met).toBe(true);
+  });
+
+  it('advanceQuests completes the quest once the distance is driven, emitting quest:completed once', () => {
+    const s = questSite();
+    const emitter = new EventEmitter();
+    const seen = collect(emitter);
+    expect(advanceQuests(s, emitter)).not.toContain(RACE);
+    recordTravelCells(s.quests, QUEST_RACE_CAR_TRAVEL_KM * CELLS_PER_KM);
+    expect(advanceQuests(s, emitter)).toContain(RACE);
+    expect(isQuestCompleted(s, RACE)).toBe(true);
+    advanceQuests(s, emitter);
+    expect(seen.filter(id => id === RACE)).toEqual([RACE]);
+  });
+
+  it('stays open while the distance is short, and the vehicle-fleet quests are unaffected', () => {
+    const s = questSite();
+    recordTravelCells(s.quests, QUEST_RACE_CAR_TRAVEL_KM * CELLS_PER_KM - 1);
+    expect(advanceQuests(s)).not.toContain(RACE);
+    expect(isQuestCompleted(s, RACE)).toBe(false);
+    expect(isQuestCompleted(s, V2)).toBe(false);
+  });
+
+  it('completeQuest shortcut works on the race-car quest', () => {
+    const s = questSite();
+    expect(completeQuest(s, RACE)).toEqual({ ok: true });
+    expect(isQuestCompleted(s, RACE)).toBe(true);
   });
 });

@@ -13,7 +13,7 @@ import {
   vehicleCapacityText,
 } from '../../../src/ui/catalogCardText.js';
 import {
-  getAllVehicleRoles, getVehicleDefByTier, type VehicleRole, type VehicleTier,
+  getAllVehicleRoles, getVehicleDefByTier, vehicleRoleMaxTier, type VehicleRole, type VehicleTier,
 } from '../../../src/core/entities/Vehicle.js';
 import {
   getAllBuildingTypes, getBuildingDef, getFootprintSize, type BuildingTier,
@@ -28,6 +28,8 @@ import frLocale from '../../../src/core/i18n/locales/fr.json' assert { type: 'js
 const EN = enLocale as Record<string, string>;
 const FR = frLocale as Record<string, string>;
 const TIERS: VehicleTier[] = [1, 2, 3];
+/** The tiers a role is sold in: three for work roles, two for the travel role (#2285). */
+const tiersOf = (role: VehicleRole): VehicleTier[] => TIERS.filter(tier => tier <= vehicleRoleMaxTier(role));
 const BUILDING_TIERS: BuildingTier[] = [1, 2, 3];
 const SEP = ' · ';
 const VEHICLE_CAPACITY_UNIT: Partial<Record<VehicleRole, string>> = {
@@ -67,7 +69,7 @@ describe('formatPerHour', () => {
 
 describe('vehicleCardLine', () => {
   for (const role of getAllVehicleRoles()) {
-    for (const tier of TIERS) {
+    for (const tier of tiersOf(role)) {
       it(`${role} tier ${tier}: "<desc> · $N/h" with no multiplier text`, () => {
         const def = getVehicleDefByTier(role, tier);
         const perHour = Math.round(def.maintenanceCostPerTick + def.fuelCostPerTick);
@@ -102,7 +104,7 @@ describe('vehicleCardLine drill rig reach (#1679)', () => {
 
 describe('vehicleCardTooltip', () => {
   for (const role of getAllVehicleRoles()) {
-    for (const tier of TIERS) {
+    for (const tier of tiersOf(role)) {
       it(`${role} tier ${tier}: absolute speed, capacity, work rate, licence level`, () => {
         const def = getVehicleDefByTier(role, tier);
         const tip = vehicleCardTooltip(def);
@@ -137,7 +139,7 @@ describe('vehicleCardTooltip', () => {
 
   it('other vehicle roles carry no reach line (#1679)', () => {
     for (const role of getAllVehicleRoles().filter(r => r !== 'drill_rig')) {
-      for (const tier of TIERS) {
+      for (const tier of tiersOf(role)) {
         const tip = vehicleCardTooltip(getVehicleDefByTier(role, tier));
         expect(tip.split('\n')).toHaveLength(4);
       }

@@ -11,9 +11,10 @@ import type { VehicleTier } from '../entities/Vehicle.js';
 import { t } from '../i18n/I18n.js';
 import { explosivesOfTier, getExplosive, type ExplosiveTier } from '../world/ExplosiveCatalog.js';
 import { getAllQuests, getQuest } from './QuestCatalog.js';
+import { CELLS_PER_KM } from '../config/balance.js';
 
 type QuestObjectiveKind =
-  'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'fleet_size' | 'buildings_built' | 'crew_housed';
+  'clean_blasts' | 'explosive_kg' | 'rock_kg' | 'safety_score' | 'fleet_size' | 'buildings_built' | 'crew_housed' | 'travel_km';
 
 interface QuestObjectiveDef {
   kind: QuestObjectiveKind;
@@ -24,6 +25,7 @@ interface QuestObjectiveDef {
 type QuestReward =
   | { kind: 'explosive_tier'; tier: ExplosiveTier }
   | { kind: 'vehicle_tier'; tier: VehicleTier }
+  | { kind: 'travel_tier'; tier: 2 }
   | { kind: 'building_tier'; tier: 2 | 3 };
 
 export interface QuestDef {
@@ -47,6 +49,8 @@ export interface QuestState {
   explosiveKg: number;
   /** Running total of rock broken, kg. */
   rockKg: number;
+  /** Cells driven in travel vehicles so far (#2285). */
+  travelCells: number;
 }
 
 export interface QuestObjectiveStatus {
@@ -59,7 +63,7 @@ export interface QuestObjectiveStatus {
 type CompleteQuestResult = { ok: true } | { ok: false; reason: 'no_quests' | 'unknown' | 'already' };
 
 export function createQuestState(): QuestState {
-  return { completed: [], cleanBlasts: 0, explosiveKg: 0, rockKg: 0 };
+  return { completed: [], cleanBlasts: 0, explosiveKg: 0, rockKg: 0, travelCells: 0 };
 }
 
 function isCount(v: unknown): v is number {
@@ -69,13 +73,13 @@ function isCount(v: unknown): v is number {
 /** Validate a loaded quest sub-state; undefined when malformed. Unknown or repeated quest ids are dropped; a non-finite or negative counter reads 0. */
 export function sanitizeQuestState(raw: unknown): QuestState | undefined {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
-  const { completed, cleanBlasts, explosiveKg, rockKg } = raw as Record<string, unknown>;
+  const { completed, cleanBlasts, explosiveKg, rockKg, travelCells } = raw as Record<string, unknown>;
   if (!Array.isArray(completed)) return undefined;
   const known = completed.filter(
     (id, i): id is string => typeof id === 'string' && getQuest(id) !== undefined && completed.indexOf(id) === i,
   );
   const count = (v: unknown): number => (isCount(v) ? v : 0);
-  return { completed: known, cleanBlasts: count(cleanBlasts), explosiveKg: count(explosiveKg), rockKg: count(rockKg) };
+  return { completed: known, cleanBlasts: count(cleanBlasts), explosiveKg: count(explosiveKg), rockKg: count(rockKg), travelCells: count(travelCells) };
 }
 
 /** Counters live on the quest state; the safety score is read from the site. */
@@ -88,6 +92,7 @@ function objectiveProgress(state: GameState, kind: QuestObjectiveKind): number {
     case 'safety_score': return state.scores.safety;
     case 'fleet_size': return state.vehicles.vehicles.length;
     case 'buildings_built': return state.buildings.buildings.length;
+    case 'travel_km': return (q?.travelCells ?? 0) / CELLS_PER_KM;
     case 'crew_housed': return Math.min(state.employees.employees.length, getBedCapacity(state.buildings));
   }
 }
@@ -116,6 +121,11 @@ export function recordQuestBlast(
   quests.cleanBlasts = blast.flyrockIncident ? 0 : quests.cleanBlasts + 1;
   if (blast.explosiveKg > 0) quests.explosiveKg += blast.explosiveKg;
   if (blast.rockKg > 0) quests.rockKg += blast.rockKg;
+}
+
+/** Book `cells` driven by a travel vehicle. No-op without quest state. */
+export function recordTravelCells(quests: QuestState | undefined, cells: number): void {
+  if (quests && cells > 0) quests.travelCells += cells;
 }
 
 /** Complete every quest whose prerequisites and objectives are met; emits `quest:completed` per quest; returns their ids. */
@@ -201,10 +211,16 @@ export function questForVehicleTier(tier: VehicleTier): QuestDef | undefined {
   return getAllQuests().find(q => q.reward.kind === 'vehicle_tier' && q.reward.tier === tier);
 }
 
+/** The quest whose reward opens travel-vehicle `tier` (the race car), if any. */
+export function questForTravelTier(tier: 2): QuestDef | undefined {
+  return getAllQuests().find(q => q.reward.kind === 'travel_tier' && q.reward.tier === tier);
+}
+
 /** Localized reward line of a quest, whatever its reward kind. */
 export function questRewardLine(def: QuestDef): string {
   const { reward } = def;
   if (reward.kind === 'vehicle_tier') return t('quest.reward.vehicle_tier', { tier: reward.tier });
+  if (reward.kind === 'travel_tier') return t('quest.reward.travel_tier', { tier: reward.tier });
   if (reward.kind === 'building_tier') return t('quest.reward.building_tier', { tier: reward.tier });
   const explosives = explosivesOfTier(reward.tier).map(e => t(e.nameKey)).join(', ');
   return t('quest.reward', { tier: reward.tier, explosives });

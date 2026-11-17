@@ -13,19 +13,24 @@ import { EVACUATION_DRIVER_MAX_PATH_ATTEMPTS } from '../config/balance.js';
 
 // ── Licence mapping ──
 
-/** Qualification category a driver needs for each vehicle role. */
-export const ROLE_LICENCE_REQUIRED: Record<VehicleRole, SkillCategory> = {
+/** Qualification category a driver needs for each vehicle role; null when anyone may drive it (the travel role, #2285). */
+export const ROLE_LICENCE_REQUIRED = {
   debris_hauler: 'driving.truck',
   charging_truck: 'driving.truck',
   building_destroyer: 'driving.truck',
   rock_digger: 'driving.excavator',
   rock_fragmenter: 'driving.rock_fragmenter',
   drill_rig: 'driving.drill_rig',
-};
+  travel_vehicle: null,
+} as const satisfies Record<VehicleRole, SkillCategory | null>;
+
+/** Level credited for a role no licence gates: high enough for every tier. */
+const UNLICENSED_ROLE_LEVEL = 3;
 
 /** Licence level `employee` holds for `role`'s licence: 0 when not held, else `licenceLevel ?? 1` (#1524). */
 export function licenceLevelOf(employee: Pick<Employee, 'qualifications'>, role: VehicleRole): number {
-  return licenceLevelOfSkill(employee.qualifications, ROLE_LICENCE_REQUIRED[role]);
+  const licence = ROLE_LICENCE_REQUIRED[role];
+  return licence === null ? UNLICENSED_ROLE_LEVEL : licenceLevelOfSkill(employee.qualifications, licence);
 }
 
 /** Level at which `qualifications` hold the licence skill `licence`: 0 when not held, else `licenceLevel ?? 1`. */

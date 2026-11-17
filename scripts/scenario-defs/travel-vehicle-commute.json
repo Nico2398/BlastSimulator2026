@@ -1,0 +1,68 @@
+{
+  "name": "travel-vehicle-commute",
+  "description": "Issue #2285: the travel vehicle (Rushbus Shuttle, no licence, does no work). A non-progression site buys it freely. An employee ordered ~44 cells away boards the free shuttle parked beside them, drives to the nearest drivable point by the target, parks, and walks the rest, finishing the order in 48 ticks against 78 for a walking control with no shuttle. The shuttle is released afterwards, free for the next employee. The wait budget (60) sits between the two, so a walk-only arrival fails it.",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:64 cash:100000",
+      "interaction": [{ "type": "command", "command": "new_game seed:42 mine_type:desert size:64 cash:100000" }],
+      "role": "setup",
+      "expect": { "equals": { "cash": 100000, "employeeCount": 0, "vehicleCount": 0 } }
+    },
+    {
+      "command": "time resume",
+      "interaction": [{ "type": "command", "command": "time resume" }],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Spawns near world centre, beside the shuttle bought next. The driller holds no licence: the travel role needs none.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"employees\"]" },
+        { "type": "waitForSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" },
+        { "type": "clickSelector", "selector": "#bs-employee-panel [data-role=\"driller\"]" }
+      ],
+      "role": "player",
+      "expect": { "changedBy": { "cash": -1000 }, "equals": { "employeeCount": 1 } }
+    },
+    {
+      "command": "vehicle buy travel_vehicle",
+      "description": "Fleet panel shuttle button; a non-progression site has no grade lock, so it is bought freely.",
+      "interaction": [
+        { "type": "clickSelector", "selector": "#bs-toolbar [data-panel=\"vehicles\"]" },
+        { "type": "awaitUsable", "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"travel_vehicle\"][data-tier=\"1\"]" },
+        { "type": "clickSelector", "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"travel_vehicle\"][data-tier=\"1\"]" }
+      ],
+      "role": "player",
+      "expect": { "changedBy": { "cash": -20000 }, "equals": { "vehicleCount": 1 } }
+    },
+    {
+      "command": "employee dispatch 1 x:60 z:16",
+      "description": "A far plain order, ~44 cells from the spawn: beyond TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS, so the planner ranks the shuttle ride against the walk. No UI control drives this exact dispatch; same bootstrap primitive vehicle-fast-transport uses.",
+      "interaction": [{ "type": "command", "command": "employee dispatch 1 x:60 z:16" }],
+      "role": "bootstrap",
+      "expect": { "equals": { "pendingActionCount": 1 } }
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:60",
+      "description": "The order resolves inside 60 ticks (the ride takes 48), under the 78 ticks the walking control (same order, no shuttle) needs, and the employee boarded the shuttle on the way.",
+      "timeout": 125,
+      "interaction": [
+        { "type": "waitUntil", "field": "pendingActionCount", "equals": 0, "maxTicks": 60, "timeoutMs": 120000 }
+      ],
+      "role": "setup",
+      "expect": { "equals": { "pendingActionCount": 0 }, "increased": ["vehicleBoardingCount"] }
+    },
+    {
+      "command": "vehicle list",
+      "description": "The shuttle shows idle with no driver: parked and free for the next employee.",
+      "interaction": [{ "type": "command", "command": "vehicle list" }],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [{ "type": "command", "command": "state full" }],
+      "role": "observe"
+    }
+  ],
+  "shots": [{ "name": "overview", "yaw": 20, "pitch": 60 }]
+}

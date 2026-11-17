@@ -1,7 +1,7 @@
 ---
 name: gameplay-vehicle-fleet
 description: >
-  Vehicle fleet specification for BlastSimulator2026: 6 vehicle roles with 3 tiers each, driver
+  Vehicle fleet specification for BlastSimulator2026: 7 vehicle roles (3 tiers each, the travel vehicle 2), driver
   licensing, and the mount/itinerary model that makes an employee the only mobile agent and a
   vehicle an inert tool they ride. Use when implementing or modifying vehicles, boarding, driving,
   movement planning, action cost estimation, traffic, hauling, drilling, digging, or demolition.
@@ -24,12 +24,13 @@ Two rules make the whole system tractable, and every invariant below follows fro
 
 ## Vehicle Roles & Tier Names
 
-Six roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
+Seven roles, 3 tiers each (the travel vehicle 2). All names are fictional, humorous, and i18n-localized.
 
 | Role | Tier 1 | Tier 2 | Tier 3 | Function |
 |------|--------|--------|--------|---------|
 | **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every building demolition (tier upgrades are done in place by a builder): `build destroy` queues a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
 | **Charging Truck** | "Pour-Bucket Pete" | "Boom-Juice Hauler 5000" | "Kaboom Cruiser Deluxe" | Bulk explosive delivery: pumps emulsion down a blast hole. Every `charge_hole` order requires it (`requiredVehicleRole: 'charging_truck'`): an employee holding `blasting` + `driving.truck` (licence level >= tier) drives it to the hole and stays mounted; charging is never done on foot. Duration = `computeChargeDurationTicks` (`ChargePlan.ts`): tier-1 base / `VEHICLE_TIER_MULTIPLIERS[tier].workRate`, then proficiency. No truck, no licensed driver, too-low licence or nobody with both skills leaves the order waiting (`no_vehicle_in_fleet` / `no_licensed_driver` / `licence_level_too_low` / `no_dual_qualified_employee`). A freshly hired Blaster holds the tier-1 `driving.truck` licence, so it can charge with no course; tiers 2/3 still need Driving Center levels. Mid-charge work is protected from forced rest via `isMidVehicleGatedWork`. Every blasting opening (`BASE_STARTING_VEHICLES`: staffed site, Dusty Hollow) carries a tier-1 truck plus a blaster holding `blasting` + `driving.truck`; the tutorial buys the truck in its `buy-charging-truck` step and its scripted driller (Dale Drillson) arrives with `driving.truck` via `ScriptedCandidate.extraQualifications`. Buyable (Fleet panel, `vehicle buy charging_truck`) and renders with its own model per tier |
+| **Travel Vehicle** | "Rushbus Shuttle" | "Zoom-Zoom Race Car" | none (two tiers only) | Commute, no work, no licence (`ROLE_LICENCE_REQUIRED` is null: anyone drives it). T1 is bought once the mine reaches grade G2 (`TRAVEL_VEHICLE_UNLOCK_GRADE`; progression sites only), T2 once its dealer quest (km driven, `travelCells`, cell = 1 m) is done; `vehicleLock` (`VehicleTierGate.ts`) names the lock on the Fleet card. Commute: `findCheapestTransportItinerary` skips this role when the target is within `TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS` (exactly at it walks); beyond it an employee boards a free parked one, drives to the drivable point by the task, parks, walks the rest, and the vehicle stays free for the next. Models are placeholder hauler copies until the travel-vehicle models land |
 | **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to a Freight Warehouse (ore) or Spoil Heap (barren rock) |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
