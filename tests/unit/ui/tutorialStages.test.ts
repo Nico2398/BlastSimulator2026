@@ -20,6 +20,7 @@ import { createGame } from '../../../src/core/state/GameState.js';
 import { getBuildingDef, getDefSize } from '../../../src/core/entities/Building.js';
 import type { BuildingType } from '../../../src/core/entities/Building.js';
 import { t } from '../../../src/core/i18n/I18n.js';
+import { createRunner } from '../../../src/console/createRunner.js';
 import { rampDefFromEndpoints, validateRampOrder } from '../../../src/core/mining/Ramp.js';
 import en from '../../../src/core/i18n/locales/en.json' with { type: 'json' };
 import fr from '../../../src/core/i18n/locales/fr.json' with { type: 'json' };
@@ -559,6 +560,30 @@ describe('REGION.boxcut stays orderable at some depth (#1210)', () => {
       if (result.success) succeededAtLeastOnce = true;
     }
     expect(succeededAtLeastOnce).toBe(true);
+  });
+});
+
+describe('REGION.boxcut is a ramp the G0 rules accept (#2318)', () => {
+  // A 6 m deep ramp at G0's 20 degree climb limit needs about 16.5 m of run.
+  const MIN_RUN_M = 17;
+
+  it('is one vertical line at x=10 starting at z=23', () => {
+    expect(REGION.boxcut.x1).toBe(10);
+    expect(REGION.boxcut.x2).toBe(10);
+    expect(REGION.boxcut.z1).toBe(23);
+    expect((REGION.boxcut as { exact?: boolean }).exact).toBe(true);
+  });
+
+  it('runs at least 17 m', () => {
+    expect(Math.abs(REGION.boxcut.z2 - REGION.boxcut.z1)).toBeGreaterThanOrEqual(MIN_RUN_M);
+  });
+
+  it('the console orders it at depth 6 on a fresh tutorial game', () => {
+    const { runner } = createRunner();
+    expect(runner.run('campaign start level:tutorial_pit staffed:true').success).toBe(true);
+    const { x1, z1, x2, z2 } = REGION.boxcut;
+    const result = runner.run(`build_ramp start:${x1},${z1} end:${x2},${z2} depth:6`);
+    expect(result.success, result.output).toBe(true);
   });
 });
 
@@ -1129,7 +1154,7 @@ describe('building pins publish the placed building footprint (#1646)', () => {
     expect(REGION.drill.x2 - REGION.drill.x1).toBe(8);
     expect(REGION.drill.z2 - REGION.drill.z1).toBe(8);
     expect(REGION.boxcut.x1).toBe(REGION.boxcut.x2);
-    expect(REGION.boxcut.z2).toBeGreaterThan(REGION.boxcut.z1);
+    expect(REGION.boxcut.z2).not.toBe(REGION.boxcut.z1);
     for (const r of [REGION.survey, REGION.drill, REGION.boxcut]) {
       expect((r as { centred?: boolean }).centred).toBeFalsy();
     }

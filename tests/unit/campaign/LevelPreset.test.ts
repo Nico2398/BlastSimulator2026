@@ -7,7 +7,6 @@ import {
   getLevel,
   applyLevelPreset,
   resolveExplosivesFor,
-  autoFulfilmentEnabled,
   type LevelDef,
   type LevelPreset,
 } from '../../../src/core/campaign/Level.js';
@@ -35,11 +34,8 @@ function unlockedCampaign() {
   return campaign;
 }
 
-/** Levels still off the ladder: tutorial_pit until #2318 moves its scenarios and ramp region to G0 rules. */
-const OFF_LADDER = ['tutorial_pit'];
-
-function ladderLevels(): LevelDef[] {
-  return getAllLevels().filter(l => !OFF_LADDER.includes(l.id));
+function ladderLevels(): readonly LevelDef[] {
+  return getAllLevels();
 }
 
 function allLevelDefs(): LevelDef[] {
@@ -58,11 +54,8 @@ function expectedExplosives(completed: readonly string[]): string[] {
 }
 
 describe('LevelPreset shape (#2292)', () => {
-  it('only the levels named in OFF_LADDER lack a preset (#2318)', () => {
-    expect(getAllLevels().filter(l => l.preset === undefined).map(l => l.id)).toEqual(OFF_LADDER);
-  });
-
-  it('every other campaign level and the sandbox def declare a preset', () => {
+  it('every campaign level, the tutorial included, and the sandbox def declare a preset (#2318)', () => {
+    expect(getAllLevels().filter(l => l.preset === undefined).map(l => l.id)).toEqual([]);
     for (const level of allLevelDefs()) {
       expect(level.preset, level.id).toBeDefined();
       expect(typeof level.preset!.grade, level.id).toBe('number');
@@ -111,14 +104,17 @@ describe('LevelPreset shape (#2292)', () => {
     expect('resolveAvailableExplosives' in LevelModule).toBe(false);
     expect('isExplosiveAvailable' in LevelModule).toBe(false);
   });
+
+  it('no level def carries a legacy field and Level.ts exports no legacy rules helpers (#2318)', () => {
+    for (const level of allLevelDefs()) expect('legacy' in level, `${level.id} legacy`).toBe(false);
+    expect('legacyRulesOf' in LevelModule).toBe(false);
+    expect('autoFulfilmentEnabled' in LevelModule).toBe(false);
+  });
 });
 
 describe('level presets reproduce the old explosive and tier rules (#2292)', () => {
-  it('tutorial_pit keeps its pre-ladder rules until #2318: no preset, tier 1 explosives only', () => {
-    const level = getLevel('tutorial_pit')!;
-    expect(level.preset).toBeUndefined();
-    expect(level.legacy?.manualContracts).toBe(true);
-    for (const id of level.legacy!.availableExplosives) expect(getExplosive(id)!.tier, id).toBe(1);
+  it('tutorial_pit starts at G0 tier 1 with no quest completed (#2318)', () => {
+    expect(getLevel('tutorial_pit')!.preset).toEqual({ grade: 0, tier: 1, completedQuests: [] });
   });
 
   it('dusty_hollow: no explosive quest, every vehicle, building and race-car quest', () => {
@@ -309,51 +305,30 @@ describe('createGameForLevel opens every ladder level on its preset (#2292)', ()
   });
 });
 
-describe('tutorial level while off the ladder (#2318)', () => {
+describe('tutorial level on the ladder (#2318)', () => {
   const tutorial = () => {
     const s = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
     s.campaign.activeLevelId = 'tutorial_pit';
     return s;
   };
 
-  it('opens with no grade and no quest state', () => {
+  it('opens at grade 0 tier 1 with an empty quest state', () => {
     const s = tutorial();
-    expect(s.grade).toBeUndefined();
-    expect(s.quests).toBeUndefined();
+    expect(s.grade).toBeDefined();
+    expect(s.grade!.grade).toBe(0);
+    expect(s.grade!.tier).toBe(1);
+    expect(s.quests).toBeDefined();
+    expect(s.quests!.completed).toEqual([]);
   });
 
-  it('only tier 1 explosives are purchasable', () => {
-    const ids = resolveExplosivesFor(tutorial());
-    expect(ids.length).toBeGreaterThan(0);
-    for (const id of ids) expect(getExplosive(id)!.tier, id).toBe(1);
+  it('only the tier 1 explosives are purchasable, derived from quests', () => {
+    expect(resolveExplosivesFor(tutorial())).toEqual(expectedExplosives([]));
+    for (const id of resolveExplosivesFor(tutorial())) expect(getExplosive(id)!.tier, id).toBe(1);
   });
 
-  it('no automatic sale or rubble clearance until the player chooses', () => {
+  it('completing the tier 2 explosive quest opens tier 2 explosives on the tutorial', () => {
     const s = tutorial();
-    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(false);
-    expect(autoFulfilmentEnabled(s, 'autoClearRubble')).toBe(false);
-  });
-
-  it('the player explicit autoSell choice wins either way', () => {
-    const s = tutorial();
-    s.contracts.autoSell = true;
-    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(true);
-    s.contracts.autoSell = false;
-    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(false);
-  });
-});
-
-describe('autoFulfilmentEnabled on every ladder level (#2292)', () => {
-  for (const level of ladderLevels()) {
-    it(`${level.id}: automatic sale and rubble clearance default on`, () => {
-      const s = createGameForLevel(unlockedCampaign(), level.id)!;
-      expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(true);
-      expect(autoFulfilmentEnabled(s, 'autoClearRubble')).toBe(true);
-    });
-  }
-
-  it('a state with no active level defaults on', () => {
-    const s = createGame({ seed: 42, mineType: 'desert' });
-    expect(autoFulfilmentEnabled(s, 'autoSell')).toBe(true);
+    s.quests!.completed.push(X2);
+    expect(resolveExplosivesFor(s)).toEqual(expectedExplosives([X2]));
   });
 });

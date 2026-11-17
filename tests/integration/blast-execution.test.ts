@@ -23,6 +23,7 @@ import {
   CHARGE_DEFAULT_STEMMING_M } from '../../src/core/config/balance.js';
 import { expectNoWorldInvariantViolations } from '../helpers/worldInvariants.js';
 import { buildBlastReport } from '../../src/core/mining/BlastExecution.js';
+import { REGION } from '../../src/ui/tutorialStages.js';
 import { totalSpoilKg } from '../../src/core/economy/SpoilHeaps.js';
 
 /** tickUntilFresh that also keeps payroll from bankrupting the run: charging is worked from a truck by one crew member (#1649), so a charge pass spans far more payroll ticks than the starting cash covers. */
@@ -1200,7 +1201,7 @@ describe('Blast execution — the tutorial plan opens the box cut (#1724)', () =
     };
     expect(run('campaign start level:tutorial_pit staffed:true').success).toBe(true);
     expect(run('build living_quarters at:12,15').success).toBe(true);
-    expect(run('build_ramp start:10,23 end:10,35 depth:6').success).toBe(true);
+    expect(run(`build_ramp start:${REGION.boxcut.x1},${REGION.boxcut.z1} end:${REGION.boxcut.x2},${REGION.boxcut.z2} depth:6`).success).toBe(true);
     tickWhile(() => ctx.state!.plannedRamps.length > 0 || ctx.state!.pendingActions.some(a => a.type === 'dig_ramp_segment'), 1500);
     expect(ctx.state!.pendingActions.some(a => a.type === 'dig_ramp_segment')).toBe(false);
 
