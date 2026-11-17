@@ -103,7 +103,7 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 2
+          "surveyCount": 1
         },
         "note": "arrival-gated: queued and paid for, not yet completed"
       }
@@ -180,7 +180,7 @@
           "cash"
         ],
         "equals": {
-          "surveyCount": 3
+          "surveyCount": 2
         },
         "note": "arrival-gated: queued and paid for, not yet completed"
       }

@@ -247,6 +247,18 @@ export interface RunSurveyResult {
   actionId?: number;
 }
 
+/** The site column closest to (x, z): the point itself when it is on the site. */
+function nearestSitePoint(
+  world: { minX: number; minZ: number; sizeX: number; sizeZ: number },
+  x: number,
+  z: number,
+): { workX: number; workZ: number } {
+  return {
+    workX: clamp(x, world.minX, world.minX + world.sizeX - 1),
+    workZ: clamp(z, world.minZ, world.minZ + world.sizeZ - 1),
+  };
+}
+
 /**
  * Validate preconditions, deduct cost, and enqueue a `survey` PendingAction.
  *
@@ -287,6 +299,12 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
 
   const actionId = state.nextPendingActionId++;
 
+  // A detector reads from a point that may lie far past the site (it claims no cells): its surveyor works at the
+  // site's edge nearest that point, since an unreachable target would never complete. The reading keeps the pick.
+  const { workX, workZ } = method === 'meteorite_detector' && state.world
+    ? nearestSitePoint(state.world, centerX, centerZ)
+    : { workX: centerX, workZ: centerZ };
+
   // Routed through dispatchPendingAction (#547) rather than a hand-built
   // literal — it owns constructing the full record (status: 'queued',
   // holderId: null) and its matching GhostPreview (claimed: false), so this
@@ -298,8 +316,8 @@ export function runSurvey(state: GameState, params: RunSurveyParams): RunSurveyR
     type: 'survey',
     requiredSkill: 'geology',
     requiredVehicleRole: null,
-    targetX: centerX,
-    targetZ: centerZ,
+    targetX: workX,
+    targetZ: workZ,
     targetY: 0,
     // durationTicks is the base; computeActionWorkTicks scales it by geology proficiency.
     payload: { method, centerX, centerZ, durationTicks: SURVEY_DURATION_TICKS[method], orderCost: cost },
