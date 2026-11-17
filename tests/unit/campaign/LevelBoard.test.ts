@@ -89,9 +89,9 @@ describe('createGameForLevel — progression ruleset (#1949)', () => {
     expect(state.board).toBeDefined();
   });
 
-  it('leaves earlier levels on the legacy market with no grade', () => {
+  it('leaves earlier levels on the legacy market, on the ladder at G0 (#2292)', () => {
     const state = createGameForLevel(createCampaignState(), 'dusty_hollow')!;
     expect(state.contracts.market).toBeUndefined();
-    expect(state.grade).toBeUndefined();
+    expect(state.grade).toMatchObject({ grade: 0, tier: 1 });
   });
 });

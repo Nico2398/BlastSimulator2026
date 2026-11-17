@@ -581,10 +581,17 @@ describe('createGameForLevel — shareholder summit rules (#1949)', () => {
       .toContainEqual({ type: 'freight_warehouse', tier: 1 });
   });
 
-  it.each(['tutorial_pit', 'dusty_hollow', 'grumpstone_ridge', 'treranium_depths'])('earlier level %s has no board, no grade ladder and no production market', id => {
+  it.each(['dusty_hollow', 'grumpstone_ridge', 'treranium_depths'])('earlier level %s has no board and no production market, but starts on the ladder (#2292)', id => {
     const campaign = createCampaignState();
     campaign.levels[id]!.unlocked = true;
     const state = createGameForLevel(campaign, id)!;
+    expect(state.board).toBeUndefined();
+    expect(state.grade).toMatchObject({ grade: 0, tier: 1 });
+    expect(state.contracts.market ?? 'legacy').toBe('legacy');
+  });
+
+  it('tutorial_pit has no board and no production market, and is still off the ladder (#2318)', () => {
+    const state = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
     expect(state.board).toBeUndefined();
     expect(state.grade).toBeUndefined();
     expect(state.contracts.market ?? 'legacy').toBe('legacy');

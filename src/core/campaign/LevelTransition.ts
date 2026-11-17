@@ -3,14 +3,12 @@
 
 import { resolveStartingSite } from '../state/StartingBuildings.js';
 import { createGame, createWorldState, type GameConfig, type GameState } from '../state/GameState.js';
-import { getLevel, type LadderStartOverride } from './Level.js';
+import { applyLevelPreset, getLevel, type LadderStartOverride } from './Level.js';
 import { recordProfit, recordStars, startLevel, type CampaignState } from './Campaign.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
 import { getFinancialReport } from '../economy/Finance.js';
 import { createBoardState } from '../economy/Board.js';
-import { createGradeState } from '../economy/MineGrade.js';
-import { createQuestState } from '../economy/Quests.js';
 import { closingAudit, settleTaxAudit, taxAuditRng } from '../events/TaxAudit.js';
 
 // ── Types ──
@@ -146,7 +144,7 @@ export function createGameForLevel(
   campaign: CampaignState,
   levelId: string,
   staffed?: boolean,
-  _start?: LadderStartOverride,
+  start?: LadderStartOverride,
 ): GameState | null {
   if (!startLevel(campaign, levelId)) return null;
 
@@ -168,10 +166,7 @@ export function createGameForLevel(
   newState.world = createWorldState(level.gridX, level.datum, level.gridZ, false);
   if (level.board) newState.board = createBoardState(level.board);
   if (level.market) newState.contracts.market = level.market;
-  if (level.progression) {
-    newState.grade = createGradeState();
-    newState.quests = createQuestState();
-  }
+  if (level.preset) applyLevelPreset(newState, level.preset, start);
 
   return newState;
 }

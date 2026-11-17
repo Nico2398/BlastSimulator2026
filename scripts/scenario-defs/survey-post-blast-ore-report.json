@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow staffed:false cash:360000",
+      "command": "campaign start level:dusty_hollow staffed:false grade:1 cash:360000",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:false cash:360000"
+          "command": "campaign start level:dusty_hollow staffed:false grade:1 cash:360000"
         }
       ],
       "role": "setup",

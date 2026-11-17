@@ -5,6 +5,8 @@ import type { GameContext } from './world.js';
 import type { RefusalKey } from '../../core/i18n/Refusal.js';
 import type { BuildingType } from '../../core/entities/Building.js';
 import { t } from '../../core/i18n/I18n.js';
+import type { LadderStartOverride } from '../../core/campaign/Level.js';
+import { MINE_TIERS_PER_GRADE } from '../../core/config/balance.js';
 import { resolveContractPriceMultiplier } from '../../core/campaign/Level.js';
 
 export { resolveContractPriceMultiplier };
@@ -90,3 +92,23 @@ export function parseStaffedFlag(raw: string | undefined): { staffed: boolean; e
   return { staffed: parsed.staffed === true, error: null };
 }
 
+
+/** `grade:N` / `tier:M`: the start rung a site pins over its preset (#2292); `start` is absent when neither is given, `error` is the refusal text. */
+export function parseLadderStart(named: Record<string, string>): { start?: LadderStartOverride; error?: string } {
+  const start: LadderStartOverride = {};
+  const rawGrade = named['grade'];
+  if (rawGrade !== undefined) {
+    const grade = Number(rawGrade);
+    if (rawGrade.trim() === '' || !Number.isInteger(grade) || grade < 0) return { error: t('sandbox.invalid_grade', { value: rawGrade }) };
+    start.grade = grade;
+  }
+  const rawTier = named['tier'];
+  if (rawTier !== undefined) {
+    const tier = Number(rawTier);
+    if (rawTier.trim() === '' || !Number.isInteger(tier) || tier < 1 || tier > MINE_TIERS_PER_GRADE) {
+      return { error: t('sandbox.invalid_tier', { value: rawTier, max: MINE_TIERS_PER_GRADE }) };
+    }
+    start.tier = tier;
+  }
+  return Object.keys(start).length > 0 ? { start } : {};
+}

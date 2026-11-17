@@ -19,11 +19,11 @@
       }
     },
     {
-      "command": "campaign start level:dusty_hollow staffed:false",
+      "command": "campaign start level:dusty_hollow staffed:false grade:1",
       "interaction": [
         {
           "type": "command",
-          "command": "campaign start level:dusty_hollow staffed:false"
+          "command": "campaign start level:dusty_hollow staffed:false grade:1"
         }
       ],
       "role": "setup",

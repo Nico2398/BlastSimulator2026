@@ -14,13 +14,12 @@ import { getAllBiomes, getBiome } from '../world/BiomeCatalog.js';
 import { getRock } from '../world/RockCatalog.js';
 import { sandboxOresYieldedByRocks, sandboxOreWindow } from '../world/SandboxDeepOre.js';
 import { getOre } from '../world/OreCatalog.js';
-import { getAllExplosives } from '../world/ExplosiveCatalog.js';
 import { SCORE_DECAY_RATE, SANDBOX_STARTING_SITES, SANDBOX_STARTING_CASH, type SandboxKitId, type StartingSiteComposition, DEFAULT_GRID_SIZE, SANDBOX_DATUM, SANDBOX_RUGGEDNESS_ROLLING_PV, SANDBOX_RUGGEDNESS_STEEP_PV, SANDBOX_PIT_MASK, SANDBOX_MARKET, SANDBOX_ORE_GRADE_SCALE } from '../config/balance.js';
 import { climateBiasLandingOn } from '../world/TerrainGen.js';
 import type { EmployeeRole } from '../entities/Employee.js';
 import type { VehicleRole, VehicleTier } from '../entities/Vehicle.js';
 import type { BuildingType, BuildingTier } from '../entities/Building.js';
-import type { LevelDef } from './Level.js';
+import type { LevelDef, LevelPreset } from './Level.js';
 import type { GameState } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
 import { estimateSurveyResult, type SurveyResult } from '../mining/SurveyCalc.js';
@@ -162,7 +161,7 @@ export function randomSandboxSeed(rand: () => number = Math.random): number {
  * climate fields happen to fall.
  * Grid extents are fixed constants (#504) rather than player-configurable.
  */
-export function sandboxLevelDef(config: SandboxConfig): LevelDef {
+export function sandboxLevelDef(config: SandboxConfig): LevelDef & { preset: LevelPreset } {
   const clamped = clampSandboxConfig(config);
   const biome = getBiome(clamped.biome)!;
 
@@ -178,7 +177,6 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     gridZ: DEFAULT_GRID_SIZE,
     startingCash: SANDBOX_KITS[clamped.kit].startingCash,
     startingSite: SANDBOX_KITS[clamped.kit].startingSite,
-    availableExplosives: getAllExplosives().map(e => e.id),
     unlockThreshold: SANDBOX_FIXED_UNLOCK_THRESHOLD,
     eventFreqMultiplier: SANDBOX_FIXED_EVENT_FREQ_MULTIPLIER,
     contractPriceMultiplier: SANDBOX_FIXED_CONTRACT_PRICE_MULTIPLIER,
@@ -190,7 +188,7 @@ export function sandboxLevelDef(config: SandboxConfig): LevelDef {
     pitMask: SANDBOX_PIT_MASK,
     oreGradeScale: SANDBOX_ORE_GRADE_SCALE,
     market: SANDBOX_MARKET,
-    progression: true,
+    preset: { grade: 0, tier: 1, completedQuests: [] },
   };
 }
 

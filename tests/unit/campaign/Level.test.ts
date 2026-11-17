@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLevel, getAllLevels, resolveContractOres, type LevelDef, resolveContractPriceMultiplier, resolveAvailableExplosives, isExplosiveAvailable } from '../../../src/core/campaign/Level.js';
+import { getLevel, getAllLevels, resolveContractOres, type LevelDef, resolveContractPriceMultiplier, resolveExplosivesFor, isExplosiveAvailableFor } from '../../../src/core/campaign/Level.js';
 import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { createGame, createWorldState, type GameState } from '../../../src/core/state/GameState.js';
 import { generateTerrain, resolveGeneratedBiome } from '../../../src/core/world/TerrainGen.js';
@@ -7,12 +7,20 @@ import { getAllBiomes, getBiome } from '../../../src/core/world/BiomeCatalog.js'
 import { getRock, oresYieldedByRocks } from '../../../src/core/world/RockCatalog.js';
 import { getAllOres, getOre } from '../../../src/core/world/OreCatalog.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
+import { createQuestState } from '../../../src/core/economy/Quests.js';
 import { sandboxLevelDef, SANDBOX_DEFAULTS, SANDBOX_LEVEL_ID } from '../../../src/core/campaign/Sandbox.js';
 import {
   TUTORIAL_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_CONTRACT_PRICE_MULTIPLIER, DUSTY_HOLLOW_STARTING_SITE,
   SANDBOX_ORE_GRADE_SCALE, SHAREHOLDER_SUMMIT_STARTING_SITE, SHAREHOLDER_SUMMIT_STARTING_CASH,
   SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD,
 } from '../../../src/core/config/balance.js';
+
+/** Explosive ids a level opens with: its own list while off the ladder (#2318), else tier 1 plus the tiers its preset quests opened. */
+function explosivesOf(level: LevelDef): readonly string[] {
+  if (level.legacy) return level.legacy.availableExplosives;
+  const quests = { ...createQuestState(), completed: [...level.preset!.completedQuests] };
+  return resolveExplosivesFor({ quests, campaign: { activeLevelId: level.id } } as Pick<GameState, 'quests' | 'campaign'>);
+}
 
 describe('Level definition system (7.1)', () => {
   it('getLevel("dusty_hollow") returns valid level data with all required fields', () => {
@@ -27,7 +35,7 @@ describe('Level definition system (7.1)', () => {
     expect(level!.datum).toBeGreaterThan(0);
     expect(level!.gridZ).toBeGreaterThan(0);
     expect(level!.startingCash).toBeGreaterThan(0);
-    expect(level!.availableExplosives.length).toBeGreaterThan(0);
+    expect(explosivesOf(level!).length).toBeGreaterThan(0);
     expect(level!.unlockThreshold).toBeGreaterThan(0);
     expect(typeof level!.eventFreqMultiplier).toBe('number');
     expect(typeof level!.contractPriceMultiplier).toBe('number');
@@ -75,13 +83,13 @@ describe('Level definition system (7.1)', () => {
     const treraniumDepths = getLevel('treranium_depths')!;
 
     // Dusty Hollow should only have starter explosives
-    expect(dustyHollow.availableExplosives).not.toContain('dynatomics');
-    expect(dustyHollow.availableExplosives).not.toContain('obliviax');
+    expect(explosivesOf(dustyHollow)).not.toContain('dynatomics');
+    expect(explosivesOf(dustyHollow)).not.toContain('obliviax');
 
     // Treranium Depths should have all explosives including endgame
-    expect(treraniumDepths.availableExplosives).toContain('pop_rock');
-    expect(treraniumDepths.availableExplosives).toContain('dynatomics');
-    expect(treraniumDepths.availableExplosives.length).toBeGreaterThan(dustyHollow.availableExplosives.length);
+    expect(explosivesOf(treraniumDepths)).toContain('pop_rock');
+    expect(explosivesOf(treraniumDepths)).toContain('dynatomics');
+    expect(explosivesOf(treraniumDepths).length).toBeGreaterThan(explosivesOf(dustyHollow).length);
   });
 
   it('level 3 has mixed rock hardness enabled', () => {
@@ -124,8 +132,8 @@ describe('Level definition system (7.1)', () => {
     expect(level!.datum).toBe(11);
     expect(level!.gridZ).toBe(32);
     expect(level!.startingCash).toBe(500000);
-    expect(level!.availableExplosives).toContain('pop_rock');
-    expect(level!.availableExplosives).toContain('boomite');
+    expect(explosivesOf(level!)).toContain('pop_rock');
+    expect(explosivesOf(level!)).toContain('boomite');
     expect(level!.unlockThreshold).toBe(62000);
     expect(level!.eventFreqMultiplier).toBe(0);
     expect(level!.contractPriceMultiplier).toBe(TUTORIAL_CONTRACT_PRICE_MULTIPLIER);
@@ -182,53 +190,44 @@ describe('Level definition system (7.1)', () => {
 
   it('tutorial_pit only has basic explosives', () => {
     const level = getLevel('tutorial_pit')!;
-    expect(level.availableExplosives).toContain('pop_rock');
-    expect(level.availableExplosives).toContain('boomite');
-    expect(level.availableExplosives).not.toContain('krackle');
-    expect(level.availableExplosives).not.toContain('big_bada_boom');
-    expect(level.availableExplosives).not.toContain('shatternite');
-    expect(level.availableExplosives).not.toContain('rumblox');
-    expect(level.availableExplosives).not.toContain('obliviax');
-    expect(level.availableExplosives).not.toContain('dynatomics');
+    expect(explosivesOf(level)).toContain('pop_rock');
+    expect(explosivesOf(level)).toContain('boomite');
+    expect(explosivesOf(level)).not.toContain('krackle');
+    expect(explosivesOf(level)).not.toContain('big_bada_boom');
+    expect(explosivesOf(level)).not.toContain('shatternite');
+    expect(explosivesOf(level)).not.toContain('rumblox');
+    expect(explosivesOf(level)).not.toContain('obliviax');
+    expect(explosivesOf(level)).not.toContain('dynatomics');
   });
 });
 
-describe('level explosive availability (#1357)', () => {
+describe('level explosive availability (#1357, #2292)', () => {
   const fullCatalog = getAllExplosives().map(e => e.id);
 
-  it('null level id resolves to the full catalog', () => {
-    expect([...resolveAvailableExplosives(null)]).toEqual(fullCatalog);
+  it('dusty_hollow opens exactly its three tier 1 explosives', () => {
+    expect([...explosivesOf(getLevel('dusty_hollow')!)]).toEqual(['pop_rock', 'boomite', 'krackle']);
   });
 
-  it('dusty_hollow resolves to exactly its three explosives', () => {
-    expect([...resolveAvailableExplosives('dusty_hollow')]).toEqual(['pop_rock', 'boomite', 'krackle']);
+  it('treranium_depths and shareholder_summit open the full catalog', () => {
+    expect([...explosivesOf(getLevel('treranium_depths')!)]).toEqual(fullCatalog);
+    expect([...explosivesOf(getLevel('shareholder_summit')!)]).toEqual(fullCatalog);
   });
 
-  it('tutorial_pit resolves to its own list, a strict subset of the catalog', () => {
-    const ids = [...resolveAvailableExplosives('tutorial_pit')];
-    expect(ids).toEqual(getLevel('tutorial_pit')!.availableExplosives);
+  it('tutorial_pit keeps its own list, a strict subset of the catalog (#2318)', () => {
+    const ids = [...explosivesOf(getLevel('tutorial_pit')!)];
+    expect(ids).toEqual(['pop_rock', 'boomite']);
     expect(ids.length).toBeLessThan(fullCatalog.length);
     expect(ids).not.toContain('dynatomics');
   });
 
-  it('unknown level id (sandbox) resolves to the full catalog', () => {
-    expect([...resolveAvailableExplosives('nonexistent_mine')]).toEqual(fullCatalog);
+  it('a bare state with no active level and no quests may use the full catalog', () => {
+    expect([...resolveExplosivesFor(createGame({ seed: 1 }))]).toEqual(fullCatalog);
   });
 
-  it('isExplosiveAvailable rejects a catalog explosive outside the level list', () => {
-    expect(isExplosiveAvailable('dusty_hollow', 'dynatomics')).toBe(false);
-    expect(isExplosiveAvailable('tutorial_pit', 'krackle')).toBe(false);
-  });
-
-  it('isExplosiveAvailable accepts every explosive in the level list', () => {
-    for (const id of getLevel('dusty_hollow')!.availableExplosives) {
-      expect(isExplosiveAvailable('dusty_hollow', id)).toBe(true);
-    }
-  });
-
-  it('isExplosiveAvailable allows everything for null and unknown level ids', () => {
-    expect(isExplosiveAvailable(null, 'dynatomics')).toBe(true);
-    expect(isExplosiveAvailable('nonexistent_mine', 'dynatomics')).toBe(true);
+  it('a ladder level rejects a catalog explosive its completed quests have not opened', () => {
+    const dusty = getLevel('dusty_hollow')!;
+    const quests = { ...createQuestState(), completed: [...dusty.preset!.completedQuests] };
+    expect(isExplosiveAvailableFor({ quests, campaign: { activeLevelId: dusty.id } } as Pick<GameState, 'quests' | 'campaign'>, 'dynatomics')).toBe(false);
   });
 });
 
@@ -417,11 +416,11 @@ describe('Dusty Hollow opens staffed and equipped (#1363)', () => {
     }
   });
 
-  it('shareholder_summit runs the progression ruleset on volcanic flats behind a board (#1949)', () => {
+  it('shareholder_summit runs the production ruleset on volcanic flats behind a board (#1949)', () => {
     const level = getLevel('shareholder_summit')!;
     expect(level.biome).toBe('volcanic_flats');
     expect(resolveGeneratedBiome(level.terrainSeed, level.gridX, level.gridZ, level.climateBias).id).toBe('volcanic_flats');
-    expect(level).toMatchObject({ difficultyTier: 4, progression: true, market: 'production', oreDeposits: true, mixedRockHardness: true });
+    expect(level).toMatchObject({ difficultyTier: 4, market: 'production', oreDeposits: true, mixedRockHardness: true });
     expect(level.board).toBeDefined();
     expect(level.board!.quarterTicks).toBeGreaterThan(0);
     expect(level.startingCash).toBeGreaterThan(0);
@@ -530,8 +529,8 @@ describe('Shareholder Summit level (#1949)', () => {
     expect(getBiome(level().biome)).toBeDefined();
   });
 
-  it('opts in to progression, the production market and ore deposits', () => {
-    expect(level().progression).toBe(true);
+  it('starts on the ladder with the production market and ore deposits', () => {
+    expect(level().preset).toBeDefined();
     expect(level().market).toBe('production');
     expect(level().oreDeposits).toBe(true);
     expect(level().oreGradeScale).toBe(SANDBOX_ORE_GRADE_SCALE);
@@ -563,7 +562,7 @@ describe('Shareholder Summit level (#1949)', () => {
   it('has cash, a profit target and at least treranium_depths\' explosive roster', () => {
     expect(level().unlockThreshold).toBeGreaterThan(0);
     expect(level().startingCash).toBeGreaterThan(0);
-    expect(level().availableExplosives.length).toBeGreaterThanOrEqual(getLevel('treranium_depths')!.availableExplosives.length);
+    expect(explosivesOf(level()).length).toBeGreaterThanOrEqual(explosivesOf(getLevel('treranium_depths')!).length);
   });
 
   it('sets a positive grid, datum and seed distinct from the earlier levels', () => {
@@ -598,10 +597,9 @@ describe('Shareholder Summit level (#1949)', () => {
     expect(level().scriptedOreSale).toBeUndefined();
   });
 
-  it('only the summit sets progression, market or a board among the authored levels', () => {
+  it('only the summit sets a market or a board among the authored levels', () => {
     for (const l of getAllLevels()) {
       if (l.id === 'shareholder_summit') continue;
-      expect(l.progression, l.id).toBeUndefined();
       expect(l.market, l.id).toBeUndefined();
       expect(l.board, l.id).toBeUndefined();
     }
@@ -621,9 +619,9 @@ describe('autoFulfilmentEnabled (#2145)', () => {
   };
 
   it('only the tutorial level teaches contracts by hand', () => {
-    expect(getLevel('tutorial_pit')!.manualContracts).toBe(true);
+    expect(getLevel('tutorial_pit')!.legacy?.manualContracts).toBe(true);
     for (const level of getAllLevels().filter(l => l.id !== 'tutorial_pit')) {
-      expect(level.manualContracts, level.id).toBeFalsy();
+      expect(level.legacy, level.id).toBeUndefined();
     }
   });
 

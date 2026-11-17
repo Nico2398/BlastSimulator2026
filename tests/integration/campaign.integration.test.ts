@@ -30,7 +30,7 @@ import {
 } from '../../src/core/campaign/SuccessTracker.js';
 import { t } from '../../src/core/i18n/I18n.js';
 import { createGame } from '../../src/core/state/GameState.js';
-import { checkLevelComplete } from '../../src/core/campaign/LevelTransition.js';
+import { checkLevelComplete, createGameForLevel } from '../../src/core/campaign/LevelTransition.js';
 import { EventEmitter } from '../../src/core/state/EventEmitter.js';
 import { serialize, deserialize } from '../../src/core/state/SaveLoad.js';
 import { addIncome, addExpense } from '../../src/core/economy/Finance.js';
@@ -122,9 +122,8 @@ describe('Campaign', () => {
     expect(level!.scoreDecayRate).toBe(0.03);
     expect(level!.mixedRockHardness).toBe(false);
     // Should include basic explosives
-    expect(level!.availableExplosives).toContain('pop_rock');
-    expect(level!.availableExplosives).toContain('boomite');
-    expect(level!.availableExplosives).toContain('krackle');
+    const state = createGameForLevel(createCampaignState(), 'dusty_hollow')!;
+    expect(resolveExplosivesFor(state)).toEqual(expect.arrayContaining(['pop_rock', 'boomite', 'krackle']));
   });
 
   // ── 3. getAllLevels returns all 5 ──────────────────────────────────────────
@@ -750,7 +749,7 @@ describe('campaign status finale line (#1320)', () => {
 
 // ── Charge limited to the active level's explosives (#1357) ────────────────
 
-describe('charge respects the active level availableExplosives (#1357)', () => {
+describe('charge respects the explosives the level preset opened (#1357, #2292)', () => {
   function withHoles(ctx: GameContext, n = 2): void {
     const st = ctx.state!;
     for (let i = 0; i < n; i++) addHole(st, st.drillHoles, 10 + i * 4, 10, 6, 0.089);
@@ -770,9 +769,8 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
 
     expect(r.success).toBe(false);
     expect(r.output).toContain(t(getExplosive('dynatomics')!.nameKey));
-    expect(r.output).toContain(t(getLevel('dusty_hollow')!.nameKey));
-    expect(r.output).toContain(t(getExplosive('krackle')!.nameKey));
-    expect(r.output).not.toContain('mining.charge.explosive_not_available');
+    expect(r.output).toContain(t('quest.explosive_t3.title'));
+    expect(r.output).not.toContain('mining.charge.explosive_locked_quest');
     expect(ctx.state!.pendingActions.length).toBe(queued);
     expect(Object.keys(ctx.state!.plannedChargesByHole)).toHaveLength(0);
     expect(ctx.state!.cash).toBe(cash);
@@ -788,7 +786,7 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
     const r = charge(ctx, { hole: '*', explosive: 'dynatomics', amount: '5kg', stemming: '2m' });
 
     expect(r.success).toBe(false);
-    expect(r.output).toContain(t(getLevel('dusty_hollow')!.nameKey));
+    expect(r.output).toContain(t('quest.explosive_t3.title'));
     expect(ctx.state!.pendingActions.length).toBe(queued);
     expect(Object.keys(ctx.state!.plannedChargesByHole)).toHaveLength(0);
     expect(ctx.state!.cash).toBe(cash);
@@ -842,7 +840,7 @@ describe('charge respects the active level availableExplosives (#1357)', () => {
     const r = queueSavedBlastPlan(ctx as never, saved as never, 'plan');
 
     expect(r.success).toBe(false);
-    expect(r.output).toContain(t(getLevel('dusty_hollow')!.nameKey));
+    expect(r.output).toContain(t('quest.explosive_t3.title'));
     expect(st.pendingActions.length).toBe(queued);
     expect(st.plannedDrillHoles).toHaveLength(0);
     expect(st.cash).toBe(cash);

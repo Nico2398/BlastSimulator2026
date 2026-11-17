@@ -27,6 +27,12 @@ import { permitLimitsFor } from '../../../../../src/core/economy/PermitLimits.js
 
 const holeCounter = { nextHoleId: 1 };
 
+/** dusty_hollow as the ladder starts it: tier 1 explosives only (#2292). */
+function onDusty(state: ReturnType<typeof makeState>): void {
+  state.campaign.activeLevelId = 'dusty_hollow';
+  state.quests = createQuestState();
+}
+
 function makeState() {
   return createGame({ seed: 1, mineType: 'desert' });
 }
@@ -537,7 +543,7 @@ describe('ChargeStep level-limited product list (#1357)', () => {
   it('shows exactly the active level explosives on dusty_hollow', () => {
     const { step } = makeStep();
     const state = makeState();
-    state.campaign.activeLevelId = 'dusty_hollow';
+    onDusty(state);
     step.update(state, 'sunny');
     expect(cardIds(step)).toEqual(['pop_rock', 'boomite', 'krackle']);
   });
@@ -568,10 +574,10 @@ describe('ChargeStep level-limited product list (#1357)', () => {
     card(step, 'dynatomics').click();
     expect(card(step, 'dynatomics').dataset['selected']).toBe('true');
 
-    state.campaign.activeLevelId = 'dusty_hollow';
+    onDusty(state);
     step.update(state, 'sunny');
 
-    expect(card(step, 'dynatomics')).toBeNull();
+    expect(step.root.querySelector('[data-action="select-explosive"][data-explosive="dynatomics"]')).toBeNull();
     const selected = Array.from(step.root.querySelectorAll('[data-action="select-explosive"][data-selected="true"]'));
     expect(selected).toHaveLength(1);
     expect(['pop_rock', 'boomite', 'krackle']).toContain((selected[0] as HTMLElement).dataset['explosive']);
@@ -992,7 +998,7 @@ describe('ChargeStep initial explosive (#2016)', () => {
   it('a pattern explosive the level does not allow falls through to Boomite', () => {
     const { step } = makeStep();
     const state = makeState();
-    state.campaign.activeLevelId = 'dusty_hollow'; // pop_rock, boomite, krackle
+    onDusty(state); // pop_rock, boomite, krackle
     state.patternCharge = { explosiveId: 'dynatomics', amountKg: 4, stemmingM: 2 };
     step.update(state, 'sunny');
     expect(selectedIds(step)).toEqual(['boomite']);
@@ -1017,7 +1023,7 @@ describe('ChargeStep initial explosive (#2016)', () => {
     step.update(state, 'sunny');
     card(step, 'dynatomics').click();
     expect(selectedIds(step)).toEqual(['dynatomics']);
-    state.campaign.activeLevelId = 'dusty_hollow';
+    onDusty(state);
     step.update(state, 'sunny');
     expect(selectedIds(step)).toEqual(['boomite']);
   });
@@ -1025,7 +1031,7 @@ describe('ChargeStep initial explosive (#2016)', () => {
   it('fills with the preselected explosive: the readout and the Charge All line show its fill of the hole', () => {
     const { step, gameConsole } = makeStep();
     const state = makeState();
-    state.campaign.activeLevelId = 'dusty_hollow';
+    onDusty(state);
     addHole(holeCounter, state.drillHoles, 10, 10, 8, 0.089);
     state.patternCharge = { explosiveId: 'pop_rock', amountKg: null, stemmingM: 2 };
     step.update(state, 'sunny');
@@ -2600,12 +2606,12 @@ describe('ChargeStep — locked explosives on a progression site (#2280)', () =>
     expect(selectable(step)).toHaveLength(getAllExplosives().length);
   });
 
-  it('a site without quests keeps a level list as it is: no locked card for an explosive outside it', () => {
+  it('a site without quests keeps a legacy level list as it is: no locked card for an explosive outside it', () => {
     const { step } = makeStep();
     const state = makeState();
-    state.campaign.activeLevelId = 'dusty_hollow';
+    state.campaign.activeLevelId = 'tutorial_pit'; // keeps its own list until #2318
     step.update(state, 'sunny');
     expect(lockedEls(step)).toHaveLength(0);
-    expect(selectable(step)).toEqual(['pop_rock', 'boomite', 'krackle']);
+    expect(selectable(step)).toEqual(['pop_rock', 'boomite']);
   });
 });

@@ -399,11 +399,13 @@ const shotExplosiveUnlocked = (s: ProbeSession): string => {
 /** Explosive a campaign level of this difficulty tier or above is shot with: krackle breaks only the cells beside its charge in its hard rock at the grade-0 charge cap. */
 const HARD_ROCK_MIN_DIFFICULTY_TIER = 4;
 const HARD_ROCK_EXPLOSIVE = 'dynatomics';
+/** The quest that opens it (tier 3). */
+const HARD_ROCK_QUEST = 'quest_explosive_t3';
 
 function hardRockLevel(s: ProbeSession): boolean {
   const id = s.engine.ctx.campaignProfile.campaign.activeLevelId;
   const level = id ? getLevel(id) : undefined;
-  return (level?.difficultyTier ?? 0) >= HARD_ROCK_MIN_DIFFICULTY_TIER && (level?.availableExplosives.includes(HARD_ROCK_EXPLOSIVE) ?? false);
+  return (level?.difficultyTier ?? 0) >= HARD_ROCK_MIN_DIFFICULTY_TIER && (level?.preset?.completedQuests.includes(HARD_ROCK_QUEST) ?? false);
 }
 
 /** One shot's pattern, charge and (optionally) hole diameter; `SHOT` is the opening's. */
