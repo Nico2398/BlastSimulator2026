@@ -39,7 +39,12 @@ function riderArcsAt(rider: MovementTrail, event: 'board' | 'alight'): number[] 
   return arcs;
 }
 
-export function replayRiderMarkers(scenario: string, batchSize: number): void {
+/**
+ * Replays `scenario` at `batchSize` ticks per batch. With `stopAfterVerified`, the replay ends as soon as that many
+ * board and that many alight markers have been compared against rider trails — a prefix of the scenario that still
+ * contains driver board/alight transitions, for scenarios too long to replay in full at every batch size.
+ */
+export function replayRiderMarkers(scenario: string, batchSize: number, stopAfterVerified?: number): void {
     const def = JSON.parse(readFileSync(resolve(__dirname, `../../scripts/scenario-defs/${scenario}.json`), 'utf8')) as { steps: ScenarioStepDef[] };
     const engine = createGameEngine();
     const { ctx } = engine;
@@ -116,6 +121,8 @@ export function replayRiderMarkers(scenario: string, batchSize: number): void {
       }
     };
 
+    const enough = () => stopAfterVerified !== undefined
+      && verified.boards >= stopAfterVerified && verified.alights >= stopAfterVerified && problems.length === 0;
     const runBatch = (ticks: number, label: string) => {
       batchEvents = new Map();
       readDrivers();
@@ -123,19 +130,21 @@ export function replayRiderMarkers(scenario: string, batchSize: number): void {
       checkBatch(label);
     };
     const runTicks = (total: number, label: string) => {
-      for (let left = total; left > 0; left -= batchSize) runBatch(Math.min(batchSize, left), label);
+      for (let left = total; left > 0 && !enough(); left -= batchSize) runBatch(Math.min(batchSize, left), label);
     };
 
     for (let i = 0; i < def.steps.length; i++) {
       const step = def.steps[i]!;
       if (step.interactionOnly) continue;
       if (ctx.state && hasLevelEnded(ctx.state)) break;
+      if (enough()) break;
       const wait = findWaitUntilAction(step);
       if (wait) {
         for (let n = 0; n < wait.maxTicks; n += batchSize) {
           runBatch(batchSize, `step ${i} wait batch ${n}`);
           const dump = serializeGameState(ctx) as Record<string, unknown> | null;
           if (dump && dump[wait.field] === wait.equals) break;
+          if (enough()) break;
           if (ctx.state?.events.pendingEvent) runCommand(engine, 'event choose 0');
           if (ctx.state && hasLevelEnded(ctx.state)) break;
         }
