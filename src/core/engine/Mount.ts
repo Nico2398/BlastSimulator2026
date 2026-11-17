@@ -233,7 +233,7 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
   const itinerary = employee?.itinerary ?? null;
   const next = itinerary?.legs[1];
   const toward = destination ?? (next ? { x: next.destX, z: next.destZ } : undefined);
-  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward, taken);
+  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward, wasDriver ? taken : [...taken, ...standingBeside(state, vehicle, employeeId)]);
   // The rider's arc up to the vehicle's final position, read before the step onto the alight cell.
   const arcAtVehicle = employee?.walkTrail ? trailArcLength(employee.walkTrail.points) : 0;
   releaseOccupant(state, vehicle, employeeId, employee, cell.x, cell.z);
@@ -248,6 +248,13 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
   }
   emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
   return cell;
+}
+
+/** The cells of the on-foot employees standing beside `vehicle`, which a passenger stepping out must not take (#2290). */
+function standingBeside(state: GameState, vehicle: Vehicle, exceptId: number): Cell[] {
+  return state.employees.employees
+    .filter(e => e.alive && e.id !== exceptId && e.locomotion.kind === 'on_foot' && isWithinBoardingRange(e.x, e.z, vehicle.x, vehicle.z))
+    .map(e => ({ x: e.x, z: e.z }));
 }
 
 /**

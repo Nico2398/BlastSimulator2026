@@ -888,11 +888,14 @@ export function findCheapestTransportItinerary(
 ): Itinerary | null {
   const distToTarget = Math.hypot(resolved.targetX - employee.x, resolved.targetZ - employee.z);
 
-  // Sharing a shuttle already being driven (#2290) ties with a ride of one's own and wins the tie:
-  // it keeps a second vehicle where it is.
-  let best: Itinerary | null = distToTarget > TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS
-    ? buildSharedRideItinerary(state, employee, goal, fidelity, resolved, action)
-    : null;
+  // Sharing a shuttle already being driven (#2290) beats a ride of one's own whenever it beats walking:
+  // it keeps a second vehicle where it is, and the crew arrives together.
+  if (distToTarget > TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS) {
+    const shared = buildSharedRideItinerary(state, employee, goal, fidelity, resolved, action);
+    if (shared !== null && shared.estTotalTicks < footCost) return shared;
+  }
+
+  let best: Itinerary | null = null;
 
   for (const role of getAllVehicleRoles()) {
     // A short trip is walked: no one fetches a travel vehicle for it (#2285).
