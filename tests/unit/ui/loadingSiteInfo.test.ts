@@ -59,6 +59,14 @@ describe('loadingSiteInfo briefing', () => {
     expect(row?.value).toBe(String(getAllExplosives().filter(e => e.tier <= 2).length));
   });
 
+  it('a level with no preset counts the tier 1 explosives only', () => {
+    const { preset: _preset, ...bare } = getLevel('tutorial_pit')!;
+    const rows = buildLoadingSiteInfo(bare).briefing ?? [];
+    const withPreset = buildLoadingSiteInfo(getLevel('tutorial_pit')!).briefing ?? [];
+    const count = (rs: typeof rows) => rs.find(r => r.labelKey === 'loading.brief.explosives')!.value;
+    expect(count(rows)).toBe(count(withPreset));
+  });
+
   it('sandbox info has no site number, zero difficulty and sandbox subtitle for each biome', () => {
     const cases: Array<[string, string]> = [
       ['desert_badlands', 'ui.portfolio.biome.desert'],
