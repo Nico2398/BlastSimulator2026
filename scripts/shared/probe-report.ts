@@ -162,3 +162,9 @@ export function formatGradeSummary(results: readonly RunResult[]): string {
 export function toJson(results: readonly RunResult[], opts: ProbeOptions): string {
   return JSON.stringify({ options: opts, results }, null, 2);
 }
+
+/** Per (biome, kit, strategy) group: the tick each catalog quest and each frontier mark was reached (#2322). */
+export function formatMilestoneSummary(results: readonly RunResult[]): string {
+  void results;
+  throw new Error('not implemented');
+}

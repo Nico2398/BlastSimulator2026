@@ -18,6 +18,8 @@ export interface ProbeRunConfig {
   maxHaulers?: number;
   /** How pending events are answered; absent = 'first'. */
   eventPolicy?: EventPolicy;
+  /** Permit grade the sandbox starts at (#2322); absent = the sandbox default. */
+  startGrade?: number;
   /** Ticks the crew idles on payroll before the strategy's first order (#2118); absent = 0. */
   startDelay?: number;
 }

@@ -56,6 +56,27 @@ function salesCostWindows(transactions: readonly Transaction[]): Array<number | 
   });
 }
 
+/** Sales income per tick over each grade's span of the run: grade 0 from tick 0, grade g from its reached tick, to the next grade or `endTick`. */
+export function gradeEarningsPerTick(
+  transactions: readonly Transaction[],
+  gradeReachedTick: Readonly<Record<number, number>>,
+  endTick: number,
+): Record<number, number> {
+  void transactions;
+  void gradeReachedTick;
+  void endTick;
+  throw new Error('not implemented');
+}
+
+/** The milestones of the frontier mechanics the probe reports, in report order. */
+export const FRONTIER_MARKS = ['bench2', 'prospection', 'shuttle', 'detector', 'island', 'treranium'] as const;
+
+/** The frontier marks that hold in this state, in `FRONTIER_MARKS` order. */
+export function frontierMarks(state: GameState): string[] {
+  void state;
+  throw new Error('not implemented');
+}
+
 /** Ticks at which cash is sampled for the report. */
 export const CASH_SAMPLE_TICKS = [1000, 3000, 6000, 10000, 15000, 25000, 40000, 50000] as const;
 
@@ -74,6 +95,12 @@ interface ProbeMetrics {
   tierReachedTick?: Record<string, number>;
   /** Deepest pit (m) the grade tracker had measured by each cash sample tick; null past the run and throughout off the progression ladder. */
   pitDepthAt?: Record<number, number | null>;
+  /** Tick each quest id first showed as completed (#2322). */
+  questTicks?: Record<string, number>;
+  /** Tick each frontier mark (`FRONTIER_MARKS`) first held (#2322). */
+  frontierTicks?: Record<string, number>;
+  /** Sales income per tick over each grade's span of the run, by grade (#2322). */
+  gradeEarnPerTick?: Record<number, number>;
   /** Cash at the tick each grade was first reached, by grade. */
   gradeCashAt: Record<number, number>;
   /** First tick every building type is owned at its max purchasable tier and every vehicle role at tier 3; null if never. */
