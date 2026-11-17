@@ -2710,6 +2710,7 @@
   "ui.crew.task_resting": "Resting",
   "ui.crew.task_driving": "Driving {vehicle}",
   "ui.crew.task_driving_to_task": "Driving to task ({vehicle})",
+  "ui.crew.task_riding": "Riding {vehicle}",
   "ui.crew.task_walking": "Walking",
   "ui.crew.task_walking_to": "Walking to {task}",
   "ui.crew.training_walking": "Walking to training",

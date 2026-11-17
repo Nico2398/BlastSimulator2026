@@ -19,7 +19,7 @@ export interface CrewCriteria {
 
 /** Activity kinds each activity-backed status choice covers; `injured` reads the flag instead. */
 const STATUS_KINDS: Record<Exclude<CrewStatusChoice, 'injured'>, readonly EmployeeActivityKind[]> = {
-  working: ['working', 'driving', 'driving_to_task', 'walking', 'training'],
+  working: ['working', 'driving', 'driving_to_task', 'riding', 'walking', 'training'],
   resting: ['resting'],
   idle: ['idle'],
   stuck: ['stuck', 'collapsed'],

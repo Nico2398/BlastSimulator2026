@@ -96,6 +96,10 @@ describe('pictogramKindFor', () => {
     expect(pictogramKindFor(makeActivity('training'))).toBeNull();
   });
 
+  it('returns null for kind "riding" — a passenger is aboard, no character mesh to hang a pictogram off of (#2290)', () => {
+    expect(pictogramKindFor(makeActivity('riding'))).toBeNull();
+  });
+
   it('returns "collapsed" for kind "collapsed"', () => {
     expect(pictogramKindFor(makeActivity('collapsed'))).toBe('collapsed');
   });
