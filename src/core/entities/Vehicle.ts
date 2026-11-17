@@ -13,6 +13,8 @@ import {
   NAV_MAX_SLOPE_RATIO,
   VEHICLE_MAX_SLOPE_RATIO,
   TRAVEL_VEHICLE_MAX_SLOPE_RATIO,
+  TRAVEL_VEHICLE_SEATS,
+  VEHICLE_SEAT_COUNT,
 } from '../config/balance.js';
 import type { Employee } from './Employee.js';
 import { computeTaskDuration } from './EmployeeTaskDuration.js';
@@ -212,13 +214,13 @@ export function vehicleDriverId(vehicle: Vehicle): number | null {
 }
 
 /** Seats of `vehicle` (driver included): per tier for the travel role, per role otherwise (#2290). */
-export function vehicleSeatCount(_vehicle: { type: VehicleRole; tier: VehicleTier }): number {
-  throw new Error('not implemented');
+export function vehicleSeatCount(vehicle: { type: VehicleRole; tier: VehicleTier }): number {
+  return vehicle.type === 'travel_vehicle' ? TRAVEL_VEHICLE_SEATS[vehicle.tier] : VEHICLE_SEAT_COUNT[vehicle.type];
 }
 
 /** The employees riding `vehicle` without driving it: every occupant after the driver (#2290). */
-export function vehiclePassengerIds(_vehicle: Vehicle): number[] {
-  throw new Error('not implemented');
+export function vehiclePassengerIds(vehicle: Vehicle): number[] {
+  return vehicle.occupantIds.slice(1);
 }
 
 /**

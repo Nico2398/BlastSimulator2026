@@ -8,6 +8,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import { planItinerary, buildBoardLeg, hasFreeSeatFor } from './PlanItinerary.js';
 import { leaveBuildingIfInside } from './Mount.js';
+import { holdShuttleForPassenger } from './SharedRide.js';
 import { isMounted } from '../entities/EmployeeLocomotion.js';
 import { getBuildingPeopleCapacity } from '../entities/Building.js';
 import { t } from '../i18n/I18n.js';
@@ -149,6 +150,7 @@ export function moveTo(
 
     employee.itinerary = itinerary;
     syncItineraryMirrors(employee);
+    holdShuttleForPassenger(state, itinerary);
     return { success: true };
   }
 
@@ -157,6 +159,7 @@ export function moveTo(
 
   employee.itinerary = itinerary;
   syncItineraryMirrors(employee);
+  holdShuttleForPassenger(state, itinerary);
   return { success: true };
 }
 
@@ -206,7 +209,8 @@ export function alightOnArrival(employee: Employee | undefined): void {
  */
 export function syncItineraryMirrors(employee: Employee): void {
   const leg = employee.itinerary?.legs[0];
-  employee.pendingDriverVehicleId = leg !== undefined && leg.onArrive.kind === 'board'
+  // A passenger's board step (#2290) is no driver's order: it names no vehicle to drive.
+  employee.pendingDriverVehicleId = leg !== undefined && leg.onArrive.kind === 'board' && leg.onArrive.passenger !== true
     ? leg.onArrive.vehicleId
     : null;
   employee.destinationX = leg !== undefined ? leg.destX : null;
