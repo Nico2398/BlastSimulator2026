@@ -144,6 +144,16 @@ function applyStatusTints(instance: ModelInstance, employee: Employee): void {
   }
 }
 
+/** A worker model of `employee`'s role, painted with their garment, skin and hair — what a character and a seated rider both wear. */
+export function dressWorker(library: ModelLibrary, employee: Employee): ModelInstance {
+  const instance = library.instantiate(workerModelId(employee.role), { size: FALLBACK_SIZE, tint: ROLE_TINT });
+  applyStatusTints(instance, employee);
+  const skin = paletteFor(employee.id, SKIN_TONES, 1);
+  instance.tints.get(SKIN_TINT)?.color.setHex(skin);
+  instance.tints.get(HAIR_TINT)?.color.setHex(hairFor(employee.id, skin));
+  return instance;
+}
+
 // ---------- Main class ----------
 
 export class CharacterMesh {
@@ -360,11 +370,7 @@ export class CharacterMesh {
   }
 
   private attachModel(group: THREE.Group, employee: Employee): { instance: ModelInstance; animator: WorkerAnimator | null } {
-    const instance = this.library.instantiate(workerModelId(employee.role), { size: FALLBACK_SIZE, tint: ROLE_TINT });
-    applyStatusTints(instance, employee);
-    const skin = paletteFor(employee.id, SKIN_TONES, 1);
-    instance.tints.get(SKIN_TINT)?.color.setHex(skin);
-    instance.tints.get(HAIR_TINT)?.color.setHex(hairFor(employee.id, skin));
+    const instance = dressWorker(this.library, employee);
     group.add(instance.root);
     group.userData[OVERLAY_Y_KEY] = instance.bounds.max.y + OVERLAY_CLEARANCE;
     const rig = instance.isFallback ? null : workerRig(instance.root);
