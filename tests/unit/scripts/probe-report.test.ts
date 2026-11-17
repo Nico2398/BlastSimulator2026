@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { formatTable, toJson } from '../../../scripts/shared/probe-report.js';
+import { beforeAll, describe, it, expect } from 'vitest';
+import { formatGradeSummary, formatMilestoneSummary, formatTable, toJson } from '../../../scripts/shared/probe-report.js';
 import { PROBE_DEFAULTS } from '../../../scripts/shared/probe-config.js';
-import type { RunResult } from '../../../scripts/shared/probe-metrics.js';
+import { FRONTIER_MARKS, type RunResult } from '../../../scripts/shared/probe-metrics.js';
+import { getAllQuests } from '../../../src/core/economy/QuestCatalog.js';
 
 function makeResult(seed: number, over: Partial<RunResult['metrics']> = {}): RunResult {
   return {
@@ -224,5 +225,157 @@ describe('probe-report sales/costs columns (#2117)', () => {
     expect(m.firstSaleTick).toBe(1200);
     expect(m.salesCostRatio).toBe(1.5);
     expect(m.salesCostWindows).toEqual([1, null, 2, 3]);
+  });
+});
+
+const rowCells = (l: string): string[] => l.split('|').slice(1, -1).map(c => c.trim());
+
+describe('probe-report quest and frontier columns (#2322)', () => {
+  const withTicks = makeResult(1, {
+    questTicks: { quest_explosive_t2: 1200, quest_building_t2: 800 },
+    frontierTicks: { bench2: 500, shuttle: 2600 },
+  });
+  const table = formatTable([withTicks, makeResult(2)]);
+  const lines = table.split('\n').filter(l => l.trim());
+  const header = rowCells(lines[0]!);
+  const questAt = header.indexOf('quest ticks');
+  const frontierAt = header.indexOf('frontier');
+  const words = (c: string) => c.split(' ').sort();
+
+  it('puts quest ticks and frontier right after grade cash', () => {
+    expect(header.indexOf('grade cash')).toBeGreaterThanOrEqual(0);
+    expect(questAt).toBe(header.indexOf('grade cash') + 1);
+    expect(frontierAt).toBe(questAt + 1);
+  });
+
+  it('lists id@tick pairs of a run space separated', () => {
+    const r = rowCells(lines[2]!);
+    expect(words(r[questAt]!)).toEqual(['quest_building_t2@800', 'quest_explosive_t2@1200']);
+    expect(words(r[frontierAt]!)).toEqual(['bench2@500', 'shuttle@2600']);
+  });
+
+  it('shows - for a run without quests or marks', () => {
+    const r = rowCells(lines[3]!);
+    expect(r[questAt]).toBe('-');
+    expect(r[frontierAt]).toBe('-');
+  });
+
+  it('shows - in both columns of the median row', () => {
+    const r = rowCells(lines[4]!);
+    expect(r[0]).toBe('median(2)');
+    expect(r[questAt]).toBe('-');
+    expect(r[frontierAt]).toBe('-');
+  });
+
+  it('keeps every row as wide as the header', () => {
+    for (const l of lines) expect(rowCells(l)).toHaveLength(header.length);
+  });
+});
+
+describe('probe-report formatGradeSummary earn/tick (#2322)', () => {
+  const ladder = (seed: number, over: Partial<RunResult['metrics']>): RunResult => {
+    const r = makeResult(seed, over);
+    r.config.strategy = 'ladder';
+    return r;
+  };
+  const rows = (out: string) => out.split('\n').filter(l => l.trim()).map(rowCells);
+
+  it('has an earn/tick column right before window', () => {
+    const header = rows(formatGradeSummary([ladder(1, {})]))[0]!;
+    expect(header).toContain('earn/tick');
+    expect(header.indexOf('earn/tick')).toBe(header.indexOf('window') - 1);
+  });
+
+  it('shows the median over reaching runs with 2 decimals', () => {
+    const out = rows(formatGradeSummary([
+      ladder(1, { gradeReachedTick: { 1: 100 }, gradeEarnPerTick: { 1: 2.5 } }),
+      ladder(2, { gradeReachedTick: { 1: 200 }, gradeEarnPerTick: { 1: 3.75 } }),
+      ladder(3, { gradeReachedTick: {}, gradeEarnPerTick: { 1: 900 } }),
+    ]));
+    const at = out[0]!.indexOf('earn/tick');
+    const g1 = out.find(r => r[3] === '1')!;
+    expect(g1[at]).toBe('3.13');
+  });
+
+  it('rounds to 2 decimals', () => {
+    const out = rows(formatGradeSummary([ladder(1, { gradeReachedTick: { 1: 100 }, gradeEarnPerTick: { 1: 2 / 3 } })]));
+    expect(out.find(r => r[3] === '1')![out[0]!.indexOf('earn/tick')]).toBe('0.67');
+  });
+
+  it('shows - for a grade no run reached or without earnings, and on tier rows', () => {
+    const r = ladder(1, { gradeReachedTick: { 1: 100, 2: 200 }, gradeEarnPerTick: { 1: 1 }, tierReachedTick: { '1.1': 1000 } });
+    const out = rows(formatGradeSummary([r]));
+    const at = out[0]!.indexOf('earn/tick');
+    expect(out.find(x => x[3] === '3')![at]).toBe('-');
+    expect(out.find(x => x[3] === '2')![at]).toBe('-');
+    expect(out.find(x => x[3] === 't1.1')![at]).toBe('-');
+  });
+
+  it('keeps every row as wide as the header', () => {
+    const out = rows(formatGradeSummary([ladder(1, { gradeReachedTick: { 1: 100 }, gradeEarnPerTick: { 1: 1 } })]));
+    for (const r of out) expect(r).toHaveLength(out[0]!.length);
+  });
+});
+
+describe('probe-report formatMilestoneSummary (#2322)', () => {
+  const questIds = getAllQuests().map(q => q.id);
+  const first = questIds[0]!;
+  const ladder = (seed: number, over: Partial<RunResult['metrics']>, strategy: RunResult['config']['strategy'] = 'ladder'): RunResult => {
+    const r = makeResult(seed, over);
+    r.config.strategy = strategy;
+    return r;
+  };
+  const rows = (out: string) => out.split('\n').filter(l => l.trim()).map(rowCells);
+  const group = [
+    ladder(1, { questTicks: { [first]: 100 }, frontierTicks: { bench2: 400, shuttle: 3000 } }),
+    ladder(2, { questTicks: { [first]: 300 }, frontierTicks: { bench2: 600 } }),
+    ladder(3, {}),
+  ];
+  let out: string[][] = [];
+  beforeAll(() => { out = rows(formatMilestoneSummary(group)); });
+
+  it('has the milestone headers', () => {
+    expect(out[0]).toEqual(['biome', 'kit', 'strategy', 'milestone', 'reached', 'median tick']);
+    expect(out[1]!.every(c => /^:?-+:?$/.test(c))).toBe(true);
+  });
+
+  it('lists one row per catalog quest, then per frontier mark, in order', () => {
+    const body = out.slice(2);
+    expect(body.map(r => r[3])).toEqual([
+      ...questIds.map(id => `quest:${id}`),
+      ...FRONTIER_MARKS.map(m => `frontier:${m}`),
+    ]);
+    for (const r of body) expect(r).toHaveLength(6);
+    expect(body[0]!.slice(0, 3)).toEqual(['desert_badlands', 'digger', 'ladder']);
+  });
+
+  it('shows runs reached over runs total and the median tick of the reaching runs', () => {
+    const body = out.slice(2);
+    const quest = body.find(r => r[3] === `quest:${first}`)!;
+    expect(quest[4]).toBe('2/3');
+    expect(quest[5]).toBe('200');
+    const bench = body.find(r => r[3] === 'frontier:bench2')!;
+    expect(bench[4]).toBe('2/3');
+    expect(bench[5]).toBe('500');
+    const shuttle = body.find(r => r[3] === 'frontier:shuttle')!;
+    expect(shuttle[4]).toBe('1/3');
+    expect(shuttle[5]).toBe('3000');
+  });
+
+  it('shows 0/n and - for a milestone no run reached', () => {
+    const treranium = out.slice(2).find(r => r[3] === 'frontier:treranium')!;
+    expect(treranium[4]).toBe('0/3');
+    expect(treranium[5]).toBe('-');
+  });
+
+  it('writes one block of rows per (biome, kit, strategy) group', () => {
+    const two = rows(formatMilestoneSummary([...group, ladder(4, {}, 'reinvest')])).slice(2);
+    expect(two).toHaveLength(2 * (questIds.length + FRONTIER_MARKS.length));
+    expect(new Set(two.map(r => r[2]))).toEqual(new Set(['ladder', 'reinvest']));
+  });
+
+  it('is deterministic and an empty list yields header and separator only', () => {
+    expect(formatMilestoneSummary(group)).toBe(formatMilestoneSummary(group));
+    expect(rows(formatMilestoneSummary([]))).toHaveLength(2);
   });
 });

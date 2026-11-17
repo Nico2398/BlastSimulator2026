@@ -25,6 +25,7 @@
 // grade 3 inside its window (8,000-14,000 ticks), about half an hour to `--horizon 14000`. Reaching
 // grade 5 takes `--horizon 50000`, hours of run time: a measurement, never a CI check. Ladder runs also
 // print a per-grade summary (median tick and cash at each grade against the target windows) after the table.
+// The milestone summary lists the tick of each quest completion and frontier mark (bench2, prospection, shuttle, detector, island, treranium); from G2 the ladder plays those mechanics (#2322).
 //
 // The full default matrix (24 runs to 10000 ticks) outlives one foreground Bash
 // call, so run it detached and wait inside the same turn, always with an
@@ -43,13 +44,13 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { parseArgs } from './shared/probe-config.js';
 import { runMatrix } from './shared/probe-strategies.js';
-import { formatGradeSummary, formatTable, toJson } from './shared/probe-report.js';
+import { formatGradeSummary, formatMilestoneSummary, formatTable, toJson } from './shared/probe-report.js';
 
 export function main(argv: readonly string[]): void {
   const opts = parseArgs(argv);
   const results = runMatrix(opts);
   console.log(formatTable(results));
-  if (opts.strategies.some(id => id === 'ladder' || id === 'stay_g1')) console.log(`\n${formatGradeSummary(results)}`);
+  if (opts.strategies.some(id => id === 'ladder' || id === 'stay_g1')) console.log(`\n${formatGradeSummary(results)}\n\n${formatMilestoneSummary(results)}`);
   if (opts.jsonPath) {
     mkdirSync(dirname(resolve(opts.jsonPath)), { recursive: true });
     writeFileSync(opts.jsonPath, toJson(results, opts));

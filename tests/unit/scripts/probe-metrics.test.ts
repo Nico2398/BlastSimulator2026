@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { CASH_SAMPLE_TICKS, MetricsObserver, fragmentOreKg, salesCostsAfterFirstSale } from '../../../scripts/shared/probe-metrics.js';
+import {
+  CASH_SAMPLE_TICKS, FRONTIER_MARKS, MetricsObserver, fragmentOreKg, frontierMarks, gradeEarningsPerTick, salesCostsAfterFirstSale,
+} from '../../../scripts/shared/probe-metrics.js';
 import type { GameState } from '../../../src/core/state/GameState.js';
 import type { Transaction } from '../../../src/core/economy/Finance.js';
 
@@ -338,5 +340,175 @@ describe('MetricsObserver tiers (#2277)', () => {
     at(40, 0, 3);
     at(50, 1, 1);
     expect(obs.finalize().tierReachedTick).toEqual({ '0.2': 20, '0.3': 40, '1.1': 50 });
+  });
+});
+
+describe('gradeEarningsPerTick (#2322)', () => {
+  it('divides the sales income of each grade span by the ticks of that span', () => {
+    const ledger = [income(50, 400), income(150, 600, 'sales'), income(350, 1000, 'bonus')];
+    const r = gradeEarningsPerTick(ledger, { 1: 100, 2: 300 }, 500);
+    expect(r[0]).toBeCloseTo(4, 9);
+    expect(r[1]).toBeCloseTo(3, 9);
+    expect(r[2]).toBeCloseTo(5, 9);
+  });
+
+  it('puts an income on the tick a grade was reached into that grade', () => {
+    const r = gradeEarningsPerTick([income(100, 200)], { 1: 100 }, 200);
+    expect(r[0]).toBeCloseTo(0, 9);
+    expect(r[1]).toBeCloseTo(2, 9);
+  });
+
+  it('leaves out income on or after the end tick', () => {
+    const r = gradeEarningsPerTick([income(100, 500), income(200, 9999)], {}, 200);
+    expect(r[0]).toBeCloseTo(2.5, 9);
+  });
+
+  it('counts sales income only, never expenses or other categories', () => {
+    const ledger = [
+      income(10, 100), expense(20, 5000), income(30, 7000, 'refund'), income(40, 7000, 'events'), income(50, 7000, 'smuggling'),
+    ];
+    expect(gradeEarningsPerTick(ledger, {}, 100)[0]).toBeCloseTo(1, 9);
+  });
+
+  it('reports zero for a grade that earned nothing', () => {
+    const r = gradeEarningsPerTick([income(10, 100)], { 1: 50 }, 100);
+    expect(r[1]).toBe(0);
+  });
+
+  it('omits a grade whose span has no ticks', () => {
+    const r = gradeEarningsPerTick([income(10, 100)], { 1: 0, 2: 100 }, 100);
+    expect(r).not.toHaveProperty('0');
+    expect(r[1]).toBeCloseTo(1, 9);
+    expect(r).not.toHaveProperty('2');
+  });
+
+  it('omits an earlier grade when two grades were reached on one tick', () => {
+    const r = gradeEarningsPerTick([income(150, 100)], { 1: 100, 2: 100 }, 200);
+    expect(r).not.toHaveProperty('1');
+    expect(r[2]).toBeCloseTo(1, 9);
+  });
+
+  it('is empty for no ticks at all and zero for no transactions', () => {
+    expect(gradeEarningsPerTick([], {}, 0)).toEqual({});
+    expect(gradeEarningsPerTick([], { 1: 10 }, 20)).toEqual({ 0: 0, 1: 0 });
+  });
+});
+
+describe('frontierMarks (#2322)', () => {
+  const state = (over: object): GameState => ({ grade: { grade: 0, deepestPitM: 0 }, ...over }) as unknown as GameState;
+  const surveys = (...methods: string[]) => methods.map((method, id) => ({ id, method }));
+
+  it('lists the marks in report order', () => {
+    expect([...FRONTIER_MARKS]).toEqual(['bench2', 'prospection', 'shuttle', 'detector', 'island', 'treranium']);
+  });
+
+  it('is empty for a bare state, partial fixtures read as false', () => {
+    expect(frontierMarks({} as unknown as GameState)).toEqual([]);
+    expect(frontierMarks(state({}))).toEqual([]);
+  });
+
+  it('marks bench2 from grade 1 with a pit deeper than the first bench', () => {
+    expect(frontierMarks(state({ grade: { grade: 1, deepestPitM: 6 } }))).toEqual(['bench2']);
+    expect(frontierMarks(state({ grade: { grade: 1, deepestPitM: 5 } }))).toEqual([]);
+    expect(frontierMarks(state({ grade: { grade: 0, deepestPitM: 30 } }))).toEqual([]);
+  });
+
+  it('marks prospection and detector from the survey methods, not other surveys', () => {
+    expect(frontierMarks(state({ surveyResults: surveys('seismic', 'aerial') }))).toEqual([]);
+    expect(frontierMarks(state({ surveyResults: surveys('prospection') }))).toEqual(['prospection']);
+    expect(frontierMarks(state({ surveyResults: surveys('meteorite_detector') }))).toEqual(['detector']);
+  });
+
+  it('marks shuttle from a travel vehicle', () => {
+    expect(frontierMarks(state({ vehicles: { vehicles: [{ type: 'drill_rig' }] } }))).toEqual([]);
+    expect(frontierMarks(state({ vehicles: { vehicles: [{ type: 'drill_rig' }, { type: 'travel_vehicle' }] } }))).toEqual(['shuttle']);
+  });
+
+  it('marks island on craktonite or absurdium ore and treranium on treranium', () => {
+    const ore = (oreYields: Record<string, number>) => state({ lastOreReport: { oreYields } });
+    expect(frontierMarks(ore({ iron: 900 }))).toEqual([]);
+    expect(frontierMarks(ore({ craktonite: 5 }))).toEqual(['island']);
+    expect(frontierMarks(ore({ absurdium: 5 }))).toEqual(['island']);
+    expect(frontierMarks(ore({ craktonite: 0, absurdium: 0, treranium: 0 }))).toEqual([]);
+    expect(frontierMarks(ore({ treranium: 1 }))).toEqual(['treranium']);
+    expect(frontierMarks(state({ lastOreReport: null }))).toEqual([]);
+  });
+
+  it('returns every mark that holds, in report order', () => {
+    const all = state({
+      grade: { grade: 3, deepestPitM: 12 },
+      surveyResults: surveys('meteorite_detector', 'prospection'),
+      vehicles: { vehicles: [{ type: 'travel_vehicle' }] },
+      lastOreReport: { oreYields: { craktonite: 1, treranium: 1 } },
+    });
+    expect(frontierMarks(all)).toEqual([...FRONTIER_MARKS]);
+  });
+});
+
+describe('MetricsObserver quest and frontier ticks (#2322)', () => {
+  type Extra = Record<string, unknown>;
+  const at = (tick: number, extra: Extra = {}): GameState => ({ ...(synthetic({ tick }) as unknown as Extra), ...extra }) as unknown as GameState;
+  const quests = (...completed: string[]) => ({ quests: { completed } });
+
+  it('records the tick each quest was first seen completed and keeps it', () => {
+    const obs = new MetricsObserver();
+    obs.onTick(at(10, quests()));
+    obs.onTick(at(20, quests('quest_a')));
+    obs.onTick(at(30, quests('quest_a', 'quest_b')));
+    obs.onTick(at(40, quests('quest_a', 'quest_b')));
+    expect(obs.finalize().questTicks).toEqual({ quest_a: 20, quest_b: 30 });
+  });
+
+  it('records a quest already completed at the first observed tick on that tick', () => {
+    const obs = new MetricsObserver();
+    obs.onTick(at(7, quests('quest_a')));
+    expect(obs.finalize().questTicks).toEqual({ quest_a: 7 });
+  });
+
+  it('has no quest ticks without a quest state', () => {
+    const obs = new MetricsObserver();
+    obs.onTick(at(5));
+    expect(obs.finalize().questTicks ?? {}).toEqual({});
+  });
+
+  it('records the first tick each frontier mark held', () => {
+    const obs = new MetricsObserver();
+    obs.onTick(at(10));
+    obs.onTick(at(20, { vehicles: { vehicles: [{ type: 'travel_vehicle' }] } }));
+    obs.onTick(at(30, { vehicles: { vehicles: [{ type: 'travel_vehicle' }] }, surveyResults: [{ id: 1, method: 'prospection' }] }));
+    obs.onTick(at(40, { vehicles: { vehicles: [] }, surveyResults: [{ id: 1, method: 'prospection' }] }));
+    expect(obs.finalize().frontierTicks).toEqual({ shuttle: 20, prospection: 30 });
+  });
+
+  it('has no frontier ticks when no mark ever held', () => {
+    const obs = new MetricsObserver();
+    obs.onTick(at(5));
+    expect(obs.finalize().frontierTicks ?? {}).toEqual({});
+  });
+
+  it('computes the per-grade earnings per tick over the ledger, reached ticks and last tick', () => {
+    const obs = new MetricsObserver();
+    const finances = { transactions: [income(50, 400), income(150, 600, 'sales'), expense(160, 9999)] };
+    const step = (tick: number, grade: number) => {
+      const s = at(tick, { finances }) as unknown as { grade: { grade: number } };
+      s.grade = { grade };
+      obs.onTick(s as unknown as GameState);
+    };
+    step(10, 0);
+    step(100, 1);
+    step(300, 1);
+    const per = obs.finalize().gradeEarnPerTick!;
+    expect(per[0]).toBeCloseTo(4, 9);
+    expect(per[1]).toBeCloseTo(3, 9);
+    expect(per).not.toHaveProperty('2');
+  });
+
+  it('serializes the new metrics deterministically', () => {
+    const build = () => {
+      const obs = new MetricsObserver();
+      obs.onTick(at(10, quests('quest_a')));
+      return JSON.stringify(obs.finalize());
+    };
+    expect(build()).toBe(build());
   });
 });

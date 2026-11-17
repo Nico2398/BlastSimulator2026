@@ -111,6 +111,8 @@ import { resolveStarterDeposit } from '../../src/core/world/StarterDeposit.js';
 import { oreGradeScaleOf } from '../../src/core/economy/OreGrade.js';
 import { BLAST_ZONE_CLEAR_MARGIN, playContracts, playTick, clearBlastZone, type Run } from './player-actions.js';
 import { MetricsObserver, fragmentOreKg, type RunResult } from './probe-metrics.js';
+import { decideExpedition, expeditionOrigin } from './probe-ladder-frontier.js';
+import { expeditionTarget, newFrontierMemory, playFrontier, shuttleCount, type FrontierMemory } from './probe-ladder-frontier-play.js';
 import type { ProbeOptions, ProbeRunConfig, StrategyId } from './probe-config.js';
 import { expandMatrix } from './probe-config.js';
 
@@ -1793,6 +1795,38 @@ function ladderHaulers(s: ProbeSession, m: ReinvestMemory): void {
  */
 const LADDER_SHIFT_POLICY = 'set_policy mode:shift_12h fatigue:60';
 
+/**
+ * The ladder's shot plan with the frontier mechanics in front (#2322): once a survey names a target (an island at G2, the
+ * estimated crater at G3) and a shuttle stands in the fleet, one shot is ordered there, with no pit-rubble gate of its own.
+ * Each target is tried once. The shot is not a pit shot: `trackFrontierShot` keeps it out of the pit's memory.
+ */
+function frontierLadderPlan(s: ProbeSession, m: LadderMemory, f: FrontierMemory): ShotPlan {
+  const base = gatedLadderPlan(s, m);
+  const target = expeditionTarget(s.state, f);
+  const cost = SHOT_EXPLOSIVE_KG + RE_FIRE_CASH_CUSHION;
+  const go = decideExpedition({
+    hasTarget: target !== null, shuttles: shuttleCount(s.state), cash: s.state.cash, cost, reserve: LADDER_UPGRADE_RESERVE,
+    inFlight: f.expedition !== null,
+  });
+  if (go === 'wait' || target === null) return base;
+  return {
+    wanted: true, gateExempt: true, cost,
+    order: () => {
+      f.shotAt.push(target);
+      const shot = orderShot(s, [], undefined, expeditionOrigin(target, SHOT_SPAN), undefined, []);
+      if (shot) f.expedition = { originsLen: m.origins.length };
+      return shot;
+    },
+  };
+}
+
+/** Once the expedition shot is over (fired or given up), forget it in the pit's memory: its origin is not a crater to ramp or deepen. */
+function trackFrontierShot(m: LadderMemory, f: FrontierMemory): void {
+  if (f.expedition === null || m.shot !== null) return;
+  m.origins.length = Math.min(m.origins.length, f.expedition.originsLen);
+  f.expedition = null;
+}
+
 function runLadder(s: ProbeSession, maxGrade: number | null): void {
   const opened = runOpening(s, false);
   s.run(LADDER_SHIFT_POLICY);
@@ -1805,7 +1839,9 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
   };
   recordRamp(m, opened.at, opened.ramp);
   s.ladderAccess = m.access;
+  const frontier = newFrontierMemory();
   playOut(s, () => {
+    playFrontier(s, frontier, LADDER_UPGRADE_RESERVE);
     playPitLogistics(s.run, s.state, s.grid, m.access);
     ladderPermit(s, m);
     replaceLostCrew(s, m);
@@ -1813,7 +1849,8 @@ function runLadder(s: ProbeSession, maxGrade: number | null): void {
     keepStorageFlowing(s, m);
     ladderSafety(s, m);
     dropUnreachablePattern(s, m);
-    reinvestShot(s, m, () => gatedLadderPlan(s, m));
+    reinvestShot(s, m, () => frontierLadderPlan(s, m, frontier));
+    trackFrontierShot(m, frontier);
     trackLadderShot(s, m);
     const last = m.origins[m.origins.length - 1]!;
     if (last.x !== m.crater.x || last.z !== m.crater.z) m.crater = { x: last.x, z: last.z, span: last.span ?? SHOT_SPAN };
@@ -1914,7 +1951,7 @@ export function runProbe(config: ProbeRunConfig, start?: (engine: RunnerWithCont
   try {
     const opened = start
       ? start(session.engine)
-      : runCommand(session.engine, `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}`).success;
+      : runCommand(session.engine, `sandbox start biome:${config.biome} kit:${config.kit} seed:${config.seed}${config.startGrade === undefined ? '' : ` grade:${config.startGrade}`}`).success;
     if (!opened) throw new ProbeStop('opening_failed:sandbox_start');
     // The crew idles on payroll before the strategy's first order; events still get the run's policy (#2118).
     for (let i = 0; i < (config.startDelay ?? 0); i++) session.tick();
