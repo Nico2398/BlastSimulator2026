@@ -27,6 +27,7 @@ import { tickLocomotion } from '../../../src/core/engine/Locomotion.js';
 import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS } from '../../../src/core/config/balance.js';
 import { installGradedRamps, bandCentreZ } from '../../helpers/gradedRamps.js';
+import { buildSlopedWorld, plateauStartX, corridorCentreZ, type SlopedWorldOpts } from '../../helpers/slopedWorld.js';
 
 const SEED = 42;
 
@@ -838,5 +839,159 @@ describe('planItinerary — one vehicle climb limit (#1938, #2045)', () => {
       expect(visited.some(onSteepRamp)).toBe(true);
       expect(Math.hypot(p.vehicle.x - TARGET.x, p.vehicle.z - TARGET.z)).toBeLessThan(3);
     });
+  });
+});
+
+
+// ── A shuttle is held to its own, lower climb limit (#2288 C2, C3) ──────────────────────────────────────
+
+describe('planItinerary — the travel vehicle on a progression site (#2288)', () => {
+  const FLOOR_END = 40;
+  const RISE = 1.2;
+  const TARGET_X = 90;
+  const STEEP = 14; // over the 8 degree shuttle limit, under the 20 degree work limit
+  const GENTLE = 6; // under both
+
+  /** A progression (or not) site on a floor/plateau world; `degrees` lists one corridor each. */
+  function world(degrees: number[], progression: boolean) {
+    const opts: SlopedWorldOpts = { width: 100, floorEnd: FLOOR_END, rise: RISE, degrees };
+    const state = createGame({ seed: SEED });
+    state.navGrid = buildSlopedWorld(opts);
+    if (progression) state.grade = createGradeState();
+    return { state, opts };
+  }
+
+  function unlicensed(state: GameState, x: number, z: number): Employee {
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), x, z);
+    employee.qualifications = [];
+    return employee;
+  }
+
+  /** Hands the order to `employee`, plans it and drives the itinerary, recording where `vehicle` stood each tick. */
+  function commute(state: GameState, employee: Employee, action: PendingAction, vehicle: { x: number; z: number }) {
+    state.pendingActions.push(action);
+    action.status = 'assigned';
+    action.holderId = employee.id;
+    employee.activeActionId = action.id;
+    employee.itinerary = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { action });
+    // The executor consumes the live itinerary's legs, so keep a copy of the plan as made.
+    const planned = employee.itinerary === null ? null : structuredClone(employee.itinerary);
+    const visited: Array<{ x: number; z: number }> = [];
+    for (let i = 0; i < 1500 && employee.itinerary !== null; i++) {
+      tickLocomotion(state);
+      visited.push({ x: vehicle.x, z: vehicle.z });
+    }
+    return { planned, visited, finished: employee.itinerary === null };
+  }
+
+  const farOrder = (targetZ: number): PendingAction => makeAction({ id: 1, targetX: TARGET_X, targetZ });
+  const ridesVehicle = (it: NonNullable<ReturnType<typeof planItinerary>>, id: number): boolean =>
+    it.legs.some(l => l.mode === 'drive' && l.vehicleId === id);
+  const onRamp = (v: { x: number }): boolean => v.x > FLOOR_END + 1;
+
+  for (const tier of [1, 2] as const) {
+    it(`tier ${tier}: with only a ${STEEP} degree ramp the commute still gets there and the shuttle never climbs it`, () => {
+      const { state } = world([STEEP], true);
+      const employee = unlicensed(state, 0, corridorCentreZ(0));
+      const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 2, corridorCentreZ(0), tier);
+      const { planned, visited, finished } = commute(state, employee, farOrder(corridorCentreZ(0)), vehicle);
+      expect(planned).not.toBeNull();
+      expect(finished).toBe(true);
+      expect(visited.some(onRamp)).toBe(false);
+      expect(Math.hypot(employee.x - TARGET_X, employee.z - corridorCentreZ(0))).toBeLessThan(3);
+      expect(vehicle.occupantIds).toEqual([]);
+    });
+  }
+
+  it('with only a steep ramp the plan is a walk, or a ride that stops short of it: never a drive leg up it', () => {
+    const { state } = world([STEEP], true);
+    const employee = unlicensed(state, 0, corridorCentreZ(0));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 2, corridorCentreZ(0));
+    const action = farOrder(corridorCentreZ(0));
+    state.pendingActions.push(action);
+    const plan = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'exact', { action });
+    expect(plan).not.toBeNull();
+    for (const leg of plan!.legs.filter(l => l.mode === 'drive' && l.vehicleId === vehicle.id)) {
+      expect(leg.destX).toBeLessThanOrEqual(FLOOR_END + 1);
+    }
+    expect(plan!.legs[plan!.legs.length - 1]!.mode).toBe('foot');
+  });
+
+  it('a ramp that only the work limit admits is climbed by a drill rig on the same site', () => {
+    const { state } = world([STEEP], true);
+    const employee = hireLicensedDriller(state, 'drill_rig', 1, corridorCentreZ(0));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 1, corridorCentreZ(0));
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    vehicle.occupantIds = [employee.id];
+    const action = makeAction({ id: 1, requiredVehicleRole: 'drill_rig', targetX: TARGET_X, targetZ: corridorCentreZ(0) });
+    const { planned, visited, finished } = commute(state, employee, action, vehicle);
+    expect(planned).not.toBeNull();
+    expect(finished).toBe(true);
+    expect(visited.some(onRamp)).toBe(true);
+  });
+
+  it('off a progression site the shuttle shares the nav limit: it rides up the 14 degree ramp', () => {
+    const { state } = world([STEEP], false);
+    const employee = unlicensed(state, 0, corridorCentreZ(0));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 2, corridorCentreZ(0));
+    const { planned, visited, finished } = commute(state, employee, farOrder(corridorCentreZ(0)), vehicle);
+    expect(planned).not.toBeNull();
+    expect(ridesVehicle(planned!, vehicle.id)).toBe(true);
+    expect(finished).toBe(true);
+    expect(visited.some(onRamp)).toBe(true);
+  });
+
+  it('given a steep and a gentle ramp the shuttle is planned over the gentle one and drives it', () => {
+    const { state, opts } = world([STEEP, GENTLE], true);
+    const steepZ = corridorCentreZ(0);
+    const employee = unlicensed(state, 0, steepZ);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 2, steepZ);
+    const { planned, visited, finished } = commute(state, employee, farOrder(steepZ), vehicle);
+    expect(planned).not.toBeNull();
+    expect(ridesVehicle(planned!, vehicle.id)).toBe(true);
+    expect(finished).toBe(true);
+    const plateau = plateauStartX(opts);
+    // On the ramp stretch the shuttle stays in the gentle corridor's rows (the steep one's are z 1..3).
+    const onRampStretch = visited.filter(v => v.x > FLOOR_END + 1 && v.x < plateau - 1);
+    expect(onRampStretch.length).toBeGreaterThan(0);
+    expect(onRampStretch.every(v => v.z >= 4.4)).toBe(true);
+    expect(Math.max(...visited.map(v => v.x))).toBeGreaterThan(plateau);
+  });
+
+  it('a drill rig on the same site takes the steep ramp the shuttle avoids', () => {
+    const { state } = world([STEEP, GENTLE], true);
+    const steepZ = corridorCentreZ(0);
+    const employee = hireLicensedDriller(state, 'drill_rig', 1, steepZ);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 1, steepZ);
+    employee.locomotion = { kind: 'mounted', vehicleId: vehicle.id };
+    vehicle.occupantIds = [employee.id];
+    const action = makeAction({ id: 1, requiredVehicleRole: 'drill_rig', targetX: TARGET_X, targetZ: steepZ });
+    const { finished, visited } = commute(state, employee, action, vehicle);
+    expect(finished).toBe(true);
+    expect(visited.some(v => v.x > FLOOR_END + 1 && v.x < FLOOR_END + 5 && v.z < 4)).toBe(true);
+  });
+
+  it('a ramp exactly at the travel limit (8 degrees) is driven by the shuttle', () => {
+    const { state } = world([8], true);
+    const employee = unlicensed(state, 0, corridorCentreZ(0));
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 2, corridorCentreZ(0));
+    const { planned, visited, finished } = commute(state, employee, farOrder(corridorCentreZ(0)), vehicle);
+    expect(planned).not.toBeNull();
+    expect(ridesVehicle(planned!, vehicle.id)).toBe(true);
+    expect(finished).toBe(true);
+    expect(visited.some(onRamp)).toBe(true);
+  });
+
+  it('with no nav grid the plan is unchanged: a travel vehicle is still taken for a far order', () => {
+    const state = createGame({ seed: SEED });
+    state.grade = createGradeState();
+    expect(state.navGrid).toBeNull();
+    const employee = unlicensed(state, 0, 0);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 2, 0);
+    const action = makeAction({ id: 1, targetX: TARGET_X, targetZ: 0 });
+    state.pendingActions.push(action);
+    const plan = planItinerary(state, employee, { kind: 'work', actionId: action.id }, 'estimate', { action });
+    expect(plan).not.toBeNull();
+    expect(plan!.legs.some(l => l.mode === 'drive' && l.vehicleId === vehicle.id)).toBe(true);
   });
 });

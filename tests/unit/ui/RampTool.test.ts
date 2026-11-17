@@ -13,7 +13,7 @@ import type { PlacementSelection, PlacementArmConfig, PlacementConfirmHandler, P
 import type { CommandResult } from '../../../src/console/ConsoleRunner.js';
 import { rampFootLine } from '../../../src/ui/rampFootLine.js';
 import { rampGradeBoundsDegrees, rampCutSlopeRatio, validateRampOrder, type RampDef } from '../../../src/core/mining/Ramp.js';
-import { plannedRampGradeDegrees } from '../../../src/core/mining/RampGrade.js';
+import { plannedRampGradeDegrees, climbingRoles } from '../../../src/core/mining/RampGrade.js';
 import { proposeRampSpiral, type SpiralSurface } from '../../../src/core/mining/RampSpiral.js';
 import { t } from '../../../src/core/i18n/I18n.js';
 
@@ -459,6 +459,7 @@ describe('RampTool: live readout', () => {
     const v = validateRampOrder({ ...SWITCHBACK_LONG_DEF, cutSlopeRatio: rampCutSlopeRatio(true) }, s.state.cash);
     expect(s.shown().readout).toEqual(describeRampPlan({
       length: 25, legs: 2, cost: v.cost, gradeDeg: g, climb: { gradeDeg: g, climbable: g <= 20 + 1e-6, maxDeg: 20 },
+      roles: climbingRoles(g, true),
     }));
     expect(s.shown().readout!.join('\n')).not.toContain('T1');
   });
@@ -469,6 +470,50 @@ describe('RampTool: live readout', () => {
     for (let i = 0; i < 60; i++) s.field('grade').onInc();
     expect(s.shown().readout!.join('\n')).toContain(t('ui.build.ramp_climbable', { max: 20 }));
     expect(s.shown().readout!.join('\n')).not.toContain(t('ui.build.ramp_not_climbable', { max: 20 }));
+  });
+});
+
+describe('RampTool: the roles line (#2288 C6)', () => {
+  it('on a progression site the readout names the roles that climb the planned grade', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([A, B, C_LONG]);
+    const readout = s.shown().readout!;
+    const g = Number(/\d+(?:\.\d+)?(?=°)/.exec(readout[0]!)?.[0]);
+    expect(Number.isFinite(g)).toBe(true);
+    const roles = climbingRoles(g, true);
+    expect(roles.length).toBeGreaterThan(0);
+    expect(readout.at(-1)).toContain(t(`vehicle.role_name.${roles[0]!}`));
+  });
+
+  it('at the 20 degree ceiling the work roles are named and the shuttle is not', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([A, B, C]);
+    for (let i = 0; i < 60; i++) s.field('grade').onInc();
+    const readout = s.shown().readout!;
+    const last = readout.at(-1)!;
+    expect(last).toContain(t('vehicle.role_name.drill_rig'));
+    expect(last).toContain(t('vehicle.role_name.debris_hauler'));
+    expect(last).not.toContain(t('vehicle.role_name.travel_vehicle'));
+  });
+
+  it('a gentle grade names the shuttle too', () => {
+    const s = setup({ progression: true });
+    s.controller.simulateWaypoints([A, B, C]);
+    for (let i = 0; i < 7; i++) s.field('depth').onDec();
+    for (let i = 0; i < 60; i++) s.field('grade').onDec();
+    const readout = s.shown().readout!;
+    expect(s.field('grade').value).toBeLessThan(8);
+    expect(readout.at(-1)).toContain(t('vehicle.role_name.travel_vehicle'));
+    expect(readout.at(-1)).toContain(t('vehicle.role_name.drill_rig'));
+  });
+
+  it('off a progression site there is no roles line', () => {
+    const s = setup();
+    s.controller.simulateWaypoints([A, B, C]);
+    const text = (s.shown().readout ?? []).join('\n');
+    expect(text).not.toContain(t('vehicle.role_name.drill_rig'));
+    expect(text).not.toContain(t('vehicle.role_name.travel_vehicle'));
+    expect(text).not.toContain(t('ui.build.ramp_roles_none'));
   });
 });
 
