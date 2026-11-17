@@ -1,0 +1,240 @@
+{
+  "name": "travel-vehicle-shared-ride",
+  "description": "Issue #2290: the shuttle seats a driver and five passengers. Three employees ordered to the same far point set off together from the parked shuttle: one drives, the others ride along as passengers (no licence, no driving credit), and all three finish the order inside the wait budget of 70 ticks, which a walking control (same orders, no shuttle) misses by about ten.",
+  "steps": [
+    {
+      "command": "new_game seed:42 mine_type:desert size:64 cash:100000",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "new_game seed:42 mine_type:desert size:64 cash:100000"
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "cash": 100000,
+          "employeeCount": 0,
+          "vehicleCount": 0
+        }
+      }
+    },
+    {
+      "command": "time resume",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "time resume"
+        }
+      ],
+      "role": "setup"
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Spawns near world centre, beside the shuttle bought next. The driller holds no licence: the travel role needs none.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Another driller, spawned beside the first: no licence needed to ride.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee hire role:driller",
+      "description": "Another driller, spawned beside the first: no licence needed to ride.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"driller\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -1000
+        },
+        "equals": {
+          "employeeCount": 3
+        }
+      }
+    },
+    {
+      "command": "vehicle buy travel_vehicle",
+      "description": "Fleet panel shuttle button; a non-progression site has no grade lock, so it is bought freely.",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"vehicles\"]"
+        },
+        {
+          "type": "awaitUsable",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"travel_vehicle\"][data-tier=\"1\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-vehicle-panel .bs-fleet-tier-btn[data-vtype=\"travel_vehicle\"][data-tier=\"1\"]"
+        }
+      ],
+      "role": "player",
+      "expect": {
+        "changedBy": {
+          "cash": -20000
+        },
+        "equals": {
+          "vehicleCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 1 x:60 z:16",
+      "description": "A far plain order, ~44 cells away: beyond TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS. The first to be ordered drives the shuttle; the others share it as passengers. No UI control drives this exact dispatch; same bootstrap primitive travel-vehicle-commute uses.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 1 x:60 z:16"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 1
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 2 x:61 z:19",
+      "description": "Same far point: this employee takes a passenger seat of the shuttle already being driven.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 2 x:61 z:19"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 2
+        }
+      }
+    },
+    {
+      "command": "employee dispatch 3 x:58 z:13",
+      "description": "Same far point: this employee takes a passenger seat of the shuttle already being driven.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee dispatch 3 x:58 z:13"
+        }
+      ],
+      "role": "bootstrap",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 3
+        }
+      }
+    },
+    {
+      "command": "wait_until field:pendingActionCount equals:0 max_ticks:70",
+      "description": "All three orders resolve inside 70 ticks: the three ride one shuttle, against about 80 ticks for a walking control (same orders, no shuttle), and the shuttle's driver boarded it.",
+      "timeout": 125,
+      "interaction": [
+        {
+          "type": "waitUntil",
+          "field": "pendingActionCount",
+          "equals": 0,
+          "maxTicks": 70,
+          "timeoutMs": 120000
+        }
+      ],
+      "role": "setup",
+      "expect": {
+        "equals": {
+          "pendingActionCount": 0
+        },
+        "increased": [
+          "vehicleBoardingCount"
+        ]
+      }
+    },
+    {
+      "command": "vehicle list",
+      "description": "The shuttle shows idle with no driver: parked and free for the next employee.",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "vehicle list"
+        }
+      ],
+      "role": "observe"
+    },
+    {
+      "command": "state full",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "state full"
+        }
+      ],
+      "role": "observe"
+    }
+  ],
+  "shots": [
+    {
+      "name": "overview",
+      "yaw": 20,
+      "pitch": 60
+    }
+  ]
+}
