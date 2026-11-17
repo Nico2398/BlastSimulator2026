@@ -43,13 +43,13 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { parseArgs } from './shared/probe-config.js';
 import { runMatrix } from './shared/probe-strategies.js';
-import { formatGradeSummary, formatTable, toJson } from './shared/probe-report.js';
+import { formatGradeSummary, formatMilestoneSummary, formatTable, toJson } from './shared/probe-report.js';
 
 export function main(argv: readonly string[]): void {
   const opts = parseArgs(argv);
   const results = runMatrix(opts);
   console.log(formatTable(results));
-  if (opts.strategies.some(id => id === 'ladder' || id === 'stay_g1')) console.log(`\n${formatGradeSummary(results)}`);
+  if (opts.strategies.some(id => id === 'ladder' || id === 'stay_g1')) console.log(`\n${formatGradeSummary(results)}\n\n${formatMilestoneSummary(results)}`);
   if (opts.jsonPath) {
     mkdirSync(dirname(resolve(opts.jsonPath)), { recursive: true });
     writeFileSync(opts.jsonPath, toJson(results, opts));

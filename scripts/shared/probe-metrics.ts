@@ -9,6 +9,7 @@ import { getAllVehicleRoles, getVehicleDefByTier } from '../../src/core/entities
 import { HIRING_COSTS } from '../../src/core/config/balance.js';
 import type { Transaction } from '../../src/core/economy/Finance.js';
 import type { ProbeRunConfig } from './probe-config.js';
+import { secondBenchReached } from './probe-ladder-frontier.js';
 
 /** Ledger sums after the first sale: sales (contracts + sales + bonus income) against all expenses (#2117). */
 interface SalesCosts {
@@ -62,10 +63,16 @@ export function gradeEarningsPerTick(
   gradeReachedTick: Readonly<Record<number, number>>,
   endTick: number,
 ): Record<number, number> {
-  void transactions;
-  void gradeReachedTick;
-  void endTick;
-  throw new Error('not implemented');
+  const starts: Array<[number, number]> = [[0, 0]];
+  for (const [g, tick] of Object.entries(gradeReachedTick)) starts.push([Number(g), tick]);
+  starts.sort((a, b) => a[0] - b[0]);
+  const out: Record<number, number> = {};
+  starts.forEach(([grade, from], i) => {
+    const to = starts[i + 1]?.[1] ?? endTick;
+    if (to <= from) return;
+    out[grade] = sumLedger(transactions, from, to).sales / (to - from);
+  });
+  return out;
 }
 
 /** The milestones of the frontier mechanics the probe reports, in report order. */
@@ -73,8 +80,17 @@ export const FRONTIER_MARKS = ['bench2', 'prospection', 'shuttle', 'detector', '
 
 /** The frontier marks that hold in this state, in `FRONTIER_MARKS` order. */
 export function frontierMarks(state: GameState): string[] {
-  void state;
-  throw new Error('not implemented');
+  const yields = state.lastOreReport?.oreYields ?? {};
+  const surveys = state.surveyResults ?? [];
+  const holds: Record<(typeof FRONTIER_MARKS)[number], boolean> = {
+    bench2: secondBenchReached({ grade: state.grade?.grade ?? 0, deepestPitM: state.grade?.deepestPitM ?? 0 }),
+    prospection: surveys.some(r => r.method === 'prospection'),
+    shuttle: (state.vehicles?.vehicles ?? []).some(v => v.type === 'travel_vehicle'),
+    detector: surveys.some(r => r.method === 'meteorite_detector'),
+    island: (yields.craktonite ?? 0) > 0 || (yields.absurdium ?? 0) > 0,
+    treranium: (yields.treranium ?? 0) > 0,
+  };
+  return FRONTIER_MARKS.filter(mark => holds[mark]);
 }
 
 /** Ticks at which cash is sampled for the report. */
@@ -207,6 +223,8 @@ export class MetricsObserver {
   };
 
   private readonly pitDepthAt: Record<number, number | null> = {};
+  private readonly questTicks: Record<string, number> = {};
+  private readonly frontierTicks: Record<string, number> = {};
 
   constructor() {
     for (const t of CASH_SAMPLE_TICKS) {
@@ -231,6 +249,7 @@ export class MetricsObserver {
     this.observeBlast(state);
     this.observeStorage(state);
     this.observeProgress(state);
+    this.observeMilestones(state);
     if (t === FIRST_BLAST_SOLD_TICK || (this.soldAt6000Kg === null && t > FIRST_BLAST_SOLD_TICK)) {
       this.soldAt6000Kg = this.soldAtSecondBlastKg ?? state.grade?.oreDeliveredKg ?? null;
     }
@@ -286,6 +305,16 @@ export class MetricsObserver {
     }
   }
 
+  private observeMilestones(state: GameState): void {
+    const t = state.tickCount;
+    for (const id of state.quests?.completed ?? []) {
+      if (this.questTicks[id] === undefined) this.questTicks[id] = t;
+    }
+    for (const mark of frontierMarks(state)) {
+      if (this.frontierTicks[mark] === undefined) this.frontierTicks[mark] = t;
+    }
+  }
+
   /** Drop tracked boulders that no longer lie on the ground as boulders. */
   private pruneBoulders(state: GameState): void {
     if (this.boulderOreKg.size === 0) return;
@@ -321,6 +350,9 @@ export class MetricsObserver {
       salesCostWindows: salesCostWindows(transactions),
       boulderOreSoldShare: this.boulderOreSoldShare(),
       affordableTick: { ...this.affordableTick },
+      questTicks: { ...this.questTicks },
+      frontierTicks: { ...this.frontierTicks },
+      gradeEarnPerTick: gradeEarningsPerTick(transactions, this.gradeReachedTick, this.lastState?.tickCount ?? 0),
     };
   }
 

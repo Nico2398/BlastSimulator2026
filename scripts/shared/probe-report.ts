@@ -1,7 +1,8 @@
 // BlastSimulator2026 — Progression probe report: markdown table and JSON (#1922)
 
 import type { ProbeOptions } from './probe-config.js';
-import { CASH_SAMPLE_TICKS, SALES_COST_WINDOW_STARTS, type RunResult } from './probe-metrics.js';
+import { CASH_SAMPLE_TICKS, FRONTIER_MARKS, SALES_COST_WINDOW_STARTS, type RunResult } from './probe-metrics.js';
+import { getAllQuests } from '../../src/core/economy/QuestCatalog.js';
 import { GRADE_TARGET_WINDOWS, TIER_TARGET_WINDOWS, gradeVerdicts, windowStatus, type GradeVerdict } from './probe-ladder.js';
 
 type Cell = number | string | null;
@@ -30,11 +31,17 @@ function gradeCash(r: RunResult): string {
   return entries.length === 0 ? NONE : entries.map(([g, c]) => `g${g}:${Math.round(c)}`).join(' ');
 }
 
+/** `name@tick` entries, in tick order; `-` for none. */
+function ticksOf(ticks: Readonly<Record<string, number>> | undefined): string {
+  const entries = Object.entries(ticks ?? {}).sort(([, a], [, b]) => a - b);
+  return entries.length === 0 ? NONE : entries.map(([name, t]) => `${name}@${t}`).join(' ');
+}
+
 const HEADERS = [
   'seed', 'biome', 'kit', 'strategy',
   ...CASH_SAMPLE_TICKS.map(t => `cash@${t}`),
   'low cash', 'low tick', 'bankrupt', 'firstBlastSold@6000', 'blasts',
-  'warehouseFull tick', 'haulWait ticks', 'boulderSold', 'boulderOreSold', 'grades', 'grade cash', 'catalog bought',
+  'warehouseFull tick', 'haulWait ticks', 'boulderSold', 'boulderOreSold', 'grades', 'grade cash', 'quest ticks', 'frontier', 'catalog bought',
   'affordable warehouseT2', 'affordable secondHauler',
   'first sale', 'sales/costs', 'sales/costs p10', ...SALES_COST_WINDOW_STARTS.map(t => `sales/costs@${t}`), 'end',
 ];
@@ -46,7 +53,7 @@ function row(r: RunResult): string[] {
     ...CASH_SAMPLE_TICKS.map(t => cell(m.cashAt[t] ?? null)),
     cell(m.lowPointCash), cell(m.lowPointTick), cell(m.bankruptTick),
     share(m.firstBlastSoldShareAt6000), cell(m.blastsFired),
-    cell(m.warehouseFullTick), cell(m.ticksHaulWaitedOnFullStorage), share(m.boulderSoldShare), share(m.boulderOreSoldShare), grades(r), gradeCash(r), cell(m.catalogBoughtTick),
+    cell(m.warehouseFullTick), cell(m.ticksHaulWaitedOnFullStorage), share(m.boulderSoldShare), share(m.boulderOreSoldShare), grades(r), gradeCash(r), ticksOf(m.questTicks), ticksOf(m.frontierTicks), cell(m.catalogBoughtTick),
     cell(m.affordableTick.warehouseT2), cell(m.affordableTick.secondHauler),
     cell(m.firstSaleTick), cell(m.salesCostRatio, 2), NONE, ...SALES_COST_WINDOW_STARTS.map((_, i) => cell(m.salesCostWindows[i] ?? null, 2)),
     r.endReason ?? `t${r.endTick}`,
@@ -84,7 +91,7 @@ function medianRow(runs: RunResult[]): string[] {
     cell(med(runs, r => r.metrics.bankruptTick)),
     share(med(runs, r => r.metrics.firstBlastSoldShareAt6000)), cell(med(runs, r => r.metrics.blastsFired)),
     cell(med(runs, r => r.metrics.warehouseFullTick)), cell(med(runs, r => r.metrics.ticksHaulWaitedOnFullStorage)),
-    share(med(runs, r => r.metrics.boulderSoldShare)), share(med(runs, r => r.metrics.boulderOreSoldShare)), NONE, NONE,
+    share(med(runs, r => r.metrics.boulderSoldShare)), share(med(runs, r => r.metrics.boulderOreSoldShare)), NONE, NONE, NONE, NONE,
     cell(med(runs, r => r.metrics.catalogBoughtTick)),
     cell(med(runs, r => r.metrics.affordableTick.warehouseT2)),
     cell(med(runs, r => r.metrics.affordableTick.secondHauler)),
@@ -97,16 +104,21 @@ function medianRow(runs: RunResult[]): string[] {
 
 const line = (cells: readonly string[]): string => `| ${cells.join(' | ')} |`;
 
-/** Markdown table: one row per run, then a median row per (biome, kit, strategy) group. */
-export function formatTable(results: readonly RunResult[]): string {
-  const lines = [line(HEADERS), line(HEADERS.map(() => '---'))];
+/** The runs of each (biome, kit, strategy) group, in first-seen order. */
+function groupRuns(results: readonly RunResult[]): RunResult[][] {
   const groups = new Map<string, RunResult[]>();
   for (const r of results) {
-    lines.push(line(row(r)));
     const key = `${r.config.biome}|${r.config.kit}|${r.config.strategy}`;
     groups.set(key, [...(groups.get(key) ?? []), r]);
   }
-  for (const runs of groups.values()) {
+  return [...groups.values()];
+}
+
+/** Markdown table: one row per run, then a median row per (biome, kit, strategy) group. */
+export function formatTable(results: readonly RunResult[]): string {
+  const lines = [line(HEADERS), line(HEADERS.map(() => '---'))];
+  for (const r of results) lines.push(line(row(r)));
+  for (const runs of groupRuns(results)) {
     if (runs.length > 1) lines.push(line(medianRow(runs)));
   }
   return lines.join('\n');
@@ -119,14 +131,9 @@ export function formatTable(results: readonly RunResult[]): string {
  * the verdict against TIER_TARGET_WINDOWS.
  */
 export function formatGradeSummary(results: readonly RunResult[]): string {
-  const headers = ['biome', 'kit', 'strategy', 'grade', 'reached', 'median tick', 'median cash', 'window', 'verdict'];
+  const headers = ['biome', 'kit', 'strategy', 'grade', 'reached', 'median tick', 'median cash', 'earn/tick', 'window', 'verdict'];
   const lines = [line(headers), line(headers.map(() => '---'))];
-  const groups = new Map<string, RunResult[]>();
-  for (const r of results) {
-    const key = `${r.config.biome}|${r.config.kit}|${r.config.strategy}`;
-    groups.set(key, [...(groups.get(key) ?? []), r]);
-  }
-  for (const runs of groups.values()) {
+  for (const runs of groupRuns(results)) {
     const first = runs[0]!.config;
     const grades = new Set<number>(Object.keys(GRADE_TARGET_WINDOWS).map(Number));
     for (const r of runs) for (const g of Object.keys(r.metrics.gradeReachedTick)) grades.add(Number(g));
@@ -134,13 +141,14 @@ export function formatGradeSummary(results: readonly RunResult[]): string {
       const reached = runs.filter(r => r.metrics.gradeReachedTick[grade] !== undefined);
       const tick = median(reached.map(r => r.metrics.gradeReachedTick[grade]!));
       const cash = median(reached.map(r => r.metrics.gradeCashAt[grade]).filter((c): c is number => c !== undefined));
+      const earn = median(reached.map(r => r.metrics.gradeEarnPerTick?.[grade]).filter((e): e is number => e !== undefined));
       const window = GRADE_TARGET_WINDOWS[grade];
       const verdict: GradeVerdict['status'] | typeof NONE = window
         ? gradeVerdicts(tick === null ? {} : { [grade]: tick }, { [grade]: window })[0]!.status
         : NONE;
       lines.push(line([
         first.biome, first.kit, first.strategy, String(grade), `${reached.length}/${runs.length}`,
-        cell(tick), cell(cash), window ? `${window[0]}-${window[1]}` : NONE, verdict,
+        cell(tick), cell(cash), cell(earn, 2), window ? `${window[0]}-${window[1]}` : NONE, verdict,
       ]));
     }
     const tierKeys = new Set<string>();
@@ -151,7 +159,7 @@ export function formatGradeSummary(results: readonly RunResult[]): string {
       const tick = median(reached.map(r => r.metrics.tierReachedTick![key]!));
       const window = TIER_TARGET_WINDOWS[key];
       lines.push(line([
-        first.biome, first.kit, first.strategy, `t${key}`, `${reached.length}/${runs.length}`, cell(tick), NONE,
+        first.biome, first.kit, first.strategy, `t${key}`, `${reached.length}/${runs.length}`, cell(tick), NONE, NONE,
         window ? `${window[0]}-${window[1]}` : NONE, window ? windowStatus(tick, window) : NONE,
       ]));
     }
@@ -165,6 +173,18 @@ export function toJson(results: readonly RunResult[], opts: ProbeOptions): strin
 
 /** Per (biome, kit, strategy) group: the tick each catalog quest and each frontier mark was reached (#2322). */
 export function formatMilestoneSummary(results: readonly RunResult[]): string {
-  void results;
-  throw new Error('not implemented');
+  const headers = ['biome', 'kit', 'strategy', 'milestone', 'reached', 'median tick'];
+  const lines = [line(headers), line(headers.map(() => '---'))];
+  const milestones = [
+    ...getAllQuests().map(q => ({ name: `quest:${q.id}`, tickOf: (r: RunResult) => r.metrics.questTicks?.[q.id] })),
+    ...FRONTIER_MARKS.map(mark => ({ name: `frontier:${mark}`, tickOf: (r: RunResult) => r.metrics.frontierTicks?.[mark] })),
+  ];
+  for (const runs of groupRuns(results)) {
+    const first = runs[0]!.config;
+    for (const { name, tickOf } of milestones) {
+      const ticks = runs.map(tickOf).filter((v): v is number => v !== undefined);
+      lines.push(line([first.biome, first.kit, first.strategy, name, `${ticks.length}/${runs.length}`, cell(median(ticks))]));
+    }
+  }
+  return lines.join('\n');
 }
