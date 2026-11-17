@@ -387,6 +387,11 @@ export function vehicleMaxSlopeRatio(progression: boolean): number {
   return progression ? VEHICLE_MAX_SLOPE_RATIO : NAV_MAX_SLOPE_RATIO;
 }
 
+/** Steepest rise/run a vehicle of `role` climbs: the work roles share one limit, the travel role a lower one on a progression site (#2288). */
+export function roleMaxSlopeRatio(_role: VehicleRole, _progression: boolean): number {
+  throw new Error('not implemented');
+}
+
 /**
  * Ticks a rig or truck crew member needs for a drill-hole or charge-hole task whose
  * tier-1 base is `baseTicks`.

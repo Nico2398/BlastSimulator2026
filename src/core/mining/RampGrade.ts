@@ -5,7 +5,7 @@ import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { GRADE_EPSILON_DEGREES, slopeDegreesForRatio } from '../nav/ClimbLimit.js';
 import { rampCenterline, rampPathOf, rampTotalLength } from './RampPath.js';
 import type { BuiltRamp, GameState } from '../state/GameState.js';
-import { vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
+import { vehicleMaxSlopeRatio, type VehicleRole } from '../entities/Vehicle.js';
 import { rampGradeBoundsDegrees, type RampDef } from './Ramp.js';
 
 /** Steepest grade (degrees) between consecutive tiles of a multi-leg ramp's centreline; the corner's inside and the bounding box's empty corner are not the path. */
@@ -84,4 +84,9 @@ export function plannedRampGradeDegrees(def: Pick<RampDef, 'length' | 'legs' | '
   if (def.gradeDegrees !== undefined) return def.gradeDegrees;
   const total = def.legs ? rampTotalLength(def.legs) : def.length;
   return rampGradeBoundsDegrees(total, def.targetDepth, def.cutSlopeRatio).min;
+}
+
+/** The vehicle roles whose slope limit admits `gradeDeg`, in fleet role order (#2288). */
+export function climbingRoles(_gradeDeg: number, _progression: boolean): VehicleRole[] {
+  throw new Error('not implemented');
 }
