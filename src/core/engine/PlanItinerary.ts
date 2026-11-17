@@ -14,7 +14,7 @@ import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUN
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
-import { canReleaseDriver, getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, vehicleMaxSlopeRatio, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
+import { canReleaseDriver, getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, roleMaxSlopeRatio, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
@@ -447,7 +447,7 @@ function buildDriveLeg(
 ): Leg | null {
   const dist = estimateLegDistance(
     state, fidelity, vehicle.id, fromX, fromZ, toX, toZ, false,
-    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)), rampFlowField(state),
+    vehicleRequiredClearanceCells(vehicle), roleMaxSlopeRatio(vehicle.type, isProgressionSite(state)), rampFlowField(state),
   );
   const effectiveDist = resolveEffectiveDistance(dist, allowUnreachable, fromX, fromZ, toX, toZ);
   if (effectiveDist === null) return null;
@@ -769,7 +769,7 @@ export function buildTransportRideItinerary(
 
   const alight = resolveRideAlightPoint(
     state, fidelity, employee.id, driveFromX, driveFromZ, resolved.targetX, resolved.targetZ,
-    vehicleRequiredClearanceCells(vehicle), vehicleMaxSlopeRatio(isProgressionSite(state)),
+    vehicleRequiredClearanceCells(vehicle), roleMaxSlopeRatio(vehicle.type, isProgressionSite(state)),
   );
   if (alight === null) return null;
 

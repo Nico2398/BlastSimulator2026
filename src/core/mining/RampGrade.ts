@@ -5,7 +5,7 @@ import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
 import { GRADE_EPSILON_DEGREES, slopeDegreesForRatio } from '../nav/ClimbLimit.js';
 import { rampCenterline, rampPathOf, rampTotalLength } from './RampPath.js';
 import type { BuiltRamp, GameState } from '../state/GameState.js';
-import { vehicleMaxSlopeRatio, type VehicleRole } from '../entities/Vehicle.js';
+import { getAllVehicleRoles, roleMaxSlopeRatio, vehicleMaxSlopeRatio, type VehicleRole } from '../entities/Vehicle.js';
 import { rampGradeBoundsDegrees, type RampDef } from './Ramp.js';
 
 /** Steepest grade (degrees) between consecutive tiles of a multi-leg ramp's centreline; the corner's inside and the bounding box's empty corner are not the path. */
@@ -65,9 +65,9 @@ export function steepestBlockingRamp(
 /** One ramp's grade against the single vehicle slope limit (#2045). */
 export type RampClimb = { gradeDeg: number; climbable: boolean; maxDeg: number };
 
-/** A grade against the one vehicle slope limit (30° off a progression site). */
-export function climbForGrade(gradeDeg: number, progression: boolean): RampClimb {
-  const maxDeg = slopeDegreesForRatio(vehicleMaxSlopeRatio(progression));
+/** A grade against the work-role slope limit, or `role`'s own (30° off a progression site). */
+export function climbForGrade(gradeDeg: number, progression: boolean, role?: VehicleRole): RampClimb {
+  const maxDeg = slopeDegreesForRatio(role === undefined ? vehicleMaxSlopeRatio(progression) : roleMaxSlopeRatio(role, progression));
   return { gradeDeg, climbable: gradeDeg <= maxDeg + GRADE_EPSILON_DEGREES, maxDeg };
 }
 
@@ -87,6 +87,6 @@ export function plannedRampGradeDegrees(def: Pick<RampDef, 'length' | 'legs' | '
 }
 
 /** The vehicle roles whose slope limit admits `gradeDeg`, in fleet role order (#2288). */
-export function climbingRoles(_gradeDeg: number, _progression: boolean): VehicleRole[] {
-  throw new Error('not implemented');
+export function climbingRoles(gradeDeg: number, progression: boolean): VehicleRole[] {
+  return getAllVehicleRoles().filter(role => climbForGrade(gradeDeg, progression, role).climbable);
 }

@@ -12,6 +12,7 @@ import {
   NAV_CLEARANCE_VEHICLE_CELLS,
   NAV_MAX_SLOPE_RATIO,
   VEHICLE_MAX_SLOPE_RATIO,
+  TRAVEL_VEHICLE_MAX_SLOPE_RATIO,
 } from '../config/balance.js';
 import type { Employee } from './Employee.js';
 import { computeTaskDuration } from './EmployeeTaskDuration.js';
@@ -382,14 +383,14 @@ export function canReleaseDriver(
 // ── Licence mapping / driver assignment / loading rate ──
 // Moved to VehicleDriverAssignment.ts (#484), re-exported above.
 
-/** Steepest rise/run any vehicle climbs: one limit for every role and tier on progression sites (#2045). */
+/** Steepest rise/run a work role climbs: one limit for every work role and tier on progression sites (#2045); `roleMaxSlopeRatio` adds the travel role's. */
 export function vehicleMaxSlopeRatio(progression: boolean): number {
   return progression ? VEHICLE_MAX_SLOPE_RATIO : NAV_MAX_SLOPE_RATIO;
 }
 
 /** Steepest rise/run a vehicle of `role` climbs: the work roles share one limit, the travel role a lower one on a progression site (#2288). */
-export function roleMaxSlopeRatio(_role: VehicleRole, _progression: boolean): number {
-  throw new Error('not implemented');
+export function roleMaxSlopeRatio(role: VehicleRole, progression: boolean): number {
+  return progression && role === 'travel_vehicle' ? TRAVEL_VEHICLE_MAX_SLOPE_RATIO : vehicleMaxSlopeRatio(progression);
 }
 
 /**
