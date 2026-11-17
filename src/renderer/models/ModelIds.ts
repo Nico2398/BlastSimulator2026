@@ -81,7 +81,6 @@ export function workerModelId(role: EmployeeRole): string {
 export const VEHICLE_TIERS: readonly VehicleTier[] = [1, 2, 3];
 
 export function vehicleModelId(role: VehicleRole, tier: VehicleTier): string {
-  // TODO(#2289): public/models/vehicle_travel_vehicle_t{1,2}.glb are copies of the debris hauler's until the travel vehicles get their own models.
   return `vehicle_${role}_t${tier}`;
 }
 

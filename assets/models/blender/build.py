@@ -39,6 +39,10 @@ def _registry() -> dict[str, tuple[str, callable]]:
     for role in vehicles.ROLES:
         for tier, mod in tier_modules.items():
             reg[f'vehicle_{role}_t{tier}'] = ('vehicles', (lambda m_, r: (lambda: m_.build_vehicle(r)))(mod, role))
+    # Two-tier roles (the travel vehicle): tier 1 junk shuttle, tier 2 race car; no tier 3.
+    for role in vehicles.TWO_TIER_ROLES:
+        for tier in (1, 2):
+            reg[f'vehicle_{role}_t{tier}'] = ('vehicles', (lambda m_, r: (lambda: m_.build_vehicle(r)))(tier_modules[tier], role))
     # Buildings: buildings.py draws every tier; buildings_t1.py / buildings_t3.py
     # override the tiers they caricature through build_building(btype).
     import buildings
