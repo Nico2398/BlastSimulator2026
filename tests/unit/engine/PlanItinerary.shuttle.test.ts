@@ -124,7 +124,8 @@ describe('shuttle sharing: planning a passenger itinerary (#2290 C5)', () => {
     const it = plan(state, b, orderAt(state, FAR + 4, 2));
     expect(hasPassengerBoard(it)).toBe(true);
     const walk = walkTicks({ x: 0, z: 1 }, { x: FAR + 4, z: 2 });
-    expect(it!.estTotalTicks).toBeLessThan(walk);
+    // `walk` is travel alone; the estimate also carries the task's own work ticks.
+    expect(it!.estTotalTicks - it!.workTicks).toBeLessThan(walk);
   });
 
   it('planning is read-only and B holds no vehicle reservation', () => {
