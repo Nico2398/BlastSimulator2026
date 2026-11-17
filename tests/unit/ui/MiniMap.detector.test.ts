@@ -152,6 +152,11 @@ describe('miniMapProjection with readings (#2291, C7)', () => {
     }
   });
 
+  it('uses one scale on both axes so a cone keeps its bearing, whatever the bearing', () => {
+    const proj = project(WORLD, [], [{ originX: 32, originZ: 32, reading: { ...READING, bearing: 0.3 } }]);
+    expect(proj.scaleZ).toBeCloseTo(proj.scaleX, 12);
+  });
+
   it('shrinks the scale as a cone reaches farther', () => {
     const near = project(WORLD, [], [{ ...origin, reading: { ...READING, minDistance: 100, maxDistance: 150 } }]);
     const far = project(WORLD, [], [origin]);

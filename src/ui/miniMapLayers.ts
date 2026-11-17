@@ -318,9 +318,14 @@ export function miniMapProjection(
   let minZ = world.minZ;
   let maxX = world.minX + world.sizeX;
   let maxZ = world.minZ + world.sizeZ;
-  // A detector cone is widened for the same way: its origin and the far corners and middle of its outer arc.
+  // A detector cone is widened for the same way: its origin, the far corners and middle of its outer arc,
+  // and any axis extreme the arc crosses.
   for (const { originX, originZ, reading } of readings) {
-    for (const angle of [reading.bearing - reading.halfAngle, reading.bearing, reading.bearing + reading.halfAngle]) {
+    const lo = reading.bearing - reading.halfAngle;
+    const hi = reading.bearing + reading.halfAngle;
+    const axisAngles: number[] = [];
+    for (let k = Math.ceil(lo / (Math.PI / 2)); k * (Math.PI / 2) <= hi; k++) axisAngles.push(k * (Math.PI / 2));
+    for (const angle of [lo, reading.bearing, hi, ...axisAngles]) {
       const px = originX + Math.cos(angle) * reading.maxDistance;
       const pz = originZ + Math.sin(angle) * reading.maxDistance;
       minX = Math.min(minX, px, originX);
@@ -334,6 +339,11 @@ export function miniMapProjection(
     maxX = Math.max(maxX, i.x + i.radius);
     minZ = Math.min(minZ, i.z - i.radius);
     maxZ = Math.max(maxZ, i.z + i.radius);
+  }
+  if (readings.length > 0) {
+    // A cone is an arc: one scale on both axes keeps its bearing and its band true on the map.
+    const scale = MAP_SIZE / Math.max(maxX - minX, maxZ - minZ);
+    return { originX: minX, originZ: minZ, scaleX: scale, scaleZ: scale };
   }
   return { originX: minX, originZ: minZ, scaleX: MAP_SIZE / (maxX - minX), scaleZ: MAP_SIZE / (maxZ - minZ) };
 }

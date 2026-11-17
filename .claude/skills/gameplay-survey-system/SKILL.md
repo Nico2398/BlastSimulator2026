@@ -13,7 +13,7 @@ Players should not know exactly what ore is in ground — discovery is rewarding
 
 ## Survey Methods
 
-Four tools with different cost/accuracy/coverage tradeoffs:
+Five tools with different cost/accuracy/coverage tradeoffs:
 
 | Method | Tool | i18n Key | Cost ($) | Time (ticks) | Accuracy | Coverage |
 |--------|------|---------|---------|-------------|---------|---------|

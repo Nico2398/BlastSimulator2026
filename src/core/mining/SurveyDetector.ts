@@ -28,8 +28,8 @@ const DEG_TO_RAD = Math.PI / 180;
 
 /** Angular error bound (radians) at a skill level: widest at skill 1, narrowest at the top skill. */
 export function detectorHalfAngle(skillLevel: number): number {
-  const t = clamp((skillLevel - 1) / (PROSPECTION_TOP_SKILL - 1), 0, 1);
-  const deg = DETECTOR_HALF_ANGLE_SKILL1_DEG + (DETECTOR_HALF_ANGLE_TOP_DEG - DETECTOR_HALF_ANGLE_SKILL1_DEG) * t;
+  const fraction = clamp((skillLevel - 1) / (PROSPECTION_TOP_SKILL - 1), 0, 1);
+  const deg = DETECTOR_HALF_ANGLE_SKILL1_DEG + (DETECTOR_HALF_ANGLE_TOP_DEG - DETECTOR_HALF_ANGLE_SKILL1_DEG) * fraction;
   return deg * DEG_TO_RAD;
 }
 
