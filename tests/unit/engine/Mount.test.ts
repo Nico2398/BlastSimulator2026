@@ -10,13 +10,13 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  board, alight, alightIfMounted, enterBuilding, findAlightCell, flushUnannouncedLeaves, leaveBuilding, releaseOccupantsOfRemovedBuildings,
+  board, alight, alightIfMounted, alightPassenger, releaseEmployeeFromHosts, enterBuilding, findAlightCell, flushUnannouncedLeaves, leaveBuilding, releaseOccupantsOfRemovedBuildings,
   releaseOccupantsOfRemovedVehicles,
 } from '../../../src/core/engine/Mount.js';
 import { dismountVehicleDriver } from '../../../src/core/engine/VehicleReservation.js';
 import { placeBuilding, destroyBuilding, getBuildingPeopleCapacity } from '../../../src/core/entities/Building.js';
 import { hireEmployee, assignSkill } from '../../../src/core/entities/Employee.js';
-import { purchaseVehicle, vehicleDriverId } from '../../../src/core/entities/Vehicle.js';
+import { purchaseVehicle, vehicleDriverId, vehiclePassengerIds } from '../../../src/core/entities/Vehicle.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { Random } from '../../../src/core/math/Random.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
@@ -1119,5 +1119,421 @@ describe('findAlightCell — fractional vehicle positions and destination bias (
 
     expect(alight(state, vehicle.id).success).toBe(true);
     expect({ x: employee.x, z: employee.z }).toEqual({ x: 11, z: 10 });
+  });
+});
+
+// ── Passenger seats (#2290) ──────────────────────────────────────────────────
+// A shuttle (travel vehicle tier 1) seats a driver and five passengers. A passenger boards with `board(.., 'passenger')`
+// once a driver is aboard, never counts as a driver boarding, and is put out on its own cell when the driver alights.
+
+describe('passenger seats (#2290)', () => {
+  const VX = 10;
+  const VZ = 10;
+
+  /** A walker holding no qualification at all: the travel role needs none. */
+  function hireWalker(state: ReturnType<typeof createGame>, x = VX, z = VZ) {
+    const { employee } = hireEmployee(state.employees, 'driller', new Random(SEED), x, z);
+    employee.qualifications = [];
+    return employee;
+  }
+
+  /** A state with a flat walkable grid and a shuttle at (VX, VZ) driven by a freshly boarded employee. */
+  function shuttleWithDriver(tier: 1 | 2 = 1) {
+    const state = createGame({ seed: SEED });
+    state.navGrid = makeNavGrid(0, 0, 30, 30, () => cell());
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', VX, VZ, tier);
+    const driver = hireWalker(state);
+    expect(board(state, vehicle.id, driver.id).success).toBe(true);
+    return { state, vehicle, driver };
+  }
+
+  /** Boards `count` fresh walkers as passengers, each standing on the shuttle's cell. */
+  function boardPassengers(state: ReturnType<typeof createGame>, vehicleId: number, count: number) {
+    const passengers = [];
+    for (let i = 0; i < count; i++) {
+      const p = hireWalker(state);
+      const result = board(state, vehicleId, p.id, undefined, 'passenger');
+      expect(result.success, `passenger ${i}`).toBe(true);
+      passengers.push(p);
+    }
+    return passengers;
+  }
+
+  const footLeg = (destX: number, destZ: number) => ({
+    mode: 'foot' as const, vehicleId: null, destX, destZ, arrival: 'exact' as const, onArrive: { kind: 'none' as const }, estTicks: 10,
+  });
+  const rideLeg = (vehicleId: number, destX: number, destZ: number, onArrive: { kind: 'none' } | { kind: 'alight' } = { kind: 'none' }) => ({
+    mode: 'ride' as const, vehicleId, destX, destZ, arrival: 'exact' as const, onArrive, estTicks: 5,
+  });
+
+  describe('board as passenger', () => {
+    it('seats an on-foot employee beside the driver: mounted, listed after the driver, on the vehicle\'s cell', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const passenger = hireWalker(state, VX + 1, VZ - 1);
+
+      const result = board(state, vehicle.id, passenger.id, undefined, 'passenger');
+
+      expect(result.success).toBe(true);
+      expect(passenger.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(vehicle.occupantIds).toEqual([driver.id, passenger.id]);
+      expect(vehicleDriverId(vehicle)).toBe(driver.id);
+      expect(vehiclePassengerIds(vehicle)).toEqual([passenger.id]);
+      expect({ x: passenger.x, z: passenger.z }).toEqual({ x: vehicle.x, z: vehicle.z });
+    });
+
+    it('needs no licence and gives no driving skill or XP', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const passenger = hireWalker(state);
+      expect(passenger.qualifications).toEqual([]);
+
+      expect(board(state, vehicle.id, passenger.id, undefined, 'passenger').success).toBe(true);
+
+      expect(passenger.qualifications).toEqual([]);
+    });
+
+    it('is not a driver boarding: the counter and the driver event stay as the driver left them', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const emitter = new EventEmitter();
+      const mounted: number[] = [];
+      const driverBoarded: number[] = [];
+      emitter.on('employee:mounted', d => mounted.push(d.employeeId));
+      emitter.on('vehicle:driver_boarded', d => driverBoarded.push(d.employeeId));
+      const countBefore = state.vehicles.driverBoardingCount;
+      const passenger = hireWalker(state);
+
+      expect(board(state, vehicle.id, passenger.id, emitter, 'passenger').success).toBe(true);
+
+      expect(state.vehicles.driverBoardingCount).toBe(countBefore);
+      expect(driverBoarded).toEqual([]);
+      expect(mounted).toEqual([passenger.id]);
+    });
+
+    it('seats one more at one tile away (Chebyshev distance 1) and snaps them onto the vehicle', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const passenger = hireWalker(state, VX + 1, VZ + 1);
+      expect(board(state, vehicle.id, passenger.id, undefined, 'passenger').success).toBe(true);
+      expect(passenger.x).toBe(vehicle.x);
+      expect(passenger.z).toBe(vehicle.z);
+    });
+
+    it('fills every seat: a driver and five passengers, then refuses the sixth passenger with nothing changed', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const passengers = boardPassengers(state, vehicle.id, 5);
+      expect(vehicle.occupantIds).toHaveLength(6);
+      const extra = hireWalker(state);
+
+      const result = board(state, vehicle.id, extra.id, undefined, 'passenger');
+
+      expect(result.success).toBe(false);
+      expect(vehicle.occupantIds).toEqual([driver.id, ...passengers.map(p => p.id)]);
+      expect(extra.locomotion).toEqual({ kind: 'on_foot' });
+    });
+
+    it('refuses when no driver is aboard', () => {
+      const state = createGame({ seed: SEED });
+      const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', VX, VZ);
+      const passenger = hireWalker(state);
+
+      const result = board(state, vehicle.id, passenger.id, undefined, 'passenger');
+
+      expect(result.success).toBe(false);
+      expect(vehicle.occupantIds).toEqual([]);
+      expect(passenger.locomotion).toEqual({ kind: 'on_foot' });
+    });
+
+    it('never seats a passenger in the race car, which carries only its driver', () => {
+      const { state, vehicle, driver } = shuttleWithDriver(2);
+      const passenger = hireWalker(state);
+
+      const result = board(state, vehicle.id, passenger.id, undefined, 'passenger');
+
+      expect(result.success).toBe(false);
+      expect(vehicle.occupantIds).toEqual([driver.id]);
+    });
+
+    it('refuses an employee two tiles away, naming the distance', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const passenger = hireWalker(state, VX + 2, VZ);
+
+      const result = board(state, vehicle.id, passenger.id, undefined, 'passenger');
+
+      expect(result.success).toBe(false);
+      if (!result.success) expect(result.error.toLowerCase()).toMatch(/distance|too far|far/);
+      expect(passenger.locomotion).toEqual({ kind: 'on_foot' });
+      expect(vehicle.occupantIds).toHaveLength(1);
+    });
+
+    it('refuses an employee who is not on foot (already riding another vehicle)', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const other = purchaseVehicle(state.vehicles, 'travel_vehicle', VX, VZ).vehicle;
+      const otherDriver = hireWalker(state);
+      expect(board(state, other.id, otherDriver.id).success).toBe(true);
+
+      const result = board(state, vehicle.id, otherDriver.id, undefined, 'passenger');
+
+      expect(result.success).toBe(false);
+      expect(vehicle.occupantIds).toHaveLength(1);
+      expect(otherDriver.locomotion).toEqual({ kind: 'mounted', vehicleId: other.id });
+    });
+
+    it('refuses a dead employee and an unknown employee', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const dead = hireWalker(state);
+      dead.alive = false;
+
+      expect(board(state, vehicle.id, dead.id, undefined, 'passenger').success).toBe(false);
+      expect(board(state, vehicle.id, 999999, undefined, 'passenger').success).toBe(false);
+      expect(vehicle.occupantIds).toHaveLength(1);
+    });
+
+    it('refuses an unknown vehicle', () => {
+      const { state } = shuttleWithDriver();
+      const passenger = hireWalker(state);
+      expect(board(state, 999999, passenger.id, undefined, 'passenger').success).toBe(false);
+    });
+
+    it('keeps the world invariants with a full house aboard (I1, I2, I3)', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      boardPassengers(state, vehicle.id, 5);
+      expectNoWorldInvariantViolations(state);
+    });
+
+    it('a work vehicle still seats one: a second employee cannot board a hauler as a passenger', () => {
+      const state = createGame({ seed: SEED });
+      const { vehicle } = purchaseVehicle(state.vehicles, 'debris_hauler', 5, 5);
+      const driver = hireTruckDriver(state, 5, 5);
+      const rider = hireTruckDriver(state, 5, 5);
+      expect(board(state, vehicle.id, driver.id).success).toBe(true);
+
+      const result = board(state, vehicle.id, rider.id, undefined, 'passenger');
+
+      expect(result.success).toBe(false);
+      expect(vehicle.occupantIds).toEqual([driver.id]);
+    });
+  });
+
+  describe('alightPassenger', () => {
+    it('puts out only that passenger: on foot, beside the vehicle, the driver stays and stays first', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const [first, second] = boardPassengers(state, vehicle.id, 2);
+      const emitter = new EventEmitter();
+      const alighted: number[] = [];
+      emitter.on('employee:alighted', d => alighted.push(d.employeeId));
+
+      const result = alightPassenger(state, vehicle.id, first!.id, emitter);
+
+      expect(result.success).toBe(true);
+      expect(first!.locomotion).toEqual({ kind: 'on_foot' });
+      expect(Math.max(Math.abs(first!.x - vehicle.x), Math.abs(first!.z - vehicle.z))).toBeLessThanOrEqual(1);
+      expect(vehicle.occupantIds).toEqual([driver.id, second!.id]);
+      expect(vehicleDriverId(vehicle)).toBe(driver.id);
+      expect(driver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(second!.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expect(alighted).toEqual([first!.id]);
+      expectNoWorldInvariantViolations(state);
+    });
+
+    it('steers the passenger toward the destination given', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const [passenger] = boardPassengers(state, vehicle.id, 1);
+
+      expect(alightPassenger(state, vehicle.id, passenger!.id, undefined, { x: 0, z: VZ }).success).toBe(true);
+
+      expect({ x: passenger!.x, z: passenger!.z }).toEqual({ x: VX - 1, z: VZ });
+    });
+
+    it('refuses the driver: use alight for that', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      boardPassengers(state, vehicle.id, 1);
+
+      const result = alightPassenger(state, vehicle.id, driver.id);
+
+      expect(result.success).toBe(false);
+      expect(vehicle.occupantIds[0]).toBe(driver.id);
+      expect(vehicle.occupantIds).toHaveLength(2);
+    });
+
+    it('refuses an employee who is not aboard, and an unknown vehicle', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const stranger = hireWalker(state);
+
+      expect(alightPassenger(state, vehicle.id, stranger.id).success).toBe(false);
+      expect(alightPassenger(state, 999999, stranger.id).success).toBe(false);
+      expect(vehicle.occupantIds).toHaveLength(1);
+    });
+
+    it('drops the passenger\'s ride leg and keeps its later foot legs', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const [passenger] = boardPassengers(state, vehicle.id, 1);
+      passenger!.itinerary = {
+        legs: [rideLeg(vehicle.id, 20, 10, { kind: 'alight' }), footLeg(25, 12)],
+        goal: { kind: 'reposition', x: 25, z: 12 },
+        workTicks: 0,
+        estTotalTicks: 15,
+      };
+
+      expect(alightPassenger(state, vehicle.id, passenger!.id).success).toBe(true);
+
+      expect(passenger!.itinerary).not.toBeNull();
+      expect(passenger!.itinerary!.legs).toHaveLength(1);
+      expect(passenger!.itinerary!.legs[0]!.mode).toBe('foot');
+      expect(passenger!.itinerary!.legs[0]!.destX).toBe(25);
+      expect(passenger!.itinerary!.legs[0]!.destZ).toBe(12);
+    });
+  });
+
+  describe('the driver alights', () => {
+    it('puts every passenger out on distinct cells near the vehicle, on foot, before the driver', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const passengers = boardPassengers(state, vehicle.id, 5);
+
+      expect(alight(state, vehicle.id).success).toBe(true);
+
+      expect(vehicle.occupantIds).toEqual([]);
+      const cells = new Set<string>();
+      for (const p of passengers) {
+        expect(p.locomotion).toEqual({ kind: 'on_foot' });
+        expect(Math.max(Math.abs(p.x - vehicle.x), Math.abs(p.z - vehicle.z))).toBeLessThanOrEqual(2);
+        cells.add(`${Math.round(p.x)},${Math.round(p.z)}`);
+      }
+      expect(cells.size).toBe(passengers.length);
+      expect(driver.locomotion).toEqual({ kind: 'on_foot' });
+      expectNoWorldInvariantViolations(state);
+    });
+
+    it('announces every passenger and the driver as alighted', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const passengers = boardPassengers(state, vehicle.id, 2);
+      const emitter = new EventEmitter();
+      const alighted: number[] = [];
+      emitter.on('employee:alighted', d => alighted.push(d.employeeId));
+
+      expect(alight(state, vehicle.id, emitter).success).toBe(true);
+
+      expect([...alighted].sort()).toEqual([driver.id, ...passengers.map(p => p.id)].sort());
+    });
+
+    it('keeps each passenger\'s remaining foot legs and drops its ride leg', () => {
+      const { state, vehicle } = shuttleWithDriver();
+      const [a, b] = boardPassengers(state, vehicle.id, 2);
+      a!.itinerary = {
+        legs: [rideLeg(vehicle.id, 20, 10, { kind: 'alight' }), footLeg(25, 12)],
+        goal: { kind: 'reposition', x: 25, z: 12 }, workTicks: 0, estTotalTicks: 15,
+      };
+      // Only a ride leg left: once the ride is over there is nothing to walk.
+      b!.itinerary = {
+        legs: [rideLeg(vehicle.id, 20, 10)],
+        goal: { kind: 'reposition', x: 20, z: 10 }, workTicks: 0, estTotalTicks: 5,
+      };
+
+      expect(alight(state, vehicle.id).success).toBe(true);
+
+      expect(a!.itinerary).not.toBeNull();
+      expect(a!.itinerary!.legs.map(l => l.mode)).toEqual(['foot']);
+      expect(a!.itinerary!.legs[0]!.destX).toBe(25);
+      expect(b!.itinerary).toBeNull();
+    });
+
+    it('alightIfMounted(driver) clears the whole vehicle', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const passengers = boardPassengers(state, vehicle.id, 3);
+
+      alightIfMounted(state, driver);
+
+      expect(vehicle.occupantIds).toEqual([]);
+      for (const p of passengers) expect(p.locomotion).toEqual({ kind: 'on_foot' });
+      expect(driver.locomotion).toEqual({ kind: 'on_foot' });
+    });
+
+    it('releaseEmployeeFromHosts(driver) — a dead driver included — puts the passengers out on foot', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const passengers = boardPassengers(state, vehicle.id, 3);
+      driver.alive = false;
+
+      releaseEmployeeFromHosts(state, driver.id);
+
+      expect(vehicle.occupantIds).toEqual([]);
+      for (const p of passengers) expect(p.locomotion).toEqual({ kind: 'on_foot' });
+      expectNoWorldInvariantViolations(state);
+    });
+
+    it('a driver alone alights exactly as before', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      expect(alight(state, vehicle.id).success).toBe(true);
+      expect(vehicle.occupantIds).toEqual([]);
+      expect(driver.locomotion).toEqual({ kind: 'on_foot' });
+    });
+  });
+
+  describe('a passenger leaves on its own', () => {
+    it('alightIfMounted(passenger) removes only that passenger', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const [a, b] = boardPassengers(state, vehicle.id, 2);
+
+      alightIfMounted(state, a!);
+
+      expect(a!.locomotion).toEqual({ kind: 'on_foot' });
+      expect(vehicle.occupantIds).toEqual([driver.id, b!.id]);
+      expect(vehicleDriverId(vehicle)).toBe(driver.id);
+      expectNoWorldInvariantViolations(state);
+    });
+
+    it('releaseEmployeeFromHosts(passenger) removes only that passenger and leaves the driver first', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const [a, b] = boardPassengers(state, vehicle.id, 2);
+
+      releaseEmployeeFromHosts(state, b!.id);
+
+      expect(b!.locomotion).toEqual({ kind: 'on_foot' });
+      expect(vehicle.occupantIds).toEqual([driver.id, a!.id]);
+      expect(driver.locomotion).toEqual({ kind: 'mounted', vehicleId: vehicle.id });
+      expectNoWorldInvariantViolations(state);
+    });
+
+    it('releasing a dead passenger leaves the ride going', () => {
+      const { state, vehicle, driver } = shuttleWithDriver();
+      const [a] = boardPassengers(state, vehicle.id, 1);
+      a!.alive = false;
+
+      releaseEmployeeFromHosts(state, a!.id);
+
+      expect(vehicle.occupantIds).toEqual([driver.id]);
+    });
+  });
+
+  describe('findAlightCell exclude list', () => {
+    it('skips an excluded cell and takes the next free neighbour', () => {
+      const grid = makeNavGrid(0, 0, 20, 20, () => cell());
+      const first = findAlightCell(grid, 10, 10);
+
+      const next = findAlightCell(grid, 10, 10, undefined, [first]);
+
+      expect(next).not.toEqual(first);
+      expect(next).not.toEqual({ x: 10, z: 10 });
+      expect(Math.max(Math.abs(next.x - 10), Math.abs(next.z - 10))).toBe(1);
+    });
+
+    it('skips excluded cells when steering toward a destination', () => {
+      const grid = makeNavGrid(0, 0, 20, 20, () => cell());
+      const first = findAlightCell(grid, 10, 10, { x: 0, z: 10 });
+      expect(first).toEqual({ x: 9, z: 10 });
+
+      const next = findAlightCell(grid, 10, 10, { x: 0, z: 10 }, [first]);
+
+      expect(next).not.toEqual(first);
+      expect(Math.max(Math.abs(next.x - 10), Math.abs(next.z - 10))).toBe(1);
+    });
+
+    it('falls back to the vehicle\'s own cell when every neighbour is excluded', () => {
+      const grid = makeNavGrid(0, 0, 20, 20, () => cell());
+      const all = NEIGHBOR_OFFSETS.map(([dx, dz]) => ({ x: 10 + dx, z: 10 + dz }));
+
+      expect(findAlightCell(grid, 10, 10, undefined, all)).toEqual({ x: 10, z: 10 });
+    });
+
+    it('an empty exclude list changes nothing', () => {
+      const grid = makeNavGrid(0, 0, 20, 20, () => cell());
+      expect(findAlightCell(grid, 10, 10, undefined, [])).toEqual(findAlightCell(grid, 10, 10));
+    });
   });
 });
