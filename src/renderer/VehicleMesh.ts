@@ -24,6 +24,13 @@ import { OVERLAY_Y_KEY } from './TaskProgressBar.js';
 
 /** Paint material every vehicle model exposes. */
 export const BODY_TINT = 'TintBody';
+/** One occupant drawn seated at a seat anchor of a vehicle (#2319). */
+export interface SeatedFigure {
+  seat: number;
+  employeeId: number;
+  object: THREE.Object3D;
+}
+
 /** Stand-in box while the asset is not loaded: a truck-sized envelope. */
 const FALLBACK_SIZE = [2.6, 1.8, 1.5] as const;
 
@@ -207,6 +214,11 @@ export class VehicleMesh {
   /** The model instance drawn for a vehicle, or null — exposes tint materials and nodes to tests. */
   getInstance(id: number): ModelInstance | null {
     return this.vehicles.get(id)?.instance ?? null;
+  }
+
+  /** The seated figures drawn in a vehicle, ordered by seat; empty when it is unknown (#2319). */
+  getSeatedFigures(_vehicleId: number): readonly SeatedFigure[] {
+    throw new Error('not implemented');
   }
 
   dispose(): void {
