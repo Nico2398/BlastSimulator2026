@@ -21,9 +21,18 @@ import { headingFromDelta, turnToward } from './Heading.js';
 import { modelLibrary, type ModelInstance, type ModelLibrary } from './models/ModelLibrary.js';
 import { vehicleModelId } from './models/ModelIds.js';
 import { OVERLAY_Y_KEY } from './TaskProgressBar.js';
+import { dressWorker } from './CharacterMesh.js';
+import { vehicleSeatAnchors } from './VehicleSeats.js';
 
 /** Paint material every vehicle model exposes. */
 export const BODY_TINT = 'TintBody';
+/** One occupant drawn seated at a seat anchor of a vehicle (#2319). */
+export interface SeatedFigure {
+  seat: number;
+  employeeId: number;
+  object: THREE.Object3D;
+}
+
 /** Stand-in box while the asset is not loaded: a truck-sized envelope. */
 const FALLBACK_SIZE = [2.6, 1.8, 1.5] as const;
 
@@ -46,7 +55,19 @@ interface VehicleEntry {
   tween: MovementTween;
   wheels: Wheel[];
   flywheel: THREE.Object3D | null;
+  /** Holds the seated figures, a child of `group` so they travel and turn with the vehicle (#2319). */
+  seats: THREE.Group;
+  figures: SeatedFigureEntry[];
 }
+
+interface SeatedFigureEntry extends SeatedFigure {
+  instance: ModelInstance;
+}
+
+/** Rider scale against a standing worker, so a figure fits a bench seat (#2319). */
+const SEATED_FIGURE_SCALE = 0.55;
+/** Hip height as a fraction of a worker's height: the figure sits with its hips on the seat, legs sunk into the floor (#2319). */
+const SEATED_HIP_FRACTION = 0.45;
 
 /** A wheel node and the radius it rolls on, measured from the model so a bicycle wheel and a monster tyre both turn true. */
 interface Wheel {
@@ -76,7 +97,11 @@ export class VehicleMesh {
     group.position.set(renderX, surfaceY, renderZ);
     tagPickable(group, 'vehicle', vehicle.id);
     this.scene.add(group);
-    this.vehicles.set(vehicle.id, { ...entry, vehicle, tween: createTween(renderX, renderZ) });
+    const seats = new THREE.Group();
+    group.add(seats);
+    const added: VehicleEntry = { ...entry, vehicle, tween: createTween(renderX, renderZ), seats, figures: [] };
+    this.vehicles.set(vehicle.id, added);
+    this.syncSeats(added, employees);
   }
 
   /**
@@ -112,6 +137,7 @@ export class VehicleMesh {
       const eased = applyEasedPosition(entry.group.position, entry.tween, fromX, fromZ, targetX, targetZ, dt, heightAt, trail, window);
       const status = computeVehicleStatus(v, vehicleState, resolveVehicleDriver(v, employees));
       this.animateMotion(entry, eased.x - fromX, eased.z - fromZ, dt, status.kind);
+      this.syncSeats(entry, employees);
     }
   }
 
@@ -181,6 +207,7 @@ export class VehicleMesh {
       entry.instance = fresh.instance;
       entry.wheels = fresh.wheels;
       entry.flywheel = fresh.flywheel;
+      this.clearSeats(entry); // re-seated against the real model on the next update
       entry.group.userData[OVERLAY_Y_KEY] = overlayY(entry.instance);
     }
   }
@@ -209,11 +236,16 @@ export class VehicleMesh {
     return this.vehicles.get(id)?.instance ?? null;
   }
 
+  /** The seated figures drawn in a vehicle, ordered by seat; empty when it is unknown (#2319). */
+  getSeatedFigures(vehicleId: number): readonly SeatedFigure[] {
+    return this.vehicles.get(vehicleId)?.figures.map(({ seat, employeeId, object }) => ({ seat, employeeId, object })) ?? [];
+  }
+
   dispose(): void {
     this.clearAll();
   }
 
-  private attachModel(group: THREE.Group, vehicle: Vehicle): Omit<VehicleEntry, 'vehicle' | 'tween'> {
+  private attachModel(group: THREE.Group, vehicle: Vehicle): Omit<VehicleEntry, 'vehicle' | 'tween' | 'seats' | 'figures'> {
     const instance = this.library.instantiate(vehicleModelId(vehicle.type, vehicle.tier), { size: FALLBACK_SIZE, tint: BODY_TINT });
     group.add(instance.root);
     const wheels: Wheel[] = [];
@@ -221,6 +253,43 @@ export class VehicleMesh {
       if (obj.name.startsWith('Wheel') && obj.parent === instance.root) wheels.push({ node: obj, radius: wheelRadius(obj) });
     });
     return { group, instance, wheels, flywheel: instance.node('Flywheel') };
+  }
+
+  /** Seat one figure per occupant at the model's seat anchors; none while the model is the stand-in box (#2319). */
+  private syncSeats(entry: VehicleEntry, employees: readonly Employee[]): void {
+    const anchors = entry.instance.isFallback ? [] : vehicleSeatAnchors(entry.vehicle.type, entry.vehicle.tier);
+    const wanted = new Map<number, Employee>();
+    anchors.forEach((_, seat) => {
+      const occupant = employees.find(e => e.id === entry.vehicle.occupantIds[seat]);
+      if (occupant) wanted.set(seat, occupant);
+    });
+    entry.figures = entry.figures.filter(fig => {
+      if (wanted.get(fig.seat)?.id === fig.employeeId) return true;
+      entry.seats.remove(fig.object);
+      fig.instance.dispose();
+      return false;
+    });
+    for (const [seat, employee] of wanted) {
+      if (entry.figures.some(f => f.seat === seat)) continue;
+      const anchor = anchors[seat]!;
+      const instance = dressWorker(this.library, employee);
+      const height = instance.bounds.max.y - instance.bounds.min.y;
+      const object = new THREE.Group();
+      object.add(instance.root);
+      object.scale.setScalar(SEATED_FIGURE_SCALE);
+      object.position.set(anchor.x, anchor.y - SEATED_HIP_FRACTION * height * SEATED_FIGURE_SCALE, anchor.z);
+      entry.seats.add(object);
+      entry.figures.push({ seat, employeeId: employee.id, object, instance });
+    }
+    entry.figures.sort((a, b) => a.seat - b.seat);
+  }
+
+  private clearSeats(entry: VehicleEntry): void {
+    for (const fig of entry.figures) {
+      entry.seats.remove(fig.object);
+      fig.instance.dispose();
+    }
+    entry.figures = [];
   }
 
   /** Turn toward the direction of travel, spin wheels by distance, run the flywheel while working. */
@@ -239,6 +308,7 @@ export class VehicleMesh {
 // ---------- Helpers ----------
 
 function disposeEntry(entry: VehicleEntry): void {
+  for (const fig of entry.figures) fig.instance.dispose();
   entry.instance.dispose();
 }
 

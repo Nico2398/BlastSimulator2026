@@ -17,7 +17,7 @@ model, cost formula, and the numbered invariant list: `gameplay-vehicle-fleet` s
   One employee is inside at most one host; a vehicle holds at most `vehicleSeatCount(v)`
   occupants (the shuttle seats a driver and five passengers), a building at most `getBuildingPeopleCapacity(type, tier)`.
 - A mounted employee's position equals their vehicle's position, and their character mesh is not
-  rendered. The two 3D models are never both visible. An employee inside a building has no
+  rendered. The walking figure and the vehicle never show together: a travel vehicle draws one seated figure per occupant at its seat anchors (`VehicleSeats.ts`) instead. An employee inside a building has no
   character mesh and no minimap dot either.
 - Boarding and alighting happen within 1 tile of the vehicle; entering and leaving a building
   happen on its ring.
