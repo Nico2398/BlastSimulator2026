@@ -5712,12 +5712,12 @@
     },
     "vehicle_travel_vehicle_t1": {
       "builder": "vehicles_t1.py",
-      "triangles": 11428,
-      "glbKb": 292,
+      "triangles": 7972,
+      "glbKb": 179,
       "size": [
-        2.54,
-        1.96,
-        1.29
+        3.02,
+        1.82,
+        1.52
       ],
       "groundY": 0,
       "tints": [
@@ -5727,77 +5727,53 @@
         "Lamp"
       ],
       "materials": [
-        "Chrome",
         "Cream",
         "Dark",
         "DuctTape",
+        "Glass",
         "Lamp",
         "Plastic",
-        "Red",
-        "Rock",
-        "RockDark",
+        "Rope",
         "Rubber",
         "Rust",
-        "RustDark",
+        "Steel",
         "TintBody",
         "White",
-        "Wood",
-        "WoodDark"
+        "Wood"
       ],
       "nodes": {
         "Body": {
-          "triangles": 3624,
+          "triangles": 5156,
           "parts": [
-            "BarsBar",
-            "BarsBell",
-            "BarsGrip",
-            "BarsStem",
-            "ChairLeg",
-            "ChairPost",
-            "ChairSeat",
-            "ChairSlat",
-            "EngineBlock",
-            "EngineElbow",
-            "EngineFin",
-            "EnginePipe",
-            "EnginePullHandle",
-            "EngineReel",
-            "EngineTank",
-            "EngineTankCap",
-            "EngineTip",
-            "FrameAxle",
-            "FrameCross",
-            "FrameDrop",
-            "FrameFloor",
-            "FrameNose",
-            "FrameRail",
-            "FrameShelf",
-            "TorchBody",
-            "TorchBracket",
-            "TorchHead",
-            "TorchLens",
-            "TorchTape"
-          ]
-        },
-        "Bed": {
-          "triangles": 4820,
-          "parts": [
-            "SkipDent",
-            "SkipForkPocket",
-            "SkipHinge",
-            "SkipLid",
-            "SkipLidGrip",
-            "SkipLidRib",
-            "SkipLip",
-            "SkipLoadRock",
-            "SkipPlate",
-            "SkipProp",
-            "SkipPropTape",
-            "SkipRail",
-            "SkipRib",
-            "SkipRust",
-            "SkipSpill",
-            "SkipTub"
+            "Belt",
+            "Bumper",
+            "BumperTape",
+            "Dent",
+            "DoorPanel",
+            "DriverSeatBack",
+            "DriverSeatCushion",
+            "Floor",
+            "Grin",
+            "GrinTooth",
+            "HeadEye",
+            "Hood",
+            "Luggage",
+            "LuggageRope",
+            "PassengerSeat1Back",
+            "PassengerSeat1Cushion",
+            "PassengerSeat2Back",
+            "PassengerSeat2Cushion",
+            "PassengerSeat3Back",
+            "PassengerSeat3Cushion",
+            "PassengerSeat4Back",
+            "PassengerSeat4Cushion",
+            "PassengerSeat5Back",
+            "PassengerSeat5Cushion",
+            "Post",
+            "Roof",
+            "Steering",
+            "Tail",
+            "Windscreen"
           ]
         },
         "WheelFL": {
@@ -5810,19 +5786,20 @@
           ]
         },
         "WheelFR": {
-          "triangles": 924,
+          "triangles": 704,
           "parts": [
+            "WheelFRBolt",
+            "WheelFRCap",
             "WheelFRHub",
-            "WheelFRRim",
-            "WheelFRSpoke",
             "WheelFRTyre"
           ]
         },
         "WheelRL": {
-          "triangles": 652,
+          "triangles": 704,
           "parts": [
+            "WheelRLBolt",
             "WheelRLCap",
-            "WheelRLDish",
+            "WheelRLHub",
             "WheelRLTyre"
           ]
         },
@@ -5839,45 +5816,55 @@
     },
     "vehicle_travel_vehicle_t2": {
       "builder": "vehicles.py",
-      "triangles": 10288,
-      "glbKb": 231,
+      "triangles": 7904,
+      "glbKb": 200,
       "size": [
-        3.05,
-        2.4,
-        1.9
+        3.35,
+        1.07,
+        1.63
       ],
       "groundY": 0,
       "tints": [
         "TintBody"
       ],
-      "emissive": [
-        "Beacon",
-        "Lamp"
-      ],
+      "emissive": [],
       "materials": [
-        "Beacon",
         "Chrome",
         "Dark",
-        "Glass",
         "Hub",
-        "Lamp",
-        "Rock",
-        "RockDark",
+        "Red",
         "Rubber",
-        "Steel",
+        "Sponsor0",
+        "Sponsor1",
+        "Sponsor2",
+        "Sponsor3",
+        "Sponsor4",
+        "Stripe",
         "TintBody"
       ],
       "nodes": {
-        "Bed": {
-          "triangles": 2992,
+        "Body": {
+          "triangles": 3312,
           "parts": [
-            "BedCanopy",
-            "BedFloor",
-            "BedHeadboard",
-            "BedLoadRock",
-            "BedRib",
-            "BedSide",
-            "BedTailgate"
+            "DriverSeatBack",
+            "DriverSeatCushion",
+            "DriverSeatHead",
+            "Engine",
+            "FrontWing",
+            "Nose",
+            "NoseTip",
+            "Number",
+            "Pod",
+            "PodIntake",
+            "RollHoop",
+            "SpoilerPlate",
+            "SpoilerStrut",
+            "SpoilerWing",
+            "Steering",
+            "Sticker",
+            "StickerHood",
+            "StickerWing",
+            "Tub"
           ]
         },
         "WheelFL": {
@@ -5914,25 +5901,6 @@
             "WheelRRCap",
             "WheelRRHub",
             "WheelRRTyre"
-          ]
-        },
-        "Body": {
-          "triangles": 2704,
-          "parts": [
-            "Bumper",
-            "CabBeacon",
-            "CabRoof",
-            "CabShell",
-            "CabSideWindow",
-            "CabWindshield",
-            "Chassis",
-            "ExhaustPipe",
-            "ExhaustTip",
-            "Fender",
-            "Grille",
-            "HeadLamp",
-            "HeadRim",
-            "Hood"
           ]
         }
       }
