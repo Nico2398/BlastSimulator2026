@@ -211,6 +211,16 @@ export function vehicleDriverId(vehicle: Vehicle): number | null {
   return vehicle.occupantIds[0] ?? null;
 }
 
+/** Seats of `vehicle` (driver included): per tier for the travel role, per role otherwise (#2290). */
+export function vehicleSeatCount(_vehicle: { type: VehicleRole; tier: VehicleTier }): number {
+  throw new Error('not implemented');
+}
+
+/** The employees riding `vehicle` without driving it: every occupant after the driver (#2290). */
+export function vehiclePassengerIds(_vehicle: Vehicle): number[] {
+  throw new Error('not implemented');
+}
+
 /**
  * The PendingAction id `vehicleId` is currently reserved for, or null when
  * unreserved — the single lookup every reader of the old

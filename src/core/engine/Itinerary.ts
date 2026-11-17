@@ -12,16 +12,17 @@ export type ArrivalEffectId = 'haul_load' | 'haul_unload' | 'boulder_split';
 /** What happens the instant a leg's destination is reached. */
 export type ArrivalStep =
   | { kind: 'none' }
-  | { kind: 'board'; vehicleId: number }
+  // `passenger`: take a passenger seat (#2290) rather than the driver's.
+  | { kind: 'board'; vehicleId: number; passenger?: boolean }
   | { kind: 'alight'; releaseVehicleForActionId?: number }
   // #1202: go inside the building — the itinerary's last step, taken from a
   // cell on the building's ring (Mount.enterBuilding).
   | { kind: 'enter_building'; buildingId: number }
   | { kind: 'effect'; effectId: ArrivalEffectId; targetId?: number };
 
-/** One foot or drive segment of an itinerary. */
+/** One foot, drive or ride segment of an itinerary; a `ride` leg is a passenger's: inert, carried by its vehicle's driver (#2290). */
 export interface Leg {
-  mode: 'foot' | 'drive';
+  mode: 'foot' | 'drive' | 'ride';
   vehicleId: number | null;
   destX: number;
   destZ: number;
@@ -119,6 +120,10 @@ export interface Leg {
   dwellTicks?: number;
   /** Runtime countdown of `dwellTicks`, set by the locomotion tick on arrival; absent until then. */
   dwellLeft?: number;
+  /** A driver's zero-length wait at the shuttle for passengers to board (#2290); its `dwellTicks` is the bound. */
+  boardingHold?: boolean;
+  /** Runtime countdown of a passenger's wait for the driver to board (#2290); absent until it starts. */
+  boardWaitLeft?: number;
 }
 
 /** What the itinerary is ultimately for. */

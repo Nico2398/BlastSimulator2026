@@ -125,7 +125,7 @@ function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): 
  * position and marks them mounted — this module is the only writer of
  * `occupantIds`, whose first entry IS the driver (#1092).
  */
-export function board(state: GameState, vehicleId: number, employeeId: number, emitter?: EventEmitter): MountResult {
+export function board(state: GameState, vehicleId: number, employeeId: number, emitter?: EventEmitter, _seat: 'driver' | 'passenger' = 'driver'): MountResult {
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: t('mount.vehicle_not_found') };
 
@@ -192,6 +192,14 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   return { success: true };
 }
 
+/**
+ * Put one passenger (an occupant who is not the driver) out of `vehicleId` onto a free cell near it (#2290).
+ * The driver stays aboard. Refuses when `employeeId` is not a passenger of that vehicle.
+ */
+export function alightPassenger(_state: GameState, _vehicleId: number, _employeeId: number, _emitter?: EventEmitter, _toward?: Destination): MountResult {
+  throw new Error('not implemented');
+}
+
 /** Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own. */
 function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter, destination?: Destination): void {
   const employee = state.employees.employees.find(e => e.id === employeeId);
@@ -246,6 +254,7 @@ export function findAlightCell(
   vx: number,
   vz: number,
   toward?: Destination,
+  _exclude?: ReadonlyArray<{ x: number; z: number }>,
 ): { x: number; z: number } {
   if (!grid) return { x: vx, z: vz };
 

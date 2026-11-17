@@ -2710,6 +2710,7 @@
   "ui.crew.task_resting": "Au repos",
   "ui.crew.task_driving": "Conduit {vehicle}",
   "ui.crew.task_driving_to_task": "En route vers la tâche ({vehicle})",
+  "ui.crew.task_riding": "Passager de {vehicle}",
   "ui.crew.task_walking": "En route",
   "ui.crew.task_walking_to": "En route vers : {task}",
   "ui.crew.training_walking": "En route vers la formation",
