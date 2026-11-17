@@ -31,7 +31,7 @@ Height 1.1–1.6 m.
 ## Vehicles — `vehicles_t1.py` / `vehicles.py` / `vehicles_t3.py`
 
 `vehicle_<role>_t<tier>` for `debris_hauler`, `rock_digger`, `drill_rig`,
-`building_destroyer`, `rock_fragmenter`, `charging_truck` × tiers 1–3.
+`building_destroyer`, `rock_fragmenter`, `charging_truck` × tiers 1–3; `travel_vehicle` × tiers 1–2 only.
 
 | Role | t1 — junk | t2 — the machine | t3 — excess |
 |------|-----------|------------------|-------------|
@@ -41,6 +41,7 @@ Height 1.1–1.6 m.
 | building_destroyer | Wrecking Rascal: ride-on mower, plank-and-nails blade, bowling-ball crane, rake ripper | Dozer | Obliterator Supreme: gold face-painted blade, spiked wrecking ball, laser turret, corporate flags |
 | rock_fragmenter | Cracky: wheelbarrow cart, see-saw sledgehammer, crate hopper, pedal-crank flywheel | Crusher | The Atomizer: glowing reactor dome, particle-ring flywheel, twin conveyors |
 | charging_truck | Pour-Bucket Pete: blue barrel strapped to a rusty go-kart, kitchen funnel, garden-hose coil and rose nozzle | Bulk-emulsion tank truck with swing boom and hose | Kaboom Cruiser Deluxe: gold-banded chrome tanker, neon TNT sign, swan-neck boom, champagne fountain on the cab roof |
+| travel_vehicle | Rattle Bus: dented open-sided crew minibus, six seats on show, roof luggage, grinning grille | Turbo Tuesday: garish single-seat racer, sponsor stickers, tail spoiler, one driver seat | none (two tiers only) |
 
 Nodes: `Body` always; `Wheel*` (`WheelFL`, `WheelFR`, `WheelRL`, `WheelRR` on
 haulers) as direct children of the root; `Flywheel` on the fragmenter; plus
