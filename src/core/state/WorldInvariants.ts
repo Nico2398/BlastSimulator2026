@@ -10,9 +10,8 @@ import type { GameState } from './GameState.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Locomotion } from '../entities/EmployeeLocomotion.js';
 import { isMounted, mountedVehicleId, isInsideBuilding } from '../entities/EmployeeLocomotion.js';
-import { vehicleDriverId, getVehicleReservation } from '../entities/Vehicle.js';
+import { vehicleDriverId, vehicleSeatCount, getVehicleReservation } from '../entities/Vehicle.js';
 import { getBuildingPeopleCapacity } from '../entities/Building.js';
-import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { resolveReservationHolder, isPendingReserveAhead } from '../engine/VehicleReservation.js';
 import { findInTransitFragment } from '../economy/Logistics.js';
 
@@ -65,7 +64,7 @@ function occupancyHosts(state: GameState): OccupancyHostView[] {
     ...state.vehicles.vehicles.map((v): OccupancyHostView => ({
       ref: { vehicleId: v.id },
       occupantIds: v.occupantIds,
-      capacity: VEHICLE_SEAT_COUNT[v.type],
+      capacity: vehicleSeatCount(v),
       isNamedBy: loc => isMounted(loc) && loc.vehicleId === v.id,
     })),
     ...state.buildings.buildings.map((b): OccupancyHostView => ({
@@ -126,7 +125,7 @@ function checkI2MountedPositionMismatch(state: GameState): Violation[] {
 
 /**
  * I3: a host's `occupantIds` may not exceed its capacity —
- * `VEHICLE_SEAT_COUNT[type]` for a vehicle, `getBuildingPeopleCapacity` for a
+ * `vehicleSeatCount` for a vehicle, `getBuildingPeopleCapacity` for a
  * building (#1202) — and no employee id may appear in more than one host's
  * `occupantIds`. Two vehicles keep their original kinds; any case involving
  * a building reports the building kinds.

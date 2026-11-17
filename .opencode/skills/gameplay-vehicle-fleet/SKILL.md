@@ -30,7 +30,7 @@ Seven roles, 3 tiers each (the travel vehicle 2). All names are fictional, humor
 |------|--------|--------|--------|---------|
 | **Building Destroyer** | "Wrecking Rascal" | "Demolition Darling" | "Obliterator Supreme" | Carries out every building demolition (tier upgrades are done in place by a builder): `build destroy` queues a `demolish_building` action (`requiredVehicleRole: 'building_destroyer'`, no skill, self-dispatched like hauling). A licensed `driving.truck` driver (the Driver role's start licence) rides it to the building's approach ring; duration = `computeDemolitionDurationTicks(footprintCells, buildingTier, vehicleTier)` (`DEMOLITION_*` in `balance.ts`: grows with footprint and building tier, shrinks with vehicle tier). With no destroyer or no licensed driver the order is blocked (`no_vehicle_in_fleet` / `no_licensed_driver`, "needs a Building Destroyer"). Cancelling refunds the full order cost |
 | **Charging Truck** | "Pour-Bucket Pete" | "Boom-Juice Hauler 5000" | "Kaboom Cruiser Deluxe" | Bulk explosive delivery: pumps emulsion down a blast hole. Every `charge_hole` order requires it (`requiredVehicleRole: 'charging_truck'`): an employee holding `blasting` + `driving.truck` (licence level >= tier) drives it to the hole and stays mounted; charging is never done on foot. Duration = `computeChargeDurationTicks` (`ChargePlan.ts`): tier-1 base / `VEHICLE_TIER_MULTIPLIERS[tier].workRate`, then proficiency. No truck, no licensed driver, too-low licence or nobody with both skills leaves the order waiting (`no_vehicle_in_fleet` / `no_licensed_driver` / `licence_level_too_low` / `no_dual_qualified_employee`). A freshly hired Blaster holds the tier-1 `driving.truck` licence, so it can charge with no course; tiers 2/3 still need Driving Center levels. Mid-charge work is protected from forced rest via `isMidVehicleGatedWork`. Every blasting opening (`BASE_STARTING_VEHICLES`: staffed site, Dusty Hollow) carries a tier-1 truck plus a blaster holding `blasting` + `driving.truck`; the tutorial buys the truck in its `buy-charging-truck` step and its scripted driller (Dale Drillson) arrives with `driving.truck` via `ScriptedCandidate.extraQualifications`. Buyable (Fleet panel, `vehicle buy charging_truck`) and renders with its own model per tier |
-| **Travel Vehicle** | "Rushbus Shuttle" | "Zoom-Zoom Race Car" | none (two tiers only) | Commute, no work, no licence (`ROLE_LICENCE_REQUIRED` is null: anyone drives it). T1 is bought once the mine reaches grade G2 (`TRAVEL_VEHICLE_UNLOCK_GRADE`; progression sites only), T2 once its dealer quest (km driven, `travelCells`, cell = 1 m) is done; `vehicleLock` (`VehicleTierGate.ts`) names the lock on the Fleet card. Commute: `findCheapestTransportItinerary` skips this role when the target is within `TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS` (exactly at it walks); beyond it an employee boards a free parked one, drives to the drivable point by the task, parks, walks the rest, and the vehicle stays free for the next |
+| **Travel Vehicle** | "Rushbus Shuttle" | "Zoom-Zoom Race Car" | none (two tiers only) | Commute, no work, no licence (`ROLE_LICENCE_REQUIRED` is null: anyone drives it). T1 is bought once the mine reaches grade G2 (`TRAVEL_VEHICLE_UNLOCK_GRADE`; progression sites only), T2 once its dealer quest (km driven, `travelCells`, cell = 1 m) is done; `vehicleLock` (`VehicleTierGate.ts`) names the lock on the Fleet card. Commute: `findCheapestTransportItinerary` skips this role when the target is within `TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS` (exactly at it walks); beyond it an employee boards a free parked one (or shares the shuttle of a colleague already setting off: six seats on T1, the race car carries its driver alone), drives to the drivable point by the task, parks, walks the rest, and the vehicle stays free for the next |
 | **Debris Hauler** | "Dumpster on Wheels" | "Haul-o-Matic 3000" | "Mega Mover XL" | Hauls fragmented rock from blast zone to a Freight Warehouse (ore) or Spoil Heap (barren rock) |
 | **Drill Rig** | "Pokey McPoke" | "Bore Master" | "Helldriller" | Drills blast holes to specified depth and angle |
 | **Rock Digger** | "The Scratch" | "Scoop Sergeant" | "Rock Reaper" | Removes one voxel at a time; used for ramp shaping and access routes |
@@ -123,9 +123,22 @@ A vehicle stores identity, position, condition, cargo, and who is inside it. It 
 destination, no task, no phase, no movement tracker. `VehicleOperationalState` and `VehicleTask`
 are **derived** for display by `computeVehicleStatus(v, vehicleState, occupant)`, never stored.
 
-Seats: `occupantIds` is an array capped by `VEHICLE_SEAT_COUNT` (every role 1 for now). The
-**driver** is `occupantIds[0]` — the occupant whose itinerary moves the vehicle. Passengers are an
-additive change to the cap, not a change of shape.
+Seats: `occupantIds` is an array capped by `vehicleSeatCount(v)` (`Vehicle.ts`): `VEHICLE_SEAT_COUNT[role]`
+(1) for every role but the travel vehicle, whose seats come from `TRAVEL_VEHICLE_SEATS` per tier (shuttle 6,
+race car 1). The **driver** is `occupantIds[0]` — the occupant whose itinerary moves the vehicle; everyone
+after is a passenger (`vehiclePassengerIds`). A passenger needs no licence, earns no driving XP, and is not a
+driver boarding (`driverBoardingCount`, `vehicle:driver_boarded`). `board(..., 'passenger')` needs the driver
+aboard first. When the driver alights, `Mount.ts` puts every passenger out first, each on its own free cell,
+keeping the legs of its journey still ahead; `alightPassenger` and `alightIfMounted` put out one passenger alone.
+
+Shared rides (`SharedRide.ts`, `findCheapestTransportItinerary`): an employee ordered to far work who would
+ride a shuttle alone joins instead the trip of one whose itinerary is still on its board leg or its boarding
+hold, when a seat is left and the drop point lies within `TRAVEL_SHARE_RADIUS_CELLS` of their own. Their
+itinerary is foot (board, `passenger: true`) -> `ride` -> foot; the `ride` leg is inert, the driver's drive
+carries them (`writeVehiclePosition` copies the position, I2). They reserve nothing. Installing it adds a
+zero-length `boardingHold` leg after the driver's board leg, bounded by `TRAVEL_BOARDING_WAIT_TICKS` and cut
+short once nobody is still walking to board; a passenger who arrives before the driver waits at most as long.
+The shuttle leaves with whoever boarded. `evacuateZone` unloads in-zone passengers before clearing the zone.
 
 A vehicle-gated action's claim on a vehicle is not stored on the vehicle. It lives in
 `VehicleState.reservations` as `{ vehicleId, actionId }` entries, read and written through
@@ -142,8 +155,8 @@ surface ramp segment while one on the road is free. With none that can reach, th
 
 ```ts
 interface Leg {
-  mode: 'foot' | 'drive';
-  vehicleId: number | null;        // set for 'drive'; also for a 'foot' leg ending in a board
+  mode: 'foot' | 'drive' | 'ride'; // 'ride' = a passenger's inert leg, carried by the driver's drive
+  vehicleId: number | null;        // set for 'drive' and 'ride'; also for a 'foot' leg ending in a board
   destX: number; destZ: number;
   arrival: 'exact' | 'adjacent';   // 'adjacent' = Chebyshev distance <= 1
   onArrive: ArrivalStep;
@@ -152,7 +165,7 @@ interface Leg {
 
 type ArrivalStep =
   | { kind: 'none' }
-  | { kind: 'board';  vehicleId: number }
+  | { kind: 'board';  vehicleId: number; passenger?: boolean }   // passenger: take a passenger seat
   | { kind: 'alight' }
   | { kind: 'enter_building'; buildingId: number }   // go inside, from a cell on its ring
   | { kind: 'effect'; effectId: string };   // haul load/unload, boulder split
@@ -380,7 +393,7 @@ does. The path-scoped `vehicles` rule names these invariants; this is where they
 |---|-----------|
 | I1 | `v.occupantIds.includes(e.id)` **iff** `e.locomotion` is `{ mounted, vehicleId: v.id }`, and `b.occupantIds.includes(e.id)` **iff** it is `{ inside, buildingId: b.id }` |
 | I2 | A mounted employee's `x`/`z` equals their vehicle's `x`/`z` |
-| I3 | A host's `occupantIds.length` is within its capacity (`VEHICLE_SEAT_COUNT[v.type]`, `getBuildingPeopleCapacity(b.type, b.tier)`), and no employee appears in two hosts |
+| I3 | A host's `occupantIds.length` is within its capacity (`vehicleSeatCount(v)`, `getBuildingPeopleCapacity(b.type, b.tier)`), and no employee appears in two hosts |
 | I4 | A vehicle whose `x`/`z` changed this tick had an occupant this tick |
 | I5 | A vehicle's reservation names a live `PendingAction` whose holder is alive and is the vehicle's driver, is walking to board it, or holds the action as a queued reserve-ahead |
 | I6 | `e.itinerary !== null` implies `legs.length > 0` |

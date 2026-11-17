@@ -163,6 +163,18 @@ describe('describeActivity', () => {
     expect(describeActivity(activity({ kind: 'driving_to_task', vehicleId: 7 }))).toBe('Driving to task (#7)');
   });
 
+  it('names the vehicle while riding it as a passenger (#2290)', () => {
+    expect(describeActivity(activity({ kind: 'riding', vehicleId: 7 }))).toBe('Riding #7');
+  });
+
+  it('has a Riding label in both locales, the French one translated (#2290)', () => {
+    const en = (enLocale as Record<string, string>)['ui.crew.task_riding'];
+    const fr = (frLocale as Record<string, string>)['ui.crew.task_riding'];
+    expect(en).toBe('Riding {vehicle}');
+    expect(fr).toContain('{vehicle}');
+    expect(fr).not.toBe(en);
+  });
+
   it('names the action while working it', () => {
     expect(describeActivity(activity({ kind: 'working', actionType: 'drill_hole' }))).toBe('Drilling');
   });

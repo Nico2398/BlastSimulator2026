@@ -1450,6 +1450,15 @@ export const TRAVEL_VEHICLE_UNLOCK_GRADE = 2;
 /** Straight-line distance (grid cells) below which an employee walks rather than fetching a travel vehicle. */
 export const TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS = 24;
 
+/** Seats per travel vehicle tier, driver included (#2290): the shuttle carries a crew (the model has a driver bench and five passenger seats), the race car only its driver. */
+export const TRAVEL_VEHICLE_SEATS: Record<VehicleTier, number> = { 1: 6, 2: 1, 3: 1 };
+
+/** Ticks a shuttle holds at its stop after its driver boards, waiting for passengers, and the longest a passenger waits for a driver (#2290). Bounded: the shuttle then leaves with whoever boarded. */
+export const TRAVEL_BOARDING_WAIT_TICKS = 8;
+
+/** Furthest apart (grid cells) two employees' drop points may be for them to share one shuttle trip (#2290). */
+export const TRAVEL_SHARE_RADIUS_CELLS = 16;
+
 /** Highest tier each role is sold in: three for the work roles, two for the travel role. */
 export const VEHICLE_ROLE_MAX_TIER: Record<VehicleRole, VehicleTier> = {
   debris_hauler: 3,

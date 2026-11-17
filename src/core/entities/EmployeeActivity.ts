@@ -6,10 +6,10 @@
 
 import type { Employee } from './Employee.js';
 import type { Vehicle, VehicleState } from './Vehicle.js';
-import { vehicleDriverId, getVehicleReservation } from './Vehicle.js';
+import { vehicleDriverId, vehiclePassengerIds, getVehicleReservation } from './Vehicle.js';
 import type { ActionType } from '../state/GameState.js';
 
-export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'walking' | 'training' | 'stuck' | 'idle';
+export type EmployeeActivityKind = 'collapsed' | 'resting' | 'working' | 'driving' | 'driving_to_task' | 'riding' | 'walking' | 'training' | 'stuck' | 'idle';
 
 export interface EmployeeActivity {
   kind: EmployeeActivityKind;
@@ -19,7 +19,7 @@ export interface EmployeeActivity {
   totalTicks: number | null;
   /** Dispatched-task type, set while working it or while walking to it. Null otherwise. */
   actionType: ActionType | null;
-  /** Vehicle currently being driven, set only for 'driving'. */
+  /** Vehicle currently being driven (or, for 'riding', ridden), set only for those kinds. */
   vehicleId: number | null;
 }
 
@@ -52,6 +52,10 @@ export function computeEmployeeActivity(employee: Employee, vehicleState: Vehicl
       vehicleId: null,
     };
   }
+
+  // A passenger (#2290) rides the shuttle another employee drives; it is the only thing they are doing.
+  const ridden = vehicleState.vehicles.find(v => vehiclePassengerIds(v).includes(employee.id));
+  if (ridden) return { ...IDLE, kind: 'riding', vehicleId: ridden.id };
 
   const drivenVehicle = findDrivenVehicle(employee.id, vehicleState.vehicles);
   if (drivenVehicle && getVehicleReservation(vehicleState, drivenVehicle.id) !== null) {

@@ -38,7 +38,8 @@ import {
 } from '../config/balance.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { employeeWorkState } from './EmployeeDispatch.js';
-import { board, alight, enterBuilding } from './Mount.js';
+import { board, alight, alightPassenger, enterBuilding } from './Mount.js';
+import { carryPassengers, holdForDriver, holdsForBoarders, isRidingAs } from './SharedRide.js';
 import { isDestinationOccupied, updateVehicleCellOccupancy } from './EntityMovementTick.js';
 import { interruptActiveAction } from './TaskDispatch.js';
 import { applyArrivalEffect } from './ArrivalEffects.js';
@@ -148,10 +149,24 @@ export function tickLocomotion(state: GameState, emitter?: EventEmitter): Locomo
 
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
+    releaseStrandedPassenger(state, emp, emitter);
     if (emp.itinerary !== null) advanceItinerary(state, emp, result, emitter);
   }
 
   return result;
+}
+
+/**
+ * A passenger (#2290) rides along a `ride` leg. One handed a different journey while still
+ * seated is put out first, so nobody walks a foot leg from inside a shuttle. A passenger with no
+ * journey at all just stays seated until the driver alights.
+ */
+function releaseStrandedPassenger(state: GameState, emp: Employee, emitter?: EventEmitter): void {
+  if (!isMounted(emp.locomotion)) return;
+  const vehicleId = emp.locomotion.vehicleId;
+  const first = emp.itinerary?.legs[0];
+  if (first === undefined || first.mode === 'ride' || !isRidingAs(state, emp, vehicleId)) return;
+  alightPassenger(state, vehicleId, emp.id, emitter);
 }
 
 /**
@@ -235,7 +250,8 @@ function clearItineraryOnFailure(state: GameState, emp: Employee): void {
  * an arrived leg starts the countdown; the call that finds it spent returns false so the
  * arrival step fires.
  */
-function holdForDwell(leg: Leg): boolean {
+function holdForDwell(leg: Leg, skip = false): boolean {
+  if (skip) return false;
   const dwell = leg.dwellTicks ?? 0;
   if (dwell <= 0) return false;
   const left = leg.dwellLeft ?? dwell;
@@ -265,6 +281,13 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     }
 
     const leg = itinerary.legs[0]!;
+
+    // A passenger's ride leg is inert (#2290): the driver's own drive carries them (writeVehiclePosition),
+    // and the driver's alight puts them out. It only ends early when the vehicle is gone.
+    if (leg.mode === 'ride') {
+      if (leg.vehicleId === null || !isRidingAs(state, emp, leg.vehicleId)) clearItineraryOnFailure(state, emp);
+      break;
+    }
 
     if (!isLegArrived(emp.x, emp.z, leg)) {
       // advanceLeg itself records emp.id (and, for a drive leg, the
@@ -310,7 +333,9 @@ function advanceItinerary(state: GameState, emp: Employee, result: LocomotionRes
     delete emp.blockEpisode;
     // #2199: a leg with a dwell (loading a fragment) holds the mover on its destination
     // for dwellTicks before the arrival step fires.
-    if (holdForDwell(leg)) break;
+    if (holdForDwell(leg, leg.boardingHold === true && !holdsForBoarders(state, leg))) break;
+    // #2290: a passenger who reached the shuttle before its driver waits, for a bounded time.
+    if (holdForDriver(state, leg)) break;
     const ok = applyArrivalStep(state, emp, leg, itinerary, emitter);
 
     // A board arrival step's post-board handling (evacuation redrive,
@@ -1563,6 +1588,7 @@ function writeVehiclePosition(state: GameState, vehicle: Vehicle, x: number, z: 
 
   vehicle.x = x;
   vehicle.z = z;
+  carryPassengers(state, vehicle);
 
   updateVehicleCellOccupancy(state, vehicle, true, isStationaryNow, prevX, prevZ);
 }
@@ -1698,7 +1724,7 @@ function applyArrivalStep(state: GameState, emp: Employee, leg: Leg, itinerary: 
 
     const alreadyThere = isMounted(emp.locomotion) && mountedVehicleId(emp.locomotion) === vehicle.id;
     if (!alreadyThere) {
-      const boarded = board(state, vehicle.id, emp.id, emitter);
+      const boarded = board(state, vehicle.id, emp.id, emitter, step.passenger === true ? 'passenger' : 'driver');
       if (!boarded.success) return false;
     }
 

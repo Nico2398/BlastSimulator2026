@@ -12,11 +12,10 @@ import type { Vehicle } from '../entities/Vehicle.js';
 import type { Employee } from '../entities/Employee.js';
 import { appendHostTransition, trailArcLength, type TrailHostEvent, type TrailHostKind } from '../entities/MovementTrail.js';
 import type { Locomotion } from '../entities/EmployeeLocomotion.js';
-import { canAssignDriver, canReleaseDriver, vehicleDriverId } from '../entities/Vehicle.js';
+import { canAssignDriver, canReleaseDriver, vehicleDriverId, vehiclePassengerIds, vehicleSeatCount } from '../entities/Vehicle.js';
 import { getBuildingDef, getBuildingPeopleCapacity } from '../entities/Building.js';
 import { isMounted, isInsideBuilding } from '../entities/EmployeeLocomotion.js';
 import { findBuildingExitCell, isOnBuildingRing } from '../nav/BuildingApproach.js';
-import { VEHICLE_SEAT_COUNT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import type { RefusalKey } from '../i18n/Refusal.js';
 import { NEIGHBOUR_OFFSETS_8 } from '../nav/NeighbourOffsets.js';
@@ -119,28 +118,38 @@ function isWithinBoardingRange(ax: number, az: number, bx: number, bz: number): 
 
 /**
  * Board an employee onto a vehicle: the employee must be within one tile
- * (Chebyshev distance) of the vehicle, licensed and otherwise eligible per
- * `canAssignDriver`, and the vehicle must have a free seat
- * (`VEHICLE_SEAT_COUNT`). On success, snaps the employee onto the vehicle's
+ * (Chebyshev distance) of the vehicle. As the driver (the default) they must
+ * be licensed and otherwise eligible per `canAssignDriver`, and the vehicle
+ * empty. As a passenger (#2290) they need no licence and no driving credit,
+ * but the vehicle must already have its driver aboard and a free seat among
+ * `vehicleSeatCount`. On success, snaps the employee onto the vehicle's
  * position and marks them mounted — this module is the only writer of
  * `occupantIds`, whose first entry IS the driver (#1092).
  */
-export function board(state: GameState, vehicleId: number, employeeId: number, emitter?: EventEmitter): MountResult {
+export function board(state: GameState, vehicleId: number, employeeId: number, emitter?: EventEmitter, seat: 'driver' | 'passenger' = 'driver'): MountResult {
+  const asPassenger = seat === 'passenger';
   const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
   if (!vehicle) return { success: false, error: t('mount.vehicle_not_found') };
 
   const employee = state.employees.employees.find(e => e.id === employeeId);
   if (!employee || !employee.alive) return { success: false, error: t('mount.employee_not_found') };
   if (isInsideBuilding(employee.locomotion)) return { success: false, error: t('mount.not_on_foot') };
+  if (asPassenger && employee.locomotion.kind !== 'on_foot') return { success: false, error: t('mount.not_on_foot') };
 
   if (!isWithinBoardingRange(employee.x, employee.z, vehicle.x, vehicle.z)) {
     return { success: false, error: t('mount.too_far_to_board') };
   }
 
-  const eligible = canAssignDriver(state.vehicles, state.employees, vehicleId, employeeId);
-  if (!eligible.success) return { success: false, error: eligible.error };
+  if (asPassenger) {
+    if (vehicleDriverId(vehicle) === null) return { success: false, error: t('mount.vehicle_no_driver') };
+  } else {
+    const eligible = canAssignDriver(state.vehicles, state.employees, vehicleId, employeeId);
+    if (!eligible.success) return { success: false, error: eligible.error };
+  }
 
-  if (!admitOccupant(vehicle, VEHICLE_SEAT_COUNT[vehicle.type], employee, { kind: 'mounted', vehicleId })) {
+  // Only the passenger seats are plural: the driver's is the one seat of an empty vehicle.
+  const capacity = asPassenger ? vehicleSeatCount(vehicle) : 1;
+  if (!admitOccupant(vehicle, capacity, employee, { kind: 'mounted', vehicleId })) {
     return { success: false, error: t('mount.vehicle_full') };
   }
   employee.x = vehicle.x;
@@ -157,13 +166,12 @@ export function board(state: GameState, vehicleId: number, employeeId: number, e
   // ArrivalGate.resolveBoarding, pre-#1089) incremented it on a successful
   // board; this is now the one place a board ever succeeds. Scoped to the
   // seat that actually becomes the driver (occupantIds[0]) rather than every
-  // successful board, so a future multi-seat passenger doesn't inflate it.
-  if (vehicleDriverId(vehicle) === employeeId) {
-    state.vehicles.driverBoardingCount++;
-  }
+  // successful board, so a passenger (#2290) doesn't inflate it.
+  const isDriver = vehicleDriverId(vehicle) === employeeId;
+  if (isDriver) state.vehicles.driverBoardingCount++;
 
   emitter?.emit('employee:mounted', { employeeId, vehicleId });
-  emitter?.emit('vehicle:driver_boarded', { employeeId, vehicleId });
+  if (isDriver) emitter?.emit('vehicle:driver_boarded', { employeeId, vehicleId });
 
   return { success: true };
 }
@@ -192,19 +200,46 @@ export function alight(state: GameState, vehicleId: number, emitter?: EventEmitt
   return { success: true };
 }
 
-/** Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own. */
-function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter, destination?: Destination): void {
+/**
+ * Put one passenger (an occupant who is not the driver) out of `vehicleId` onto a free cell near it (#2290).
+ * The driver stays aboard. Refuses when `employeeId` is not a passenger of that vehicle.
+ */
+export function alightPassenger(state: GameState, vehicleId: number, employeeId: number, emitter?: EventEmitter, toward?: Destination): MountResult {
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  if (!vehicle) return { success: false, error: t('mount.vehicle_not_found') };
+  if (!vehiclePassengerIds(vehicle).includes(employeeId)) return { success: false, error: t('mount.alight_failed') };
+
+  alightOccupant(state, vehicle, employeeId, emitter, toward);
+  return { success: true };
+}
+
+type Cell = { x: number; z: number };
+
+/**
+ * Put `employeeId` out of `vehicle` onto its alight cell and announce it. No mid-haul guard: callers apply their own.
+ * A driver takes every passenger out first, each onto its own cell (#2290). A passenger keeps the rest of its
+ * itinerary, minus the ride legs it just left behind. Returns the cell the employee stands on.
+ */
+function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, emitter?: EventEmitter, destination?: Destination, taken: Cell[] = []): Cell {
   const employee = state.employees.employees.find(e => e.id === employeeId);
-  // Read the next destination before releaseOccupant clears the itinerary.
-  const next = employee?.itinerary?.legs[1];
-  const toward = destination ?? (next ? { x: next.destX, z: next.destZ } : undefined);
-  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward);
-  // The rider's arc up to the vehicle's final position, read before the step onto the alight cell.
   const wasDriver = vehicleDriverId(vehicle) === employeeId;
+  if (wasDriver) {
+    // A seat held by someone not on the roster is left alone: there is nobody to put out.
+    for (const passengerId of vehiclePassengerIds(vehicle).filter(id => state.employees.employees.some(e => e.id === id))) {
+      taken.push(alightOccupant(state, vehicle, passengerId, emitter, undefined, taken));
+    }
+  }
+  // Read the next destination before releaseOccupant clears the itinerary.
+  const itinerary = employee?.itinerary ?? null;
+  const next = itinerary?.legs[1];
+  const toward = destination ?? (next ? { x: next.destX, z: next.destZ } : undefined);
+  const cell = findAlightCell(state.navGrid ?? undefined, vehicle.x, vehicle.z, toward, wasDriver ? taken : [...taken, ...standingBeside(state, vehicle, employeeId)]);
+  // The rider's arc up to the vehicle's final position, read before the step onto the alight cell.
   const arcAtVehicle = employee?.walkTrail ? trailArcLength(employee.walkTrail.points) : 0;
   releaseOccupant(state, vehicle, employeeId, employee, cell.x, cell.z);
   if (employee && wasDriver) markDriverOnVehicle(vehicle, employee, 'alight', arcAtVehicle);
   if (employee) markTransition(employee, 'alight', 'vehicle', vehicle.x, vehicle.z);
+  if (employee && !wasDriver && itinerary) resumeAfterRide(employee, itinerary);
   // A driver who alights mid-route (rest, death) leaves the vehicle parked on a
   // cell its drive leg never marked: without the flag, foot paths route through it
   // and every hop is then refused by the occupancy ledger, stranding the walker.
@@ -212,6 +247,28 @@ function alightOccupant(state: GameState, vehicle: Vehicle, employeeId: number, 
     updateVehicleCellOccupancy(state, vehicle, true, true, Math.round(vehicle.x), Math.round(vehicle.z));
   }
   emitter?.emit('employee:alighted', { employeeId, vehicleId: vehicle.id });
+  return cell;
+}
+
+/** The cells of the on-foot employees standing beside `vehicle`, which a passenger stepping out must not take (#2290). */
+function standingBeside(state: GameState, vehicle: Vehicle, exceptId: number): Cell[] {
+  return state.employees.employees
+    .filter(e => e.alive && e.id !== exceptId && e.locomotion.kind === 'on_foot' && isWithinBoardingRange(e.x, e.z, vehicle.x, vehicle.z))
+    .map(e => ({ x: e.x, z: e.z }));
+}
+
+/**
+ * Hands a passenger who just stepped out the legs of their journey that are still ahead: the leading
+ * ride legs are over, the rest stand. `releaseOccupant` cleared the itinerary and its mirrors; this
+ * puts them back (the mirrors as MoveTo.ts's syncItineraryMirrors derives them).
+ */
+function resumeAfterRide(employee: Employee, itinerary: NonNullable<Employee['itinerary']>): void {
+  const legs = [...itinerary.legs];
+  while (legs[0]?.mode === 'ride') legs.shift();
+  if (legs.length === 0) return;
+  employee.itinerary = { ...itinerary, legs };
+  employee.destinationX = legs[0]!.destX;
+  employee.destinationZ = legs[0]!.destZ;
 }
 
 /**
@@ -246,6 +303,7 @@ export function findAlightCell(
   vx: number,
   vz: number,
   toward?: Destination,
+  exclude: ReadonlyArray<{ x: number; z: number }> = [],
 ): { x: number; z: number } {
   if (!grid) return { x: vx, z: vz };
 
@@ -260,6 +318,7 @@ export function findAlightCell(
     const cell = grid.cellAt(x, z);
     if (!cell || isImpassable(cell, true)) continue;
     if (!isStepClimbable(from, cell.surfaceY, Math.hypot(dx, dz))) continue;
+    if (exclude.some(e => Math.round(e.x) === x && Math.round(e.z) === z)) continue;
     if (!toward) return { x, z };
     candidates.push({ x, z, dist: Math.hypot(x - toward.x, z - toward.z) });
   }
@@ -291,9 +350,12 @@ export function findAlightCell(
  * collapse.
  */
 export function alightIfMounted(state: GameState, emp: Employee, emitter?: EventEmitter, toward?: Destination): void {
-  if (isMounted(emp.locomotion)) {
-    alight(state, emp.locomotion.vehicleId, emitter, toward);
-  }
+  if (!isMounted(emp.locomotion)) return;
+  const vehicleId = emp.locomotion.vehicleId;
+  const vehicle = state.vehicles.vehicles.find(v => v.id === vehicleId);
+  // A passenger (#2290) steps out alone; the driver stays at the wheel.
+  if (vehicle && vehiclePassengerIds(vehicle).includes(emp.id)) alightPassenger(state, vehicleId, emp.id, emitter, toward);
+  else alight(state, vehicleId, emitter, toward);
 }
 
 /**
@@ -439,7 +501,7 @@ export function releaseOccupantsOfRemovedBuildings(state: GameState, emitter?: E
 function staleVehicleOrder(emp: Employee, live: ReadonlySet<number>): boolean {
   if (emp.pendingDriverVehicleId !== null && !live.has(emp.pendingDriverVehicleId)) return true;
   return emp.itinerary?.legs.some(leg => {
-    if (leg.mode === 'drive' && leg.vehicleId !== null && !live.has(leg.vehicleId)) return true;
+    if ((leg.mode === 'drive' || leg.mode === 'ride') && leg.vehicleId !== null && !live.has(leg.vehicleId)) return true;
     return leg.onArrive.kind === 'board' && !live.has(leg.onArrive.vehicleId);
   }) ?? false;
 }

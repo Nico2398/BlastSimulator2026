@@ -218,3 +218,55 @@ describe('computeEmployeeActivity — stuck (#1387)', () => {
     expect(computeEmployeeActivity(emp, makeVehicleState()).kind).toBe('working');
   });
 });
+
+describe('computeEmployeeActivity — riding (#2290 C8)', () => {
+  it('reports riding, with the vehicle, for a passenger aboard', () => {
+    const passenger = makeEmployee({ id: 7, locomotion: { kind: 'mounted', vehicleId: 9 } });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, type: 'travel_vehicle', occupantIds: [6, 7] })]);
+
+    const activity = computeEmployeeActivity(passenger, vehicleState);
+
+    expect(activity.kind).toBe('riding');
+    expect(activity.vehicleId).toBe(9);
+    expect(activity.actionType).toBeNull();
+  });
+
+  it('a passenger on a reserved vehicle is riding, not driving to a task', () => {
+    const passenger = makeEmployee({ id: 7, locomotion: { kind: 'mounted', vehicleId: 9 } });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, type: 'travel_vehicle', occupantIds: [6, 7] })]);
+    vehicleState.reservations.push({ vehicleId: 9, actionId: 3 });
+
+    expect(computeEmployeeActivity(passenger, vehicleState).kind).toBe('riding');
+  });
+
+  it('a passenger whose itinerary mirrors a destination is riding, not walking', () => {
+    const passenger = makeEmployee({ id: 7, locomotion: { kind: 'mounted', vehicleId: 9 }, destinationX: 40, destinationZ: 2 });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, type: 'travel_vehicle', occupantIds: [6, 7] })]);
+
+    expect(computeEmployeeActivity(passenger, vehicleState).kind).toBe('riding');
+  });
+
+  it('the driver of the same vehicle still reports driving', () => {
+    const driver = makeEmployee({ id: 6, locomotion: { kind: 'mounted', vehicleId: 9 } });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, type: 'travel_vehicle', occupantIds: [6, 7] })]);
+
+    const activity = computeEmployeeActivity(driver, vehicleState);
+
+    expect(activity.kind).toBe('driving');
+    expect(activity.vehicleId).toBe(9);
+  });
+
+  it('a collapsed passenger still reads collapsed (priority order unchanged)', () => {
+    const passenger = makeEmployee({ id: 7, collapsing: true, locomotion: { kind: 'mounted', vehicleId: 9 } });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, type: 'travel_vehicle', occupantIds: [6, 7] })]);
+
+    expect(computeEmployeeActivity(passenger, vehicleState).kind).toBe('collapsed');
+  });
+
+  it('an employee on foot beside a shuttle is not riding', () => {
+    const walker = makeEmployee({ id: 7 });
+    const vehicleState = makeVehicleState([makeVehicle({ id: 9, type: 'travel_vehicle', occupantIds: [6] })]);
+
+    expect(computeEmployeeActivity(walker, vehicleState).kind).toBe('idle');
+  });
+});

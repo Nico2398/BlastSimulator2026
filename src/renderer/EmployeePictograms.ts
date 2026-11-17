@@ -42,6 +42,9 @@ export function pictogramKindFor(activity: EmployeeActivity): PictogramKind | nu
     case 'driving':
     case 'driving_to_task':
       return 'driving';
+    case 'riding':
+      // A passenger is aboard, with no character mesh to hang an icon off of (#2290).
+      return null;
     case 'walking':
       return activity.actionType === 'rest' ? 'walking_to_rest' : 'walking';
     case 'training':

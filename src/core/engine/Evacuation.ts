@@ -13,6 +13,9 @@ import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
 import { vehicleDriverId, getVehicleReservation, roleMaxSlopeRatio, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M, EVACUATION_LATERAL_STEP_M, EVACUATION_LATERAL_STEPS } from '../config/balance.js';
 import { isOnReturnTripLeg } from './Locomotion.js';
+import { alightPassenger } from './Mount.js';
+import { isRidingAs } from './SharedRide.js';
+import { isMounted } from '../entities/EmployeeLocomotion.js';
 import {
   EVACUATION_HOLD_KEY, discardStaleRestAction, releaseInZoneTaskQueueEntries, isMidEvacuationDrive,
 } from './EvacuationHold.js';
@@ -222,6 +225,12 @@ export function findSafeEvacuationCell(
  * driverless-rescue branch finds it genuinely free.
  */
 export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResult {
+  // A passenger (#2290) cannot be driven out like a driver: the zone clearing orders drivers and
+  // on-foot evacuees only. They step out first, then walk out like anyone else in the zone.
+  for (const emp of state.employees.employees) {
+    if (emp.alive && isInZone(emp.x, emp.z, zone)) alightIfPassenger(state, emp);
+  }
+
   for (const emp of state.employees.employees) {
     if (!emp.alive) continue;
     if (!isInZone(emp.x, emp.z, zone)) continue;
@@ -302,6 +311,13 @@ export function evacuateZone(state: GameState, zone: ZoneBounds): EvacuationResu
     (fromX, fromZ, z, vehicle, avoidCells) => findSafeEvacuationCell(state, fromX, fromZ, z, vehicle, avoidCells),
     (employee, vehicle) => canEmployeeReachVehicleForEvacuation(state, employee, vehicle),
   );
+}
+
+/** Puts `emp` out of the shuttle they ride, when they ride one as a passenger (#2290). */
+function alightIfPassenger(state: GameState, emp: Employee): void {
+  if (!isMounted(emp.locomotion)) return;
+  const vehicleId = emp.locomotion.vehicleId;
+  if (isRidingAs(state, emp, vehicleId)) alightPassenger(state, vehicleId, emp.id);
 }
 
 /**

@@ -10,12 +10,13 @@ import type { Employee } from '../entities/Employee.js';
 import type { Goal, Itinerary, Leg } from './Itinerary.js';
 import { octileHeuristic, findExactPath, findFootPathWithVehicleFallback, type RampFlowField } from '../nav/Pathfinding.js';
 import { rampFlowField } from '../mining/RampFlow.js';
-import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, VEHICLE_SEAT_COUNT, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_LOAD_TICKS, TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS } from '../config/balance.js';
+import { AGENT_WALK_SPEED, VEHICLE_TRANSPORT_PLANNING_ENABLED, TRANSPORT_ALIGHT_FINISH_WALK_CELLS, NAV_CLEARANCE_EMPLOYEE_CELLS, HAUL_BATCH_RADIUS_CELLS, HAUL_LOAD_TICKS, TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS, TRAVEL_BOARDING_WAIT_TICKS, TRAVEL_SHARE_RADIUS_CELLS } from '../config/balance.js';
 import { computeActionWorkTicks, cellsToTravelTicks } from './ActionSelection.js';
 import { findFreeVehicleForRole, minVehicleTierFor } from './VehicleReservation.js';
 import { isMounted, mountedVehicleId } from '../entities/EmployeeLocomotion.js';
 import { canReleaseDriver, getVehicleDefByTier, getAllVehicleRoles, findVehicleReservedForAction, vehicleRequiredClearanceCells, roleMaxSlopeRatio, type Vehicle, type VehicleRole, type VehicleTier } from '../entities/Vehicle.js';
 import { isDestinationOccupied } from './EntityMovementTick.js';
+import { findShuttleHosts } from './SharedRide.js';
 import { fragmentApproachCell } from '../economy/FragmentApproach.js';
 import { isOversized } from '../mining/BlastCalc.js';
 // Economy -> engine -> economy: findHaulDepotApproach (HaulingTask.ts) needs
@@ -264,13 +265,14 @@ export function buildBoardLeg(
 }
 
 /**
- * Whether `vehicle` has a free seat for `employee` — already aboard counts as
+ * Whether `vehicle` has a free driver's seat for `employee` — already aboard counts as
  * free (continuity never needs a second seat). Shared with MoveTo.ts's
  * board-only itinerary, which runs the identical availability check before
- * committing to a route.
+ * committing to a route. Passenger seats (#2290) are never taken this way: a
+ * driver needs the vehicle empty, however many seats it has.
  */
 export function hasFreeSeatFor(vehicle: Vehicle, employee: Employee): boolean {
-  return vehicle.occupantIds.includes(employee.id) || vehicle.occupantIds.length < VEHICLE_SEAT_COUNT[vehicle.type];
+  return vehicle.occupantIds.includes(employee.id) || vehicle.occupantIds.length === 0;
 }
 
 /**
@@ -802,6 +804,69 @@ export function buildTransportRideItinerary(
 }
 
 /**
+ * A passenger's itinerary for a non-vehicle-gated 'work' goal (#2290): walk to a shuttle another
+ * employee is about to drive, ride it to the point its driver alights at, then walk the rest.
+ * Only a shuttle that has not left, has a seat left, and whose drop point lies within
+ * `TRAVEL_SHARE_RADIUS_CELLS` of where this employee's own ride would have dropped them is a host,
+ * and only when the walk to it and the shuttle's own boarding agree within `TRAVEL_BOARDING_WAIT_TICKS`.
+ * Takes no vehicle reservation: the driver's ride holds the shuttle. Returns the cheapest host's
+ * itinerary, or null when none qualifies.
+ */
+function buildSharedRideItinerary(
+  state: GameState,
+  employee: Employee,
+  goal: Goal,
+  fidelity: PlanFidelity,
+  resolved: ResolvedGoal,
+  action?: PendingAction,
+): Itinerary | null {
+  if (targetBecomesBlocked(action) || resolved.actionId === null) return null;
+
+  let best: Itinerary | null = null;
+  for (const host of findShuttleHosts(state, employee)) {
+    const { vehicle, driveLeg } = host;
+    const boardLeg = buildBoardLeg(state, employee, vehicle, fidelity);
+    if (boardLeg === null) continue;
+    // Never arrive after the shuttle has gone, nor so early the wait for its driver outlasts its bound.
+    if (boardLeg.estTicks > host.boardTicks + host.holdTicks) continue;
+    if (host.boardTicks - boardLeg.estTicks > TRAVEL_BOARDING_WAIT_TICKS) continue;
+
+    const own = resolveRideAlightPoint(
+      state, fidelity, employee.id, vehicle.x, vehicle.z, resolved.targetX, resolved.targetZ,
+      vehicleRequiredClearanceCells(vehicle), roleMaxSlopeRatio(vehicle.type, isProgressionSite(state)),
+    );
+    if (own === null || Math.hypot(own.x - driveLeg.destX, own.z - driveLeg.destZ) > TRAVEL_SHARE_RADIUS_CELLS) continue;
+
+    const footDist = estimateFootLegDistance(state, fidelity, employee.id, driveLeg.destX, driveLeg.destZ, resolved.targetX, resolved.targetZ);
+    if (footDist === null) continue;
+
+    boardLeg.onArrive = { kind: 'board', vehicleId: vehicle.id, passenger: true };
+    const rideLeg: Leg = {
+      mode: 'ride',
+      vehicleId: vehicle.id,
+      destX: driveLeg.destX,
+      destZ: driveLeg.destZ,
+      arrival: 'exact',
+      onArrive: { kind: 'none' },
+      estTicks: driveLeg.estTicks + Math.max(0, host.boardTicks - boardLeg.estTicks),
+    };
+    const footLeg: Leg = {
+      mode: 'foot',
+      vehicleId: null,
+      destX: resolved.targetX,
+      destZ: resolved.targetZ,
+      arrival: 'exact',
+      onArrive: { kind: 'none' },
+      estTicks: cellsToTravelTicks(footDist, AGENT_WALK_SPEED),
+    };
+    const legs = [boardLeg, rideLeg, footLeg];
+    const estTotalTicks = legs.reduce((sum, leg) => sum + leg.estTicks, 0) + resolved.workTicks;
+    if (best === null || estTotalTicks < best.estTotalTicks) best = { legs, goal, workTicks: resolved.workTicks, estTotalTicks };
+  }
+  return best;
+}
+
+/**
  * Finds the cheapest ride itinerary across every vehicle role for a
  * non-vehicle-gated 'work' goal (phase 7, #1093): iterates
  * `getAllVehicleRoles()`, uses `findFreeVehicleForRole` to find a free
@@ -821,9 +886,16 @@ export function findCheapestTransportItinerary(
   footCost: number,
   action?: PendingAction,
 ): Itinerary | null {
-  let best: Itinerary | null = null;
-
   const distToTarget = Math.hypot(resolved.targetX - employee.x, resolved.targetZ - employee.z);
+
+  // Sharing a shuttle already being driven (#2290) beats a ride of one's own whenever it beats walking:
+  // it keeps a second vehicle where it is, and the crew arrives together.
+  if (distToTarget > TRAVEL_VEHICLE_WALK_THRESHOLD_CELLS) {
+    const shared = buildSharedRideItinerary(state, employee, goal, fidelity, resolved, action);
+    if (shared !== null && shared.estTotalTicks < footCost) return shared;
+  }
+
+  let best: Itinerary | null = null;
 
   for (const role of getAllVehicleRoles()) {
     // A short trip is walked: no one fetches a travel vehicle for it (#2285).
