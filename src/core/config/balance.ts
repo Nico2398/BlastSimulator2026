@@ -2244,6 +2244,7 @@ export const SURVEY_BASE_ERROR = {
   core_sample: 0.05,
   aerial:      0.25,
   prospection: 0.3,
+  meteorite_detector: 0.2,
 } as const;
 
 /** Survey disc radius (grid cells) around the centre point for each method. */
@@ -2253,6 +2254,8 @@ export const SURVEY_COVERAGE_RADIUS = {
   aerial:      30,
   /** Reaches every island from the base: ORE_ISLAND_MAX_DISTANCE_M + ORE_ISLAND_RADIUS_MAX_M = 338 (#2286). */
   prospection: 400,
+  /** A reading is taken at one point and touches no cell (#2291). */
+  meteorite_detector: 0,
 } as const;
 
 /**
@@ -2271,6 +2274,8 @@ export const SURVEY_DEPTH_BELOW_SURFACE = {
   core_sample: 40,
   /** Reads no voxel: a coarse island map only (#2286). */
   prospection:  0,
+  /** Reads no voxel: a bearing and a distance band only (#2291). */
+  meteorite_detector: 0,
 } as const;
 
 /** Mine grade at which each survey method opens on a progression site (#2279): surface methods at G0, depth methods from G1. */
@@ -2280,6 +2285,8 @@ export const SURVEY_METHOD_UNLOCK_GRADE = {
   core_sample: 1,
   /** Long range opens at G2, where the ore islands are (#2286). */
   prospection: 2,
+  /** The meteorite detector opens at G3, where the crater is the goal (#2291). */
+  meteorite_detector: 3,
 } as const;
 
 /** Thickness in metres of the G0 band: G0 ores sit within this depth of the surface (#2279). */
@@ -2315,6 +2322,7 @@ export const SURVEY_COSTS = {
   core_sample:  800,
   aerial:      1500,
   prospection: 12000,
+  meteorite_detector: 6000,
 } as const;
 
 /** Survey duration (ticks) for each method. 1 tick = 1 game-hour. */
@@ -2323,7 +2331,20 @@ export const SURVEY_DURATION_TICKS = {
   core_sample: 4,
   aerial:      3,
   prospection: 12,
+  meteorite_detector: 6,
 } as const;
+
+/** Meteorite detector (#2291): half-angle of the bearing cone at skill 1, in degrees. */
+export const DETECTOR_HALF_ANGLE_SKILL1_DEG = 24;
+
+/** Meteorite detector: half-angle at the top skill (PROSPECTION_TOP_SKILL), in degrees; never zero. */
+export const DETECTOR_HALF_ANGLE_TOP_DEG = 6;
+
+/** Meteorite detector: width of the reported distance band, in metres. */
+export const DETECTOR_BAND_WIDTH_M = 150;
+
+/** Meteorite detector: band edges are rounded to this step (metres). */
+export const DETECTOR_BAND_ROUND_M = 10;
 
 /** Prospection (#2286): metres a reported island centre may sit from the true one at skill 1; zero at the top skill. */
 export const PROSPECTION_POSITION_ERROR_M = 24;

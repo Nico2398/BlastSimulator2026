@@ -181,7 +181,7 @@ describe('mining.ts usage strings — English literal + fr divergence', () => {
     },
     {
       name: 'survey usage (no subcommand)',
-      englishLiteral: 'Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z> | survey prospection | survey islands',
+      englishLiteral: 'Usage: survey <seismic|core_sample|aerial|meteorite_detector> x:<X> z:<Z> | survey prospection | survey islands | survey readings',
       run: (ctx) => surveyCommand(ctx, [], {}),
     },
     {
@@ -191,7 +191,7 @@ describe('mining.ts usage strings — English literal + fr divergence', () => {
     },
     {
       name: 'survey unknown method',
-      englishLiteral: 'Unknown method "foobar". Usage: survey <seismic|core_sample|aerial> x:<X> z:<Z> | survey prospection | survey islands',
+      englishLiteral: 'Unknown method "foobar". Usage: survey <seismic|core_sample|aerial|meteorite_detector> x:<X> z:<Z> | survey prospection | survey islands | survey readings',
       run: (ctx) => surveyCommand(ctx, ['foobar'], { x: '10', z: '10' }),
     },
   ];

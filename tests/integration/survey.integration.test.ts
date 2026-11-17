@@ -150,7 +150,7 @@ describe('Survey system', () => {
   it('all voxel-reading SURVEY_METHODS can estimate', () => {
     const grid = makeOreGrid(30);
 
-    for (const method of SURVEY_METHODS.filter(m => m !== 'prospection')) {
+    for (const method of SURVEY_METHODS.filter(m => m !== 'prospection' && m !== 'meteorite_detector')) {
       const result = runSurveyOnGrid(grid, method, 10, 10);
       expect(result).toBeDefined();
       expect(result.method).toBe(method);

@@ -1,0 +1,230 @@
+{
+  "name": "meteorite-detector",
+  "description": "#2291: at grade 3 a player takes two readings with the meteorite detector from the Survey panel, from two spots apart; each result lists a bearing with its error and a distance band, and the minimap draws the two overlapping cones. The crater itself is never shown.",
+  "steps": [
+    {
+      "command": "sandbox start biome:green_foothills seed:42 grade:3",
+      "role": "setup",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "sandbox start biome:green_foothills seed:42 grade:3"
+        }
+      ],
+      "description": "Grade 3 site: the meteorite detector method is open.",
+      "expect": {
+        "equals": {
+          "surveyCount": 1
+        },
+        "note": "the sandbox starts with one free starter survey"
+      }
+    },
+    {
+      "command": "employee hire role:surveyor",
+      "role": "player",
+      "interaction": [
+        {
+          "type": "clickSelector",
+          "selector": "#bs-toolbar [data-panel=\"employees\"]"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-employee-panel [data-role=\"surveyor\"]"
+        }
+      ],
+      "expect": {
+        "changedBy": {
+          "cash": -1200
+        }
+      }
+    },
+    {
+      "command": "employee assign_skill 5 skill:geology level:3",
+      "role": "bootstrap",
+      "interaction": [
+        {
+          "type": "command",
+          "command": "employee assign_skill 5 skill:geology level:3"
+        }
+      ],
+      "description": "Test-only bootstrap: raises the new surveyor to a mid skill so each cone is neither the widest nor the narrowest. The player-facing path is `employee train`."
+    },
+    {
+      "command": "survey meteorite_detector x:30 z:30",
+      "role": "player",
+      "timeout": 120,
+      "description": "First reading, taken from a spot inside the site: the player picks the detector, picks the point on the map and confirms. The survey is queued and paid for.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"meteorite_detector\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 30,
+          "z": 30
+        },
+        {
+          "type": "pickTile",
+          "x": 30,
+          "z": 30
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 1
+        },
+        "note": "arrival-gated: queued and paid for, not yet completed"
+      }
+    },
+    {
+      "command": "wait_until field:surveyCount equals:2 max_ticks:600",
+      "role": "setup",
+      "timeout": 240,
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 2,
+          "maxTicks": 600,
+          "timeoutMs": 210000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "surveyCount": 2
+        }
+      }
+    },
+    {
+      "command": "survey meteorite_detector x:160 z:20",
+      "role": "player",
+      "timeout": 120,
+      "description": "Second reading, taken from another spot well east of the first: a second cone to cross the first.",
+      "interaction": [
+        {
+          "type": "clickIfPresent",
+          "selector": "#bs-inspector [data-panel-close]",
+          "timeoutMs": 0
+        },
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-panel [data-method=\"meteorite_detector\"]"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-survey-run"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-tile-select-confirm"
+        },
+        {
+          "type": "focusTile",
+          "x": 160,
+          "z": 20
+        },
+        {
+          "type": "pickTile",
+          "x": 160,
+          "z": 20
+        },
+        {
+          "type": "screenshot"
+        },
+        {
+          "type": "clickSelector",
+          "selector": "#bs-tile-select-confirm"
+        }
+      ],
+      "expect": {
+        "decreased": [
+          "cash"
+        ],
+        "equals": {
+          "surveyCount": 2
+        },
+        "note": "arrival-gated: queued and paid for, not yet completed"
+      }
+    },
+    {
+      "command": "wait_until field:surveyCount equals:3 max_ticks:600",
+      "role": "setup",
+      "timeout": 240,
+      "interaction": [
+        {
+          "type": "resolveEventIfPending"
+        },
+        {
+          "type": "waitUntil",
+          "field": "surveyCount",
+          "equals": 3,
+          "maxTicks": 600,
+          "timeoutMs": 210000
+        }
+      ],
+      "expect": {
+        "equals": {
+          "surveyCount": 3
+        }
+      }
+    },
+    {
+      "command": "state",
+      "role": "player",
+      "timeout": 90,
+      "description": "Both results list a reading row (bearing with its error, and the distance band); the minimap is widened to hold the two cones, which overlap where the crater lies. The crater itself is on no screen.",
+      "interaction": [
+        {
+          "type": "ensurePanel",
+          "panel": "survey"
+        },
+        {
+          "type": "waitForSelector",
+          "selector": "#bs-survey-panel [data-reading]"
+        },
+        {
+          "type": "screenshot"
+        }
+      ]
+    }
+  ]
+}

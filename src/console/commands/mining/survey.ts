@@ -6,6 +6,7 @@ import type { MiningContext } from './types.js';
 import { requireGameWithSub } from './shared.js';
 import { runSurvey, surveyCostFor, SURVEY_METHODS, type SurveyMethod } from '../../../core/mining/SurveyCalc.js';
 import { SURVEY_COVERAGE_RADIUS } from '../../../core/config/balance.js';
+import { detectorReadingText } from '../../../core/mining/SurveyDetector.js';
 import { surveyMethodRefusal } from '../../../core/mining/SurveyGate.js';
 import { claimForAction, cellsInDisc } from '../siteExpansion.js';
 
@@ -69,6 +70,12 @@ export function surveyCommand(
     return { success: true, output: [`Detected islands: ${islands.length}`, ...lines].join('\n') };
   }
 
+  if (sub === 'readings') {
+    const readings = ctx.state!.surveyResults.flatMap(r => (r.reading ? [r.reading] : []));
+    const lines = readings.map(reading => `  ${detectorReadingText(reading, 'mining.survey.reading_line')}`);
+    return { success: true, output: [`Detector readings: ${readings.length}`, ...lines].join('\n') };
+  }
+
   if (!sub) {
     return { success: false, output: t('mining.survey.usage') };
   }
@@ -84,7 +91,7 @@ export function surveyCommand(
 
   // A prospection runs from the base: its point defaults to the base centre and it claims no site cells.
   const world = ctx.state!.world;
-  if (method === 'prospection' && world) {
+  if ((method === 'prospection' || method === 'meteorite_detector') && world) {
     named['x'] ??= String(Math.floor(world.baseSizeX / 2));
     named['z'] ??= String(Math.floor(world.baseSizeZ / 2));
   }
@@ -104,7 +111,7 @@ export function surveyCommand(
   const refusal = surveyMethodRefusal(ctx.state!.grade?.grade, method);
   if (refusal !== null) return { success: false, output: refusal };
 
-  if (method !== 'prospection') {
+  if (method !== 'prospection' && method !== 'meteorite_detector') {
     const claim = claimForAction(ctx, cellsInDisc(x, z, SURVEY_COVERAGE_RADIUS[method]), 'survey');
     if (!claim.ok) return { success: false, output: claim.output! };
   }
