@@ -1,7 +1,7 @@
 ---
 name: gameplay-vehicle-fleet
 description: >
-  Vehicle fleet specification for BlastSimulator2026: 6 vehicle roles with 3 tiers each, driver
+  Vehicle fleet specification for BlastSimulator2026: 7 vehicle roles (3 tiers each, the travel vehicle 2), driver
   licensing, and the mount/itinerary model that makes an employee the only mobile agent and a
   vehicle an inert tool they ride. Use when implementing or modifying vehicles, boarding, driving,
   movement planning, action cost estimation, traffic, hauling, drilling, digging, or demolition.
@@ -24,7 +24,7 @@ Two rules make the whole system tractable, and every invariant below follows fro
 
 ## Vehicle Roles & Tier Names
 
-Six roles, 3 tiers each. All names are fictional, humorous, and i18n-localized.
+Seven roles, 3 tiers each (the travel vehicle 2). All names are fictional, humorous, and i18n-localized.
 
 | Role | Tier 1 | Tier 2 | Tier 3 | Function |
 |------|--------|--------|--------|---------|
