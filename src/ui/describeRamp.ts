@@ -3,6 +3,7 @@
 import { t } from '../core/i18n/I18n.js';
 import type { BuiltRamp } from '../core/state/GameState.js';
 import type { RampClimb } from '../core/mining/RampGrade.js';
+import type { VehicleRole } from '../core/entities/Vehicle.js';
 import { formatMoney } from '../core/economy/formatMoney.js';
 
 /** Whether vehicles climb a ramp, as one line carrying the limit (#2045); literal keys so key scans find them. */
@@ -27,10 +28,16 @@ export function describeRamp(ramp: BuiltRamp, climb?: RampClimb): { title: strin
 }
 
 /** Readout lines for the ramp param strip while a plan is being drawn; the climbable line only when `climb` is given. */
-export function describeRampPlan(p: { length: number; legs: number; cost: number; gradeDeg: number; climb: RampClimb | null }): string[] {
+export function describeRampPlan(p: { length: number; legs: number; cost: number; gradeDeg: number; climb: RampClimb | null; roles?: readonly VehicleRole[] }): string[] {
   const lines = [t('ui.build.ramp_readout', {
     length: p.length, legs: p.legs, cost: formatMoney(p.cost), grade: Math.round(p.gradeDeg * 10) / 10,
   })];
   if (p.climb !== null) lines.push(climbableLine(false, p.climb));
+  if (p.roles !== undefined) lines.push(rolesLine(p.roles));
   return lines;
+}
+
+/** The vehicle roles that can climb the planned ramp, or the line saying none can (#2288). */
+function rolesLine(roles: readonly VehicleRole[]): string {
+  return roles.length === 0 ? t('ui.build.ramp_roles_none') : t('ui.build.ramp_roles', { roles: roles.map(r => t(`vehicle_type.${r}`)).join(', ') });
 }

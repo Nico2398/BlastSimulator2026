@@ -18,7 +18,7 @@ import {
   type RampDef,
 } from '../core/mining/Ramp.js';
 import { legsFromWaypoints, rampLegsOf, rampPathOf, rampTotalLength, rampWaypoints, type RampLeg } from '../core/mining/RampPath.js';
-import { climbForGrade, plannedRampGradeDegrees } from '../core/mining/RampGrade.js';
+import { climbForGrade, climbingRoles, plannedRampGradeDegrees } from '../core/mining/RampGrade.js';
 import {
   MAX_RAMP_LENGTH, RAMP_DEFAULT_WIDTH, RAMP_WIDTH_OPTIONS, RAMP_DEFAULT_DEPTH_M, RAMP_MAX_DEPTH_M, RAMP_GRADE_STEP_DEGREES, type RampWidth,
 } from '../core/config/balance.js';
@@ -316,6 +316,7 @@ export class RampTool {
     const readout = def === null || totalLength === null ? [] : describeRampPlan({
       length: totalLength, legs: rampLegsOf(def).length, cost, gradeDeg: planGrade,
       climb: progression ? climbForGrade(planGrade, true) : null,
+      ...(progression ? { roles: climbingRoles(planGrade, true) } : {}),
     });
     const actions: NonNullable<ParamStripConfig['actions']> = [];
     if (!exact && wps.length > 0) {

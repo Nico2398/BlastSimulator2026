@@ -10,7 +10,7 @@ import { interruptActiveAction } from './TaskCancellation.js';
 import { releaseVehicleReservation } from './VehicleReservation.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle, VehicleState } from '../entities/Vehicle.js';
-import { vehicleDriverId, getVehicleReservation, vehicleMaxSlopeRatio, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
+import { vehicleDriverId, getVehicleReservation, roleMaxSlopeRatio, vehicleRequiredClearanceCells } from '../entities/Vehicle.js';
 import { EVACUATION_CLEARANCE_M, EVACUATION_LATERAL_STEP_M, EVACUATION_LATERAL_STEPS } from '../config/balance.js';
 import { isOnReturnTripLeg } from './Locomotion.js';
 import {
@@ -179,7 +179,7 @@ export function findSafeEvacuationCell(
   // A vehicle is driven out: its cell must be reached at the vehicle's clearance and climb limit (#2045), or the
   // nearest cell a walker reaches is picked, the drive there fails and the vehicle reads stranded.
   const drive = vehicle === undefined ? {}
-    : { requiredClearance: vehicleRequiredClearanceCells(vehicle), maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(state)) };
+    : { requiredClearance: vehicleRequiredClearanceCells(vehicle), maxSlopeRatio: roleMaxSlopeRatio(vehicle.type, isProgressionSite(state)) };
 
   for (const candidate of candidates) {
     if (avoidCells?.has(evacuationCellKey(candidate.x, candidate.z))) continue;

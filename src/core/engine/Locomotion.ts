@@ -15,7 +15,7 @@ import type { EventEmitter } from '../state/EventEmitter.js';
 import type { Employee } from '../entities/Employee.js';
 import type { Vehicle } from '../entities/Vehicle.js';
 import type { TrainingCancellation } from '../entities/EmployeeTraining.js';
-import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
+import { getVehicleDefByTier, vehicleDriverId, isVehicleCurrentlyDriving, getVehicleReservation, vehicleRequiredClearanceCells, roleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Leg, Itinerary } from './Itinerary.js';
 import { findPath, findFootPathWithVehicleFallback, type PathResult, type PathRequest } from '../nav/Pathfinding.js';
 import { rampFlowField } from '../mining/RampFlow.js';
@@ -852,7 +852,7 @@ type DriveLimits = Pick<PathRequest, 'requiredClearance' | 'maxSlopeRatio' | 'ra
 function driveLimitsOf(state: GameState, vehicle: Vehicle): DriveLimits {
   return {
     requiredClearance: vehicleRequiredClearanceCells(vehicle),
-    maxSlopeRatio: vehicleMaxSlopeRatio(isProgressionSite(state)),
+    maxSlopeRatio: roleMaxSlopeRatio(vehicle.type, isProgressionSite(state)),
     rampFlow: rampFlowField(state),
   };
 }

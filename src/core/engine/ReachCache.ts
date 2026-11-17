@@ -8,7 +8,7 @@
 
 import type { NavGrid } from '../nav/NavGrid.js';
 import { isProgressionSite, type GameState } from '../state/GameState.js';
-import { vehicleMaxSlopeRatio, type Vehicle } from '../entities/Vehicle.js';
+import { roleMaxSlopeRatio, type Vehicle } from '../entities/Vehicle.js';
 import { computeClimbComponents, type ClimbComponents } from '../nav/NavGridReachability.js';
 import { dockedFrom, withDockingCells } from '../nav/DockingReach.js';
 import { NAV_CLEARANCE_VEHICLE_CELLS, NAV_MAX_SLOPE_RATIO } from '../config/balance.js';
@@ -60,10 +60,10 @@ export function componentsOf(cache: ReachCache, clearance: number, maxSlopeRatio
  * and an approach cell beside a building the way order classification does. True with no nav grid (nothing to
  * weigh). A vehicle a shot left on a crater floor reaches only that floor (#2091).
  */
-export function vehicleReachesCell(state: GameState, vehicle: Pick<Vehicle, 'x' | 'z'>, x: number, z: number): boolean {
+export function vehicleReachesCell(state: GameState, vehicle: Pick<Vehicle, 'x' | 'z' | 'type'>, x: number, z: number): boolean {
   const cache = cacheFor(state);
   if (cache === null) return true;
-  const ratio = vehicleMaxSlopeRatio(isProgressionSite(state));
+  const ratio = roleMaxSlopeRatio(vehicle.type, isProgressionSite(state));
   const reach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio)
     .reachableFrom(dockedFrom(cache.navGrid, [vehicle], NAV_CLEARANCE_VEHICLE_CELLS, ratio));
   return withDockingCells(cache.navGrid, reach, NAV_CLEARANCE_VEHICLE_CELLS).has(x, z);
