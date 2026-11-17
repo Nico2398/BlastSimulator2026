@@ -11,7 +11,26 @@ export interface SeatAnchor {
   z: number;
 }
 
+/** Seat-surface height of the shuttle's benches (m, model space). */
+const SHUTTLE_SEAT_Y = 0.52;
+/** Seat-surface height of the race car's bucket seat (m, model space). */
+const RACE_CAR_SEAT_Y = 0.55;
+
+// Model space is the glTF export of the Blender build: X forward, Y up, Z = -Blender Y.
+// Seat positions mirror vehicles_t1.py (`build_travel_shuttle`) and vehicles.py (`build_travel_race_car`).
+const SHUTTLE_SEATS: readonly SeatAnchor[] = [
+  { x: 0.4, y: SHUTTLE_SEAT_Y, z: -0.28 },
+  { x: 0.4, y: SHUTTLE_SEAT_Y, z: 0.28 },
+  { x: -0.15, y: SHUTTLE_SEAT_Y, z: -0.28 },
+  { x: -0.15, y: SHUTTLE_SEAT_Y, z: 0.28 },
+  { x: -0.7, y: SHUTTLE_SEAT_Y, z: -0.28 },
+  { x: -0.7, y: SHUTTLE_SEAT_Y, z: 0.28 },
+];
+const RACE_CAR_SEATS: readonly SeatAnchor[] = [{ x: -0.05, y: RACE_CAR_SEAT_Y, z: 0 }];
+
 /** Seat anchors of a vehicle model, index 0 the driver's; empty when the model draws no seats. */
-export function vehicleSeatAnchors(_role: VehicleRole, _tier: VehicleTier): readonly SeatAnchor[] {
-  throw new Error('not implemented');
+export function vehicleSeatAnchors(role: VehicleRole, tier: VehicleTier): readonly SeatAnchor[] {
+  if (role !== 'travel_vehicle') return [];
+  if (tier === 1) return SHUTTLE_SEATS;
+  return tier === 2 ? RACE_CAR_SEATS : [];
 }
