@@ -16,6 +16,8 @@ import { dispatchChargeAction } from '../../../../../src/core/mining/ChargeOrder
 import { chargeKgPerMetre } from '../../../../../src/core/mining/HoleDiameter.js';
 import { formatMoney } from '../../../../../src/core/economy/formatMoney.js';
 import { setLocale } from '../../../../../src/core/i18n/I18n.js';
+import { createGameForLevel } from '../../../../../src/core/campaign/LevelTransition.js';
+import { createCampaignState } from '../../../../../src/core/campaign/Campaign.js';
 import { createGradeState } from '../../../../../src/core/economy/MineGrade.js';
 import { createQuestState, completeQuest } from '../../../../../src/core/economy/Quests.js';
 import { getQuest } from '../../../../../src/core/economy/QuestCatalog.js';
@@ -2606,12 +2608,13 @@ describe('ChargeStep — locked explosives on a progression site (#2280)', () =>
     expect(selectable(step)).toHaveLength(getAllExplosives().length);
   });
 
-  it('a site without quests keeps a legacy level list as it is: no locked card for an explosive outside it', () => {
+  it('a tutorial game shows the quest-locked cards like any ladder site and offers every tier 1 explosive (#2318)', () => {
     const { step } = makeStep();
-    const state = makeState();
-    state.campaign.activeLevelId = 'tutorial_pit'; // keeps its own list until #2318
+    const state = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
+    state.campaign.activeLevelId = 'tutorial_pit';
     step.update(state, 'sunny');
-    expect(lockedEls(step)).toHaveLength(0);
-    expect(selectable(step)).toEqual(['pop_rock', 'boomite']);
+    expect(selectable(step)).toEqual(['pop_rock', 'boomite', 'krackle']);
+    expect(locked(step, 'big_bada_boom')).not.toBeNull();
+    expect(locked(step, 'dynatomics')).not.toBeNull();
   });
 });

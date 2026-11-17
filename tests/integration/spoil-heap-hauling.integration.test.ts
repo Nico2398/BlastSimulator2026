@@ -332,12 +332,14 @@ describe('rubble_disposal contracts draw on heap mass (#1530)', () => {
 
 describe('seeded blast with a heap and a warehouse (#1530)', () => {
   it('warehouse mass equals the ore-bearing delivered fragments; heap mass equals the barren delivered fragments', () => {
-    const { run, state } = drillChargeAndBlast(18, 10, 3, 5_000_000);
+    const { run, state } = drillChargeAndBlast(12, 14, 3, 5_000_000);
     const initial = new Map(state.logistics.fragments.map(f => [f.fragment.id, f.fragment]));
     const initialMass = new Map(state.logistics.fragments.map(f => [f.fragment.id, f.fragment.mass])); // the fragments shrink in place when concentrated (#2142)
     expect([...initial.values()].some(f => isBarrenFragment(f.oreDensities))).toBe(true);
     expect([...initial.values()].some(f => !isBarrenFragment(f.oreDensities))).toBe(true);
 
+    // The ladder start offers a rubble contract that auto-clears heap stock: the mass under test must stay put (#2145).
+    state.contracts.autoSell = false; state.contracts.autoClearRubble = false;
     addFreightWarehouseToState(state, 1, 8);
     upgradeFreightWarehousesToTier3(state, 75_000);
     expect(run('build spoil_heap at:1,4')).toMatchObject({ success: true });

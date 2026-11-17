@@ -40,7 +40,9 @@ import type { Vehicle } from '../../src/core/entities/Vehicle.js';
 import { vehicleDriverId } from '../../src/core/entities/Vehicle.js';
 import { chargeCommand } from '../../src/console/commands/mining.js';
 import { addHole } from '../../src/core/mining/DrillPlan.js';
-import { getExplosive } from '../../src/core/world/ExplosiveCatalog.js';
+import { getExplosive, getAllExplosives } from '../../src/core/world/ExplosiveCatalog.js';
+import { explosiveFailure } from '../../src/console/commands/mining/charge.js';
+import { getQuest } from '../../src/core/economy/QuestCatalog.js';
 import { queueSavedBlastPlan } from '../../src/console/commands/mining/savedPlanQueue.js';
 import { addBlastFragments } from '../../src/core/economy/Logistics.js';
 import { makeRubbleFragment } from '../helpers/blastFixtures.js';
@@ -1322,12 +1324,37 @@ describe('Campaign level presets (#2292)', () => {
     });
   }
 
-  it('the tutorial, still off the ladder (#2318), opens with no grade and tier 1 explosives only', () => {
+  it('the tutorial opens at grade 0 tier 1 with an empty quest state and tier 1 explosives only (#2318)', () => {
     const c = makeCtx();
     expect(campaignStartCommand(c, [], { level: 'tutorial_pit' }).success).toBe(true);
-    expect(c.state!.grade).toBeUndefined();
-    expect(c.state!.quests).toBeUndefined();
-    for (const id of resolveExplosivesFor(c.state!)) expect(getExplosive(id)!.tier, id).toBe(1);
+    expect(c.state!.grade).toBeDefined();
+    expect(c.state!.grade!.grade).toBe(0);
+    expect(c.state!.grade!.tier).toBe(1);
+    expect(c.state!.quests).toBeDefined();
+    expect(c.state!.quests!.completed).toEqual([]);
+    const ids = resolveExplosivesFor(c.state!);
+    expect([...ids].sort()).toEqual(getAllExplosives().filter(e => e.tier === 1).map(e => e.id).sort());
+    for (const id of ids) expect(getExplosive(id)!.tier, id).toBe(1);
+  });
+
+  it('the tutorial refuses a quest-locked explosive naming the quest, and accepts a tier 1 one (#2318)', () => {
+    const c = makeCtx();
+    expect(campaignStartCommand(c, [], { level: 'tutorial_pit' }).success).toBe(true);
+    const refused = explosiveFailure(c.state!, 'big_bada_boom');
+    expect(refused).not.toBeNull();
+    expect(refused!.success).toBe(false);
+    expect(refused!.output).toContain(t(getQuest('quest_explosive_t2')!.titleKey));
+    const refused3 = explosiveFailure(c.state!, 'dynatomics');
+    expect(refused3!.output).toContain(t(getQuest('quest_explosive_t3')!.titleKey));
+    for (const id of ['pop_rock', 'boomite', 'krackle']) expect(explosiveFailure(c.state!, id), id).toBeNull();
+  });
+
+  it('the tutorial opens a tier 2 explosive once its quest is completed (#2318)', () => {
+    const c = makeCtx();
+    expect(campaignStartCommand(c, [], { level: 'tutorial_pit' }).success).toBe(true);
+    c.state!.quests!.completed.push('quest_explosive_t2');
+    expect(explosiveFailure(c.state!, 'big_bada_boom')).toBeNull();
+    expect(explosiveFailure(c.state!, 'dynatomics')).not.toBeNull();
   });
 
   it('dusty_hollow buys tier 1 explosives only and has every vehicle and building tier quest done', () => {

@@ -284,7 +284,7 @@ describe('Vehicle fleet', () => {
 
     // (3,2)/(4,0) above are the original issue's repro coordinates, quoted
     // for context; this test's own reposition target is unrelated to them.
-    const reposition = runCommand(engine, `vehicle reposition ${debrisHauler.id} 13 2`);
+    const reposition = runCommand(engine, `vehicle reposition ${debrisHauler.id} 13 12`);
     expect(reposition.success).toBe(true);
 
     const TICK_BUDGET = 5;

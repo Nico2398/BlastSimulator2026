@@ -404,7 +404,7 @@
       "command": "state",
       "timeout": 60,
       "role": "player",
-      "description": "#1597: buy-drill-rig-assign. The tier-2 dealership button is railed (inert to the pointer). Focus it and press Enter, then Space -- a keyboard activation must be swallowed exactly as a click is: no purchase, no cash spent, clock not paused. (page.type focuses the element first, so this needs no Tab-order assumptions.)",
+      "description": "#1597: buy-drill-rig-assign. The tier-1 debris hauler dealership button is railed (the tier-2 buttons are quest-locked at G0, and a disabled button cannot take focus) (inert to the pointer). Focus it and press Enter, then Space -- a keyboard activation must be swallowed exactly as a click is: no purchase, no cash spent, clock not paused. (page.type focuses the element first, so this needs no Tab-order assumptions.)",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -412,16 +412,16 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"2\"]"
+          "selector": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"1\"]"
         },
         {
           "type": "type",
-          "selector": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"2\"]",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"1\"]",
           "text": "\n"
         },
         {
           "type": "type",
-          "selector": "#bs-vehicle-panel button[data-vtype=\"drill_rig\"][data-tier=\"2\"]",
+          "selector": "#bs-vehicle-panel button[data-vtype=\"debris_hauler\"][data-tier=\"1\"]",
           "text": " "
         }
       ],

@@ -92,14 +92,6 @@ export interface LevelDef {
   market?: MarketId;
   /** Where the site starts on the ladder: grade, tier and the quests already completed (#2292). */
   preset?: LevelPreset;
-  /** Pre-ladder rules a level not yet on the ladder keeps: no grade, no quests (tutorial only, TODO(#2318)). */
-  legacy?: LegacyLevelRules;
-}
-
-/** The rules a level off the ladder keeps until #2318: its own explosive list and manual contracts. */
-export interface LegacyLevelRules {
-  availableExplosives: readonly string[];
-  manualContracts: boolean;
 }
 
 /** A level's start on the one progression ladder (#2292). */
@@ -151,8 +143,7 @@ const LEVELS: readonly LevelDef[] = [
     // No events. Bonus contracts. Player-proof score decay.
     // ────────────────────────────────────────────────────────
     id: 'tutorial_pit',
-    // TODO(#2318): the tutorial's scenarios and ramp region are not yet G0 rules; it keeps the pre-ladder rules until they are.
-    legacy: { availableExplosives: ['pop_rock', 'boomite'], manualContracts: true },
+    preset: { grade: 0, tier: 1, completedQuests: [] },
     hiringScript: TUTORIAL_HIRING_SCRIPT,       // Same four hires on every run (#1600)
     scriptedOreSale: TUTORIAL_ORE_SALE_OFFER,   // sell-ore never waits on the random board (#1600)
     startingSite: TUTORIAL_STARTING_SITE, // A free spoil heap from tick 0; no crew or fleet
@@ -404,8 +395,6 @@ function siteYieldedOres(state: GameState): readonly string[] {
 
 /** Explosive ids the site may buy: tier 1 plus the tiers its completed quests opened. */
 export function resolveExplosivesFor(state: Pick<GameState, 'quests' | 'campaign'>): readonly string[] {
-  const legacy = state.quests ? undefined : legacyRulesOf(state.campaign.activeLevelId);
-  if (legacy) return legacy.availableExplosives;
   return getAllExplosives().filter(e => explosiveLockedByQuest(state, e.id) === null).map(e => e.id);
 }
 
@@ -424,16 +413,4 @@ export function resolveHiringScript(state: GameState): readonly ScriptedCandidat
 export function resolveScriptedOreSale(state: GameState): ScriptedOreSaleOffer | undefined {
   const levelId = state.campaign.activeLevelId;
   return levelId ? getLevel(levelId)?.scriptedOreSale : undefined;
-}
-
-/** Whether an automatic contract behaviour is on: the player's explicit choice, else on, except where a level not yet on the ladder asks for manual contracts (#2318). */
-export function autoFulfilmentEnabled(state: GameState, key: 'autoSell' | 'autoClearRubble'): boolean {
-  const explicit = state.contracts[key];
-  if (explicit !== undefined) return explicit;
-  return !legacyRulesOf(state.campaign.activeLevelId)?.manualContracts;
-}
-
-/** The pre-ladder rules of a level that keeps them (#2318); undefined on the ladder and for no level. */
-export function legacyRulesOf(levelId: string | null): LegacyLevelRules | undefined {
-  return levelId ? getLevel(levelId)?.legacy : undefined;
 }

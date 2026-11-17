@@ -15,9 +15,8 @@ import {
   SHAREHOLDER_SUMMIT_PROFIT_TARGET, SHAREHOLDER_SUMMIT_BOARD,
 } from '../../../src/core/config/balance.js';
 
-/** Explosive ids a level opens with: its own list while off the ladder (#2318), else tier 1 plus the tiers its preset quests opened. */
+/** Explosive ids a level opens with: tier 1 plus the tiers its preset quests opened. */
 function explosivesOf(level: LevelDef): readonly string[] {
-  if (level.legacy) return level.legacy.availableExplosives;
   const quests = { ...createQuestState(), completed: [...level.preset!.completedQuests] };
   return resolveExplosivesFor({ quests, campaign: { activeLevelId: level.id } } as Pick<GameState, 'quests' | 'campaign'>);
 }
@@ -188,11 +187,10 @@ describe('Level definition system (7.1)', () => {
     expect(getLevel('shareholder_summit')!.datum).toBeGreaterThan(0);
   });
 
-  it('tutorial_pit only has basic explosives', () => {
+  it('tutorial_pit only has tier 1 explosives', () => {
     const level = getLevel('tutorial_pit')!;
     expect(explosivesOf(level)).toContain('pop_rock');
     expect(explosivesOf(level)).toContain('boomite');
-    expect(explosivesOf(level)).not.toContain('krackle');
     expect(explosivesOf(level)).not.toContain('big_bada_boom');
     expect(explosivesOf(level)).not.toContain('shatternite');
     expect(explosivesOf(level)).not.toContain('rumblox');
@@ -213,9 +211,9 @@ describe('level explosive availability (#1357, #2292)', () => {
     expect([...explosivesOf(getLevel('shareholder_summit')!)]).toEqual(fullCatalog);
   });
 
-  it('tutorial_pit keeps its own list, a strict subset of the catalog (#2318)', () => {
+  it('tutorial_pit opens the tier 1 explosives, a strict subset of the catalog (#2318)', () => {
     const ids = [...explosivesOf(getLevel('tutorial_pit')!)];
-    expect(ids).toEqual(['pop_rock', 'boomite']);
+    expect(ids).toEqual(['pop_rock', 'boomite', 'krackle']);
     expect(ids.length).toBeLessThan(fullCatalog.length);
     expect(ids).not.toContain('dynatomics');
   });
@@ -603,65 +601,6 @@ describe('Shareholder Summit level (#1949)', () => {
       expect(l.market, l.id).toBeUndefined();
       expect(l.board, l.id).toBeUndefined();
     }
-  });
-});
-
-// ── autoFulfilmentEnabled (#2145) ───────────────────────────────────────────
-
-import { autoFulfilmentEnabled } from '../../../src/core/campaign/Level.js';
-
-describe('autoFulfilmentEnabled (#2145)', () => {
-  const KEYS = ['autoSell', 'autoClearRubble'] as const;
-  const gameIn = (levelId: string | null) => {
-    const state = createGame({ seed: 42 });
-    state.campaign.activeLevelId = levelId;
-    return state;
-  };
-
-  it('only the tutorial level teaches contracts by hand', () => {
-    expect(getLevel('tutorial_pit')!.legacy?.manualContracts).toBe(true);
-    for (const level of getAllLevels().filter(l => l.id !== 'tutorial_pit')) {
-      expect(level.legacy, level.id).toBeUndefined();
-    }
-  });
-
-  it.each(KEYS)('%s defaults on with no active level', (key) => {
-    expect(autoFulfilmentEnabled(gameIn(null), key)).toBe(true);
-  });
-
-  it.each(KEYS)('%s defaults on in a campaign level', (key) => {
-    expect(autoFulfilmentEnabled(gameIn('dusty_hollow'), key)).toBe(true);
-  });
-
-  it.each(KEYS)('%s defaults on in the sandbox', (key) => {
-    expect(autoFulfilmentEnabled(gameIn(SANDBOX_LEVEL_ID), key)).toBe(true);
-  });
-
-  it.each(KEYS)('%s defaults off in the tutorial', (key) => {
-    expect(autoFulfilmentEnabled(gameIn('tutorial_pit'), key)).toBe(false);
-  });
-
-  it.each(KEYS)('an explicit true on %s wins over the tutorial default', (key) => {
-    const state = gameIn('tutorial_pit');
-    state.contracts[key] = true;
-    expect(autoFulfilmentEnabled(state, key)).toBe(true);
-  });
-
-  it.each(KEYS)('an explicit false on %s wins over the default on', (key) => {
-    const state = gameIn('dusty_hollow');
-    state.contracts[key] = false;
-    expect(autoFulfilmentEnabled(state, key)).toBe(false);
-  });
-
-  it('the two switches are independent', () => {
-    const state = gameIn('dusty_hollow');
-    state.contracts.autoSell = false;
-    expect(autoFulfilmentEnabled(state, 'autoSell')).toBe(false);
-    expect(autoFulfilmentEnabled(state, 'autoClearRubble')).toBe(true);
-    const tutorial = gameIn('tutorial_pit');
-    tutorial.contracts.autoClearRubble = true;
-    expect(autoFulfilmentEnabled(tutorial, 'autoSell')).toBe(false);
-    expect(autoFulfilmentEnabled(tutorial, 'autoClearRubble')).toBe(true);
   });
 });
 

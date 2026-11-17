@@ -23,7 +23,7 @@ import { createGradeState } from '../../../src/core/economy/MineGrade.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { EventEmitter } from '../../../src/core/state/EventEmitter.js';
 import { serialize, deserialize } from '../../../src/core/state/SaveLoad.js';
-import { getLevel, resolveExplosivesFor, isExplosiveAvailableFor, legacyRulesOf } from '../../../src/core/campaign/Level.js';
+import { getLevel, resolveExplosivesFor, isExplosiveAvailableFor } from '../../../src/core/campaign/Level.js';
 import { getAllExplosives, explosivesOfTier } from '../../../src/core/world/ExplosiveCatalog.js';
 import { optimizerOptionsFor } from '../../../src/core/mining/ChargeOptimizer.js';
 import { autoChargeHole, chargePatternHoles } from '../../../src/core/mining/ChargeOrder.js';
@@ -859,14 +859,14 @@ describe('explosive availability on progression and other sites (#2280 C7)', () 
     expect([...resolveExplosivesFor(s)].sort()).toEqual(ids(explosivesOfTier(1)).sort());
   });
 
-  it('a bare site opens the full catalog, except a tutorial that keeps its own list (#2318)', () => {
+  it('a bare site opens the full catalog on every level, the tutorial included (#2318)', () => {
     const s = createGame({ seed: 42, mineType: 'desert' });
     s.campaign.activeLevelId = 'dusty_hollow';
     expect(resolveExplosivesFor(s)).toHaveLength(getAllExplosives().length);
     s.campaign.activeLevelId = null;
     expect(resolveExplosivesFor(s)).toHaveLength(getAllExplosives().length);
     s.campaign.activeLevelId = 'tutorial_pit';
-    expect([...resolveExplosivesFor(s)]).toEqual([...legacyRulesOf('tutorial_pit')!.availableExplosives]);
+    expect(resolveExplosivesFor(s)).toHaveLength(getAllExplosives().length);
   });
 
   it('isExplosiveAvailableFor: locked until the quest completes on a progression site', () => {
@@ -879,10 +879,15 @@ describe('explosive availability on progression and other sites (#2280 C7)', () 
     expect(isExplosiveAvailableFor(s, 'obliviax')).toBe(false);
   });
 
-  it('isExplosiveAvailableFor on a tutorial site that keeps its own list follows that list (#2318)', () => {
-    const s = createGame({ seed: 42, mineType: 'desert' });
+  it('isExplosiveAvailableFor on a tutorial game follows its quests, not a level list (#2318)', () => {
+    const s = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
     s.campaign.activeLevelId = 'tutorial_pit';
     expect(isExplosiveAvailableFor(s, 'boomite')).toBe(true);
+    expect(isExplosiveAvailableFor(s, 'krackle')).toBe(true);
+    expect(isExplosiveAvailableFor(s, 'big_bada_boom')).toBe(false);
+    expect(isExplosiveAvailableFor(s, 'dynatomics')).toBe(false);
+    completeQuest(s, T2);
+    expect(isExplosiveAvailableFor(s, 'big_bada_boom')).toBe(true);
     expect(isExplosiveAvailableFor(s, 'dynatomics')).toBe(false);
   });
 
@@ -1045,10 +1050,10 @@ describe('quest state on a campaign level (#2280 C6)', () => {
     expect(state.quests).toEqual({ ...createQuestState(), completed: [...getLevel('shareholder_summit')!.preset!.completedQuests] });
   });
 
-  it('a level still off the ladder (#2318) has no quest state', () => {
+  it('the tutorial starts at grade 0 tier 1 with quest state and no quest completed (#2318)', () => {
     const state = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
-    expect(state.grade).toBeUndefined();
-    expect(state.quests).toBeUndefined();
+    expect(state.grade).toMatchObject({ grade: 0, tier: 1 });
+    expect(state.quests).toEqual({ ...createQuestState(), completed: [] });
   });
 });
 

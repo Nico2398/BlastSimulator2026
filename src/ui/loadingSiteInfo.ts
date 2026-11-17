@@ -22,9 +22,8 @@ const BIOME_CATEGORY_KEY: Record<string, string> = {
 };
 const DEFAULT_BIOME_CATEGORY_KEY = 'ui.portfolio.biome.mountain';
 
-/** Explosives a level opens with: its own list while off the ladder, else tier 1 plus its preset quests' tiers. */
+/** Explosives a level opens with: tier 1 plus its preset quests' tiers. */
 function explosiveCount(level: LevelDef): number {
-  if (level.legacy) return level.legacy.availableExplosives.length;
   const completed = level.preset ? [...level.preset.completedQuests] : [];
   return resolveExplosivesFor({ quests: { ...createQuestState(), completed }, campaign: { activeLevelId: null } as GameState['campaign'] }).length;
 }

@@ -590,10 +590,10 @@ describe('createGameForLevel — shareholder summit rules (#1949)', () => {
     expect(state.contracts.market ?? 'legacy').toBe('legacy');
   });
 
-  it('tutorial_pit has no board and no production market, and is still off the ladder (#2318)', () => {
+  it('tutorial_pit has no board and no production market, and starts at G0 tier 1 (#2318)', () => {
     const state = createGameForLevel(createCampaignState(), 'tutorial_pit')!;
     expect(state.board).toBeUndefined();
-    expect(state.grade).toBeUndefined();
+    expect(state.grade).toMatchObject({ grade: 0, tier: 1 });
     expect(state.contracts.market ?? 'legacy').toBe('legacy');
   });
 

@@ -174,8 +174,13 @@ describe('building tier gate depends only on completed quests (#2292)', () => {
 describe('level start states gate tiers by their preset quests (#2292)', () => {
   const start = (id: string) => createGameForLevel(unlockedCampaign(), id)!;
 
-  it('the tutorial, still off the ladder (#2318), has no quest state to gate by', () => {
-    expect(start('tutorial_pit').quests).toBeUndefined();
+  it('the tutorial (#2318) has an empty quest state: vehicle and building tiers above 1 are locked, tier 1 explosives only', () => {
+    const s = start('tutorial_pit');
+    expect(s.quests).toBeDefined();
+    expect(s.quests!.completed).toEqual([]);
+    expect(vehicleTierGate(s, 2)).not.toBeNull();
+    for (const type of MULTI_TIER()) expect(isBuildingTierUnlocked(s, type, 2), type).toBe(false);
+    expect(resolveExplosivesFor(s)).toEqual(explosiveIdsOfTier(1));
   });
 
   for (const id of ['dusty_hollow', 'grumpstone_ridge', 'treranium_depths']) {

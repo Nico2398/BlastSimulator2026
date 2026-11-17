@@ -642,7 +642,7 @@
       }
     },
     {
-      "command": "build_ramp start:10,23 end:10,35 depth:6",
+      "command": "build_ramp start:10,23 end:10,41 depth:6",
       "timeout": 90,
       "description": "box-cut complete: dig the starter cut down the west face of the drill pattern before the first shot, so the blasted rock has a free face and a void to fall into (real open pits pioneer this access cut first). #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward, so box-cut now advances straight to 'drill-plan', same as before #923. #1151: depth explicit 8 -> 6 -- length 12 (z:19-31, can't extend further without running off this 32-wide map's edge) now caps the legal depth at floor(12 / 1.8) = 6 to keep every per-column step within NAV_MAX_SLOPE_RATIO. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan below is depth:8, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth by up to 1 (the old depth:8/length:12 pairing actually bottomed out at floor(11/12*8)=7, not 8) -- at depth:6 the ramp's real floor is floor(11/12*6)=5, up to 3m short of this file's 8-deep crater floor. A gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of how ramp length/depth are tuned in this file alone; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts) -- not something a scenario-def edit can fix on its own.",
       "role": "player",
@@ -670,11 +670,18 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 10,
+          "z": 38,
+          "distance": 40,
+          "pitch": 75
+        },
+        {
           "type": "dragTiles",
           "x1": 10,
           "z1": 23,
           "x2": 10,
-          "z2": 35
+          "z2": 41
         },
         {
           "type": "screenshot"
@@ -800,7 +807,7 @@
       "commandOutcome": "either"
     },
     {
-      "command": "charge hole:* explosive:boomite stemming:2.5",
+      "command": "charge hole:* explosive:boomite stemming:2.8",
       "timeout": 30,
       "description": "charge ordered: Charge All Holes clicked — the panel applies its own form defaults and hole rows turn amber/loading (#554: charging is real work now, so the click only queues the order; the wait step right after drains it and confirms the tutorial advances to sequence once every hole has actually landed). #949: standardized on boomite (matching tutorial-playthrough.json/tutorial-steps-visual.json, and the panel's own DEFAULT_EXPLOSIVE, Charge.ts) -- the old pop_rock/3kg/2m command never actually matched what a real click produced anyway (Charge All always applies the panel's own boomite/5kg/2m defaults, a pre-existing command/click divergence this file carried before #949), so no explosive-selector click is needed. Amount/stemming steppers now clicked explicitly to reach the retuned amount:4/stemming: the amount stepper's step is 1kg (5->4, one decrement click) and the stemming stepper's step is 0.2m (2.0->2.2->2.5, two increment clicks) -- 2.5m is the closest reachable value to the 2.5 this step first declared (the command now declares 2.5 too, so both channels run the same value -- setStepper refuses a target the control cannot reach), and functionally equivalent to it: both sit at or above BlastCalc's own full-stemming-effectiveness cap of 0.3x depth (0.3*8=2.5m at this pattern's depth:8), so the extra 0.1m the console command asks for does nothing more. The stepper click count/selectors were verified against a real interaction-mode run (Puppeteer, screenshots). #1330: superseded by the panel-default retune -- the panel's own defaults are now exactly this plan (grid spacing 4 m, depth 8 m; charge amount 4 kg, stemming 2.5 m), so this step carries no spacing/depth/amount/stemming setStepper actions and any stepper-click wording above is historical.",
       "role": "player",
@@ -817,7 +824,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "2.5 m"
+          "expectedValue": "2.8 m"
         },
         {
           "type": "clickSelector",

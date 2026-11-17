@@ -260,8 +260,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:15,15 diameter:0.089",
-      "description": "#553: the drag rectangle was shrunk from (15,15)-(25,25) to (15,15)-(21,21). Command and click stay equivalent -- the Drill panel's own default spacing (DEFAULT_SPACING_M=3) computes cols/rows as round(size/spacing)+1, so round(6/3)+1 = 3x3 = 9 holes for this rectangle, exactly what the command declares. The shrink is the point: drill_hole is now real queued work, and a lone driller with one drill_rig and no living quarters collapses from fatigue partway through a pattern (sandbox-measured: hole 9 of 9 lands at tick 119, hole 16 of 16 not until tick ~400). 16 holes would have made this file a study of one worker's stamina rather than a tutorial playthrough. depth stays 6, the panel default this step never clicks away from. Blast consequences re-measured at the smaller pattern rather than carried over -- see the blast step below. diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/save-load-visual.json/weather-flood.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission kept the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. Confirmed exact: adding the real default here reproduces interaction mode's own $126,884 figure at the very next charge step, and the same fixed $108 offset carries unchanged through every remaining cash checkpoint in this file (the second drill_plan below needs no change -- its own diameter default happens not to move the total further).",
+      "command": "drill_plan grid rows:3 cols:3 spacing:3 depth:6 start:8,13 diameter:0.089",
+      "description": "#553: the drag rectangle was shrunk from (15,15)-(25,25) to (15,15)-(21,21). Command and click stay equivalent -- the Drill panel's own default spacing (DEFAULT_SPACING_M=3) computes cols/rows as round(size/spacing)+1, so round(6/3)+1 = 3x3 = 9 holes for this rectangle, exactly what the command declares. The shrink is the point: drill_hole is now real queued work, and a lone driller with one drill_rig and no living quarters collapses from fatigue partway through a pattern (sandbox-measured: hole 9 of 9 lands at tick 119, hole 16 of 16 not until tick ~400). 16 holes would have made this file a study of one worker's stamina rather than a tutorial playthrough. depth stays 6, the panel default this step never clicks away from. Blast consequences re-measured at the smaller pattern rather than carried over -- see the blast step below. diameter:0.089 added (issue #553 shared-mechanism finding, same as rock-fragmenter-breaking.json/hauling-gate.json/nav-*-visual.json/save-load-visual.json/weather-flood.json): the real grid-tool confirm always sends the panel's own DEFAULT_DIAMETER_M=0.089 (Drill.ts), while an omitted diameter: on this console command fell back to a different console-only default (0.15, mining.ts) -- computeDrillHoleDurationTicks scales drill duration by diameter, so the omission kept the drill_rig busy (fuelCostPerTick) for extra ticks command mode never should have spent. Confirmed exact: adding the real default here reproduces interaction mode's own $126,884 figure at the very next charge step, and the same fixed $108 offset carries unchanged through every remaining cash checkpoint in this file (the second drill_plan below needs no change -- its own diameter default happens not to move the total further). #2318: start 15,15 -> 8,13 (dragTiles 15,15-21,21 -> 8,13-14,19): tutorial_pit starts on the progression ladder, vehicles climb 20 degrees, and the drill rig cannot reach the east hillside. 8,13 keeps every hole on the vehicle-reachable NW plateau (x <= z+1) and clear of the starting spoil heap at 4,19.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -296,10 +296,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 15,
-          "z1": 15,
-          "x2": 21,
-          "z2": 21
+          "x1": 8,
+          "z1": 13,
+          "x2": 14,
+          "z2": 19
         },
         {
           "type": "screenshot"
@@ -381,7 +381,7 @@
       "description": "#1895: a cash-bought charge order waits out the explosives delivery, 400 idle ticks; on continuous shifts with no rest the idle crew's morale collapses and it revolts before the shipment arrives. The default shift policy carries it through the wait."
     },
     {
-      "command": "charge hole:* explosive:boomite stemming:1.8",
+      "command": "charge hole:* explosive:boomite stemming:3.8",
       "description": "Fill each 6 m hole with boomite up to 1.8 m of stemming (>= 0.3 x depth, #949): a 4.2 m column, 8.4 kg per hole, which breaks out (#1774: a shot too small for the burden leaves the rubble sealed under the cap, sealed rock gets no haul order, and the crater stays stepped so the later build_ramp click at (15,15) cannot resolve its tile). The click path sets the same stemming on the Charge step's stepper before Charge All. Earlier history: the shot was an explicit 5 kg (#1774), first tuned at amount:5 stemming:2 and retuned for #949.",
       "interaction": [
         {
@@ -395,7 +395,7 @@
         {
           "type": "setStepper",
           "selector": "#bs-blast-panel [data-field=\"stemming\"]",
-          "value": 1.8
+          "value": 3.8
         },
         {
           "type": "clickSelector",
@@ -454,7 +454,7 @@
     },
     {
       "command": "blast",
-      "description": "Finding #40: the corrected 16-hole grid (vs. the originally-declared 9) is dense and energetic enough to kill both employees standing nearby -- confirmed via direct trace (state.damage.deathCount goes 0->2, both the surveyor and the driller, neither of whom this file ever dispatches away from the blast area first). This is a real, verified consequence of fixing the grid-spacing bug, not a scenario-authoring mistake to route around: the file's own later steps never depend on employee #1 or #2 specifically again (later roles are filled by newly-hired employees #3/#4), so the playthrough continues normally with a smaller, grimmer workforce -- exactly what a real player who dragged this same rectangle would experience. #949: deathCount stays 2, unchanged by the amount/stemming retune above -- blast.ts's own exact-hit check (\"Standing on the rock when it goes is not survivable, whatever the charge\") kills any employee standing on a column the blast clears regardless of charge tuning, and this file never adds an evacuate-zone step before this first blast (unlike the tutorial's own scripted flow, which now teaches evacuation before every shot). These two deaths are positional, not overload-related, so #949's retune of the shot's energy does not touch them.",
+      "description": "Finding #40: the corrected 16-hole grid (vs. the originally-declared 9) is dense and energetic enough to kill both employees standing nearby -- confirmed via direct trace (state.damage.deathCount goes 0->2, both the surveyor and the driller, neither of whom this file ever dispatches away from the blast area first). This is a real, verified consequence of fixing the grid-spacing bug, not a scenario-authoring mistake to route around: the file's own later steps never depend on employee #1 or #2 specifically again (later roles are filled by newly-hired employees #3/#4), so the playthrough continues normally with a smaller, grimmer workforce -- exactly what a real player who dragged this same rectangle would experience. #949: deathCount stays 2, unchanged by the amount/stemming retune above -- blast.ts's own exact-hit check (\"Standing on the rock when it goes is not survivable, whatever the charge\") kills any employee standing on a column the blast clears regardless of charge tuning, and this file never adds an evacuate-zone step before this first blast (unlike the tutorial's own scripted flow, which now teaches evacuation before every shot). These two deaths are positional, not overload-related, so #949's retune of the shot's energy does not touch them. #2318: changedBy cash 0 -> -250: the Blast Notification Form B-52 permit fee of the grade-0 rung (PERMIT_LIMITS[0].fee) is charged at the shot. The charge went from 1.8m to 3.8m stemming and the grid moved to 8,13 so the pattern stays under the grade-0 40kg cap (9 x 3.8kg = 34kg; unrestrained it was 75kg and drew a Ministry fine) and on ground the vehicles climb at 20 degrees.",
       "interaction": [
         {
           "type": "clickSelector",
@@ -494,7 +494,7 @@
           "deathCount": 2
         },
         "changedBy": {
-          "cash": 0
+          "cash": -250
         }
       }
     },
@@ -734,7 +734,7 @@
       }
     },
     {
-      "command": "build freight_warehouse at:6,9",
+      "command": "build freight_warehouse at:8,24",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -755,8 +755,8 @@
         },
         {
           "type": "pickTile",
-          "x": 6,
-          "z": 9
+          "x": 8,
+          "z": 24
         },
         {
           "type": "screenshot"
@@ -766,7 +766,7 @@
           "selector": "#bs-tile-select-confirm"
         }
       ],
-      "description": "Per #526: was `build storage_depot at:12,8`, a phantom BuildingType (commandOutput: \"Unknown subcommand or building type\") with no catalog row and nothing to click -- \"storage_depot\" maps to the real freight_warehouse building. Converted to the tutorial's own real `build-storage` stage (TUTORIAL_STAGES['build-storage'], tutorialStages.ts), whose region tile is REGION.warehouse = (6,6), not the phantom step's (12,8).",
+      "description": "Per #526: was `build storage_depot at:12,8`, a phantom BuildingType (commandOutput: \"Unknown subcommand or building type\") with no catalog row and nothing to click -- \"storage_depot\" maps to the real freight_warehouse building. Converted to the tutorial's own real `build-storage` stage (TUTORIAL_STAGES['build-storage'], tutorialStages.ts), whose region tile is REGION.warehouse = (6,6), not the phantom step's (12,8). #2318: warehouse moved 6,9 -> 8,24 (flat ground south of the shot that the vehicles and crew reach; 2,12/2,8 are flat only before the blast or out of reach): the ground at 6,9 is too steep for a building on tutorial_pit's grade-0 relief.",
       "expect": {
         "equals": {
           "orderedBuildingCount": 1
@@ -961,8 +961,8 @@
       }
     },
     {
-      "command": "build_ramp start:15,15 end:20,25 depth:5",
-      "description": "#1151: explicit depth:5 added -- the 10m length's max legal depth is length / 1.8 ~= 5.77, so the previously-unspecified default depth:8 (grade 0.8) is now too steep. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan patterns are depth:6, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth (at depth:5/length:10 the ramp's real floor is floor(9/10*5)=4, 2m short of the 6-deep crater floor) -- a gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of scenario-level length/depth tuning; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts).",
+      "command": "build_ramp start:15,15 end:20,30 depth:5",
+      "description": "#1151: explicit depth:5 added -- the 10m length's max legal depth is length / 1.8 ~= 5.77, so the previously-unspecified default depth:8 (grade 0.8) is now too steep. Flagging for the implementer/CI to verify against a live run: this file's own drill_plan patterns are depth:6, and Ramp.ts's per-column floor() staircase already undershoots its own nominal targetDepth (at depth:5/length:10 the ramp's real floor is floor(9/10*5)=4, 2m short of the 6-deep crater floor) -- a gap that size is illegal under NAV_MAX_SLOPE_RATIO regardless of scenario-level length/depth tuning; closing it needs Ramp.ts's own carving to move from a floored integer staircase to a continuous per-column depth (see the identical note in tests/integration/navmesh.integration.test.ts). #2318: end 20,25 -> 20,30: the 20 degree slope limit needs length >= depth/tan(20 deg) = 13.8m (15m by whole tiles) for depth 5, the 10m ramp was refused. Cost scales with length: -1000 -> -1500 for the 15m ramp.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -998,7 +998,7 @@
           "x1": 15,
           "z1": 15,
           "x2": 20,
-          "z2": 25
+          "z2": 30
         },
         {
           "type": "screenshot"
@@ -1011,7 +1011,7 @@
       "role": "player",
       "expect": {
         "changedBy": {
-          "cash": -1000
+          "cash": -1500
         }
       }
     },
@@ -1055,27 +1055,7 @@
       }
     },
     {
-      "command": "wait_until field:blingiteSaleOffered equals:true max_ticks:2000",
-      "timeout": 130,
-      "description": "#1586: wait for a blingite ore_sale to be on the board before the accept below. The pool re-rolls every CONTRACT_REFRESH_INTERVAL ticks and the haulers fill storage on their own clock, so a pinned dirtite sale was a bet on timing: with lowest-real-cost routing the warehouse finishes ~19 ticks sooner (tick 233, was 252), the board then held no dirtite offer, and waiting for one let the haulers store enough dirtite that the guard deliver below completed the sale and ended the level. Blingite is never in storage before blast 2, so the accepted, held contract stays unfillable whatever the timing, which is what the deliver guard below proves; and waiting on the condition holds under any upstream retime.",
-      "interaction": [
-        {
-          "type": "waitUntil",
-          "field": "blingiteSaleOffered",
-          "equals": true,
-          "maxTicks": 2000,
-          "timeoutMs": 120000
-        }
-      ],
-      "role": "setup",
-      "expect": {
-        "equals": {
-          "blingiteSaleOffered": true
-        }
-      }
-    },
-    {
-      "command": "contract accept type:ore_sale material:blingite",
+      "command": "contract accept type:ore_sale material:dirtite",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1083,11 +1063,11 @@
         },
         {
           "type": "waitForSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-accept"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-accept"
         }
       ],
       "role": "player",
@@ -1096,10 +1076,10 @@
           "activeContractCount": 2
         }
       },
-      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:blingite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size. #1586: blingite, not dirtite -- see the wait step above."
+      "description": "#513/#581: the accept click is scoped to `[data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"]`, the contract this step's `command` names. Unscoped, `.bs-contract-accept` always resolves to whichever offered card is first in the DOM, so command mode accepted the named contract literally while interaction mode accepted whatever led the list -- two channels driving different contracts while both reported pass, because nothing asserted here can tell them apart (`activeContractCount` counts accepts, not identities). `level1-win-efficient` is what that costs once a `[data-contract-type]`-scoped assertion is added on top: its guard failed with its control absent from the DOM entirely, red on `main`, cause pointing nowhere near the accept step. ContractsPanel sets `data-contract-type`/`data-contract-material` on offered cards (`makeOfferedCard`), so scoping removes the DOM-order coupling rather than baking around it. #554 had renumbered this contract's id run to run (re-verified against `contract list` at this file's real tick count, 251, each time); #635 drops the numeric id entirely for the stable `type:ore_sale material:dirtite` selector. Opens the Contracts panel with ensurePanel rather than a bare toolbar click (#556): the tab toggles, so when a preceding step left it open a second click closes it and the accept button underneath reports zero size. #1586: dirtite, not dirtite -- see the wait step above. #2318: dirtite, not blingite, and the blingite wait step is gone: tutorial_pit starts at grade 0 and the board only offers the current grade's ores (dirtite, rustite -- resolveContractOres/oresOfPermitGrade), so no blingite sale is ever posted. The deliver guard below still holds under any timing because amount:5000 exceeds anything stored; interaction mode waits for the card in this step's own waitForSelector."
     },
     {
-      "command": "contract hold type:ore_sale material:blingite",
+      "command": "contract hold type:ore_sale material:dirtite",
       "interaction": [
         {
           "type": "ensurePanel",
@@ -1107,14 +1087,14 @@
         },
         {
           "type": "awaitUsable",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] [data-action=\"hold-toggle\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
         },
         {
           "type": "clickSelector",
-          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] [data-action=\"hold-toggle\"]"
+          "selector": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] [data-action=\"hold-toggle\"]"
         }
       ],
-      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason. #1586: blingite, not dirtite -- see the wait step above.",
+      "description": "#1367: stored ore now auto-delivers to every active, non-held contract each tick, which would pay this ore contract out and end the tutorial level (profit threshold) mid-scenario. This file proves the hire/survey/drill/blast/build flow, not delivery, so the accepted contract is held by clicking its hold-toggle: it keeps counting as active and still expires on its deadline, but takes no stock. Second contract of the pair, held for the same reason. #1586: dirtite, not dirtite -- see the wait step above.",
       "role": "player",
       "expect": {
         "changedBy": {
@@ -1123,20 +1103,20 @@
       }
     },
     {
-      "command": "contract deliver type:ore_sale material:blingite amount:5000",
+      "command": "contract deliver type:ore_sale material:dirtite amount:5000",
       "interaction": [
         {
           "type": "command",
-          "command": "contract deliver type:ore_sale material:blingite amount:5000"
+          "command": "contract deliver type:ore_sale material:dirtite amount:5000"
         }
       ],
-      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 30) and here either. The console command returns success:false (\"Not enough dirtite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:blingite`, matching the accept step above. #1586: blingite, not dirtite -- see the wait step above.",
+      "description": "BLOCKED, same class as the two deliver steps above: a direct trace shows all three active cards at 0.0 kg stored, so every DELIVER button on the panel is disabled. Still true post-#552, for the same zero-elapsed-ticks reason as the guard step above -- no `tick` step runs between the warehouse going up (step 30) and here either. The console command returns success:false (\"Not enough dirtite in storage: 0.0 kg available\") and command mode only fails on a thrown exception, so this is a silent no-op in both modes. `expect.blocked` proves the guard. #635: dropped the numeric id for `type:ore_sale material:dirtite`, matching the accept step above. #1586: dirtite, not dirtite -- see the wait step above.",
       "expect": {
         "equals": {
           "activeContractCount": 2
         },
         "usable": "#bs-contract-panel [data-action=\"goto-ops\"]",
-        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"blingite\"] .bs-contract-deliver"
+        "blocked": "#bs-contract-panel [data-contract-type=\"ore_sale\"][data-contract-material=\"dirtite\"] .bs-contract-deliver"
       },
       "role": "guard",
       "commandOutcome": "refused"
@@ -1267,8 +1247,8 @@
       }
     },
     {
-      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:24,25",
-      "description": "#553: pattern moved from (8,8)-(12,12) to (24,24)-(28,28). The freight_warehouse built at (6,6) earlier in this file occupies ground the old rectangle reached: two of its four holes were ordered onto cells no driller can stand on, so they stayed ghosts forever and the charge step below saw 2 holes instead of 4. Nothing was wrong pre-#553 because confirming a plan wrote all four holes out regardless of who could reach them. Original note follows -- spacing corrected from 4 to 3 (the Drill panel's real default, DEFAULT_SPACING_M): the click drags a 4-unit (8,8)-(12,12) rectangle, and round(4/3)+1 = 2 either way, so the hole COUNT this file originally declared (2x2=4) already happened to match by coincidence -- but the declared spacing value did not match what the click actually uses, so corrected for accuracy per the same principle as the first drill_plan step above, even though no assertion here was actually at risk. diameter:0.089 added (issue #586 CI, this PR): this command is what both command mode AND a bare-command replay through the browser actually run for this step (the click flow's own grid-tool confirm handler always sends its panel default DEFAULT_DIAMETER_M=0.089, same as the first drill_plan step, which already carries diameter:0.089 for exactly this reason) -- omitted here, the command fell back to the console-only default (0.15, mining.ts), a 68% bigger diameter that computeDrillHoleDurationTicks (DrillPlan.ts) scales hole-drilling duration by. Direct trace: with the console default, driller #5 spends enough extra active-drilling ticks over the pattern-2 wait to fatigue-collapse mid-pattern and get auto-routed to rest near living_quarters (17,13), safely outside the blast footprint when it fires. With the real diameter both a live UI click and this corrected command now share, #5 instead finishes all 4 holes with ticks to spare and is standing at (27,27) -- one of the pattern's own holes -- when the blast goes off, the same mechanism that already kills employee #2 in blast 1. That is the real, common-diameter outcome verified live (3 consecutive clean interaction-mode reruns, deathCount 0->2 unchanged from blast 1, matching the note on the blast step below) and is what command mode now also produces with this fix, closing the gap between the two channels instead of leaving them disagreeing on how many holes' worth of diameter default this file forgot to correct. #1151: shifted one cell west. Under the 30-degree slope gate (27,24) sits outside the crew's climb-reachable patch at this point in the run, so that hole could never be claimed and the pattern stalled at 3 of 4. Measured by replaying this file's own steps to this point; start:23,24 is the nearest origin whose whole 2x2 grid is reachable, and the smallest perturbation of a pattern this file's blast-damage expectations are calibrated against: every alternative tried (24,25 / 23,25 / 24,26) moved the pattern far enough to change deathCount from 5 to 3. Command mode reproduces this file's full expected outcome on it -- 5 deaths, both vehicles destroyed. Interaction mode still reads one vehicle surviving at the final step; that beat sits on the edge of blast 2's attenuation radius and is tracked in the follow-up issue, not silenced here. Rubble blocks vehicles over its footprint: moved one cell east and one south, start:23,24 -> 24,25. Blast 1's pile reaches the crater rim, and three rocks resting on the bench cover the old (23,24) hole's cell; their centres lie over the crater floor, which no vehicle reaches here, so they are never hauled and the rig never stood on that hole (pattern stalled at 3 of 4, the order reading target_unreachable). (24,25) is the nearest origin whose four holes are clear of the pile; deathCount stays 3 and every later pin holds (command mode, deterministic).",
+      "command": "drill_plan grid rows:2 cols:2 spacing:3 depth:6 diameter:0.089 start:17,24",
+      "description": "#553: pattern moved from (8,8)-(12,12) to (24,24)-(28,28). The freight_warehouse built at (6,6) earlier in this file occupies ground the old rectangle reached: two of its four holes were ordered onto cells no driller can stand on, so they stayed ghosts forever and the charge step below saw 2 holes instead of 4. Nothing was wrong pre-#553 because confirming a plan wrote all four holes out regardless of who could reach them. Original note follows -- spacing corrected from 4 to 3 (the Drill panel's real default, DEFAULT_SPACING_M): the click drags a 4-unit (8,8)-(12,12) rectangle, and round(4/3)+1 = 2 either way, so the hole COUNT this file originally declared (2x2=4) already happened to match by coincidence -- but the declared spacing value did not match what the click actually uses, so corrected for accuracy per the same principle as the first drill_plan step above, even though no assertion here was actually at risk. diameter:0.089 added (issue #586 CI, this PR): this command is what both command mode AND a bare-command replay through the browser actually run for this step (the click flow's own grid-tool confirm handler always sends its panel default DEFAULT_DIAMETER_M=0.089, same as the first drill_plan step, which already carries diameter:0.089 for exactly this reason) -- omitted here, the command fell back to the console-only default (0.15, mining.ts), a 68% bigger diameter that computeDrillHoleDurationTicks (DrillPlan.ts) scales hole-drilling duration by. Direct trace: with the console default, driller #5 spends enough extra active-drilling ticks over the pattern-2 wait to fatigue-collapse mid-pattern and get auto-routed to rest near living_quarters (17,13), safely outside the blast footprint when it fires. With the real diameter both a live UI click and this corrected command now share, #5 instead finishes all 4 holes with ticks to spare and is standing at (27,27) -- one of the pattern's own holes -- when the blast goes off, the same mechanism that already kills employee #2 in blast 1. That is the real, common-diameter outcome verified live (3 consecutive clean interaction-mode reruns, deathCount 0->2 unchanged from blast 1, matching the note on the blast step below) and is what command mode now also produces with this fix, closing the gap between the two channels instead of leaving them disagreeing on how many holes' worth of diameter default this file forgot to correct. #1151: shifted one cell west. Under the 30-degree slope gate (27,24) sits outside the crew's climb-reachable patch at this point in the run, so that hole could never be claimed and the pattern stalled at 3 of 4. Measured by replaying this file's own steps to this point; start:23,24 is the nearest origin whose whole 2x2 grid is reachable, and the smallest perturbation of a pattern this file's blast-damage expectations are calibrated against: every alternative tried (24,25 / 23,25 / 24,26) moved the pattern far enough to change deathCount from 5 to 3. Command mode reproduces this file's full expected outcome on it -- 5 deaths, both vehicles destroyed. Interaction mode still reads one vehicle surviving at the final step; that beat sits on the edge of blast 2's attenuation radius and is tracked in the follow-up issue, not silenced here. Rubble blocks vehicles over its footprint: moved one cell east and one south, start:23,24 -> 24,25. Blast 1's pile reaches the crater rim, and three rocks resting on the bench cover the old (23,24) hole's cell; their centres lie over the crater floor, which no vehicle reaches here, so they are never hauled and the rig never stood on that hole (pattern stalled at 3 of 4, the order reading target_unreachable). (24,25) is the nearest origin whose four holes are clear of the pile; deathCount stays 3 and every later pin holds (command mode, deterministic). #2318: start 24,25 -> 17,24 (dragTiles 24,25-28,29 -> 17,24-21,28): the 24,25 hillside is beyond the 20 degree vehicle climb limit of a grade-0 site, the rig never reached it.",
       "interaction": [
         {
           "type": "clickIfPresent",
@@ -1293,10 +1273,10 @@
         },
         {
           "type": "dragTiles",
-          "x1": 24,
-          "z1": 25,
-          "x2": 28,
-          "z2": 29
+          "x1": 17,
+          "z1": 24,
+          "x2": 21,
+          "z2": 28
         },
         {
           "type": "screenshot"
@@ -1476,9 +1456,9 @@
         "equals": {
           "holeCount": 0,
           "chargedCount": 0,
-          "deathCount": 3
+          "deathCount": 6
         },
-        "note": "deathCount 3 under the kernel energy model with the floor rule and MIN_THROW_FRACTION 0.02 (less flyrock than the 5 measured before). Fill mode (charges fill each hole to the stemming): blast 1 loads 8.4 kg per hole at 1.8 m of stemming (was 5 kg) and this blast 8 kg at 2 m (was 4 kg), so the run's clock moves (this shot fires at tick 443, was 700): driver #4 is out in the debris_hauler at (11,18) instead of waiting by the heap at (6,19), and the flyrock that kills #5 at (15,24) kills him too, with #6 at the pattern; deathCount re-measured 4 -> 5 (command mode, deterministic). Rally point (tutorial spoil heap moved from (28,16) to (4,19)): deathCount is 4, not 5 -- the debris_hauler now parks beside the heap at (6,20) with its driver #4 at (6,19) (it stood at (10,11) before), and blast 2's flyrock no longer reaches it there: direct trace (command mode) shows #5 (14,24) and #6 (26,24) die, #3 and #4 survive, and the hauler is the one vehicle left. Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on — see the campaign-status step's own note. Re-measured after merging main (#1793 bounded free-face pull) with #1774 (sealed rock gets no haul orders): the shifted blast zone now also catches one more worker, deathCount 5; deterministic across reruns, blast still clears 215 voxels so the breakout charge works. Re-measured for #2199 (a hauler stands HAUL_LOAD_TICKS at each fragment it loads): the haulers sit elsewhere when blast 2 fires, one fewer worker is caught, deathCount 4.",
+        "note": "#2318: deathCount 6, not 3. tutorial_pit is on the progression ladder: the second pattern now sits at 17,24 (vehicle-reachable ground) and its blast kills all four crew still alive (#3 manager, #4 hauler driver, #5 digger driver, #6 driller) on top of the two the first blast killed -- the mine is a write-off by design (see the campaign status note below). Re-measured in command mode (deterministic). Older history: deathCount 3 under the kernel energy model with the floor rule and MIN_THROW_FRACTION 0.02 (less flyrock than the 5 measured before). Fill mode (charges fill each hole to the stemming): blast 1 loads 8.4 kg per hole at 1.8 m of stemming (was 5 kg) and this blast 8 kg at 2 m (was 4 kg), so the run's clock moves (this shot fires at tick 443, was 700): driver #4 is out in the debris_hauler at (11,18) instead of waiting by the heap at (6,19), and the flyrock that kills #5 at (15,24) kills him too, with #6 at the pattern; deathCount re-measured 4 -> 5 (command mode, deterministic). Rally point (tutorial spoil heap moved from (28,16) to (4,19)): deathCount is 4, not 5 -- the debris_hauler now parks beside the heap at (6,20) with its driver #4 at (6,19) (it stood at (10,11) before), and blast 2's flyrock no longer reaches it there: direct trace (command mode) shows #5 (14,24) and #6 (26,24) die, #3 and #4 survive, and the hauler is the one vehicle left. Issue #586 CI, this PR: costs a real third life at minimum -- direct trace (`state full`) shows the replacement driller (#5) does not collapse from fatigue this time, standing at (27,27) -- one of the pattern's own holes -- when charge/blast fire, same as before. #557 (fixer pass, this issue): deathCount is 5, not 3 -- Damage.ts's processProjections now attenuates debris out to BLAST_DANGER_MARGIN_M (15m, was an exact 2m HIT_RADIUS only, the audited gap #557 closed), so the manager (#3, at (5,6), ~30m from the pattern -- still spared) and the driver (#4, at (~20.8,~12.8), ~11.6m from the nearest hole) both now take a lethal hit alongside #5 and the drill_rig operator (#6, exact-hit as before): #4's distance was previously far enough to take zero damage under the old exact-2m rule, but is well inside the new 15m attenuated range. Reproduced deterministically (command mode, this pass) -- #4/#5/#6 all die in blast 2, only #3 survives clear of the wider radius. #1151/#1166: the fleet claim moved here from the campaign-status step below, as a step-local direction. That the blast destroys parked vehicles is what this step does; exactly how many of the three it catches depends on where each one happened to park, which the two channels no longer agree on — see the campaign-status step's own note. Re-measured after merging main (#1793 bounded free-face pull) with #1774 (sealed rock gets no haul orders): the shifted blast zone now also catches one more worker, deathCount 5; deterministic across reruns, blast still clears 215 voxels so the breakout charge works. Re-measured for #2199 (a hauler stands HAUL_LOAD_TICKS at each fragment it loads): the haulers sit elsewhere when blast 2 fires, one fewer worker is caught, deathCount 4.",
         "decreased": [
           "vehicleCount"
         ]
@@ -1537,10 +1517,7 @@
         "increased": [
           "tickCount"
         ],
-        "decreased": [
-          "cash"
-        ],
-        "note": "#1723: 40 ticks, not 5 -- the blasts floor to grade now and the run lands between payroll ticks, so 5 ticks can show no spend; the opening purse is 400000 for the same reason (a slower drill order drains 300000 before the second charging truck). Confirmed via direct trace: cash drops from ongoing payroll/maintenance even with no active tasks (28000 -> 26130, shifted from the pre-#526 43000 -> 41130 by the freight_warehouse construction cost above), matching every other file's ordinary tick-drain pattern."
+        "note": "#2318: no longer asserts a cash drop. With the whole crew dead and the fleet destroyed after the second blast there is no payroll or maintenance left to drain cash in these 40 ticks (cash stays 433926). Earlier reasoning: #1723: 40 ticks, not 5 -- the blasts floor to grade now and the run lands between payroll ticks, so 5 ticks can show no spend; the opening purse is 400000 for the same reason (a slower drill order drains 300000 before the second charging truck). Confirmed via direct trace: cash drops from ongoing payroll/maintenance even with no active tasks (28000 -> 26130, shifted from the pre-#526 43000 -> 41130 by the freight_warehouse construction cost above), matching every other file's ordinary tick-drain pattern."
       }
     },
     {
@@ -1555,7 +1532,7 @@
       "role": "setup",
       "expect": {
         "equals": {
-          "deathCount": 3,
+          "deathCount": 6,
           "activeContractCount": 0,
           "employeeCount": 6,
           "holeCount": 0

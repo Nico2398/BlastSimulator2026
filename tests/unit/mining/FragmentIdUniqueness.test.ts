@@ -34,7 +34,7 @@ function fireSecondBlast(run: (cmd: string) => unknown, state: GameState, startX
 }
 
 function twoBlasts() {
-  const first = drillGridChargeAndBlast({ rows: 2, cols: 2, spacing: 5, startX: 14, startZ: 14, amount: 5 });
+  const first = drillGridChargeAndBlast({ rows: 2, cols: 2, spacing: 5, startX: 8, startZ: 16, amount: 5 });
   const { run, state } = first;
   const firstFragments = state.logistics.fragments.map(f => f.fragment);
   const firstCount = firstFragments.length;
@@ -120,7 +120,7 @@ describe('blast console command — unique fragment ids across blasts', () => {
   });
 
   it('does not reuse ids of fragments removed from the ground', () => {
-    const first = drillGridChargeAndBlast({ rows: 2, cols: 2, spacing: 5, startX: 14, startZ: 14, amount: 5 });
+    const first = drillGridChargeAndBlast({ rows: 2, cols: 2, spacing: 5, startX: 8, startZ: 16, amount: 5 });
     const { run, state } = first;
     const total = state.logistics.fragments.length;
     state.logistics.fragments.length = 0; // all delivered / hauled away
@@ -139,7 +139,7 @@ describe('blast console command — unique fragment ids across blasts', () => {
   });
 
   it('a refused blast consumes no ids', () => {
-    const { run, state } = drillGridChargeAndBlast({ rows: 1, cols: 1, spacing: 3, startX: 14, startZ: 14, amount: 5 });
+    const { run, state } = drillGridChargeAndBlast({ rows: 1, cols: 1, spacing: 3, startX: 8, startZ: 16, amount: 5 });
     const before = state.logistics.nextFragmentId;
     expect(run('blast')).toMatchObject({ success: false });
     expect(state.logistics.nextFragmentId).toBe(before);

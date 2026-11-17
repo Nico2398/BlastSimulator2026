@@ -1,8 +1,14 @@
 // BlastSimulator2026 — `contract auto`: switches for automatic ore sale and rubble clearance (#2145)
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
-import { autoFulfilmentEnabled } from '../../../src/core/campaign/Level.js';
 import { setLocale, t } from '../../../src/core/i18n/I18n.js';
+
+/** The two switch lines `contract auto` prints for the given on/off states, in listing order. */
+function switchLines(sell: boolean, rubble: boolean): string[] {
+  const line = (nameKey: string, on: boolean) =>
+    t('economy.contract.auto_line', { name: t(nameKey), state: t(on ? 'economy.contract.auto_on' : 'economy.contract.auto_off') });
+  return [line('economy.contract.auto_sell_name', sell), line('economy.contract.auto_rubble_name', rubble)];
+}
 
 function sandbox() {
   const { runner, ctx } = createRunner();
@@ -23,8 +29,7 @@ describe('contract auto (#2145)', () => {
     const r = runner.run('contract auto sell off');
     expect(r.success).toBe(true);
     expect(state.contracts.autoSell).toBe(false);
-    expect(autoFulfilmentEnabled(state, 'autoSell')).toBe(false);
-    expect(autoFulfilmentEnabled(state, 'autoClearRubble')).toBe(true);
+    expect(runner.run('contract auto').output.split('\n').slice(0, 2)).toEqual(switchLines(false, true));
   });
 
   it('`contract auto sell on` turns it back on', () => {
@@ -38,7 +43,7 @@ describe('contract auto (#2145)', () => {
     const { runner, state } = sandbox();
     expect(runner.run('contract auto rubble off').success).toBe(true);
     expect(state.contracts.autoClearRubble).toBe(false);
-    expect(autoFulfilmentEnabled(state, 'autoSell')).toBe(true);
+    expect(runner.run('contract auto').output.split('\n').slice(0, 2)).toEqual(switchLines(true, false));
     expect(runner.run('contract auto rubble on').success).toBe(true);
     expect(state.contracts.autoClearRubble).toBe(true);
   });
@@ -66,6 +71,47 @@ describe('contract auto (#2145)', () => {
     expect(runner.run('contract auto rubble 1').success).toBe(false);
     expect(state.contracts.autoSell).toBeUndefined();
     expect(state.contracts.autoClearRubble).toBeUndefined();
+  });
+});
+
+describe('contract auto on the tutorial: automatic sale and rubble clearance default on (#2318)', () => {
+  function tutorial() {
+    setLocale('en');
+    const { runner, ctx } = createRunner();
+    expect(runner.run('campaign start level:tutorial_pit').success).toBe(true);
+    return { runner, state: ctx.state! };
+  }
+
+  it('lists both switches on before the player chooses', () => {
+    const { runner, state } = tutorial();
+    expect(state.contracts.autoSell).toBeUndefined();
+    expect(state.contracts.autoClearRubble).toBeUndefined();
+    expect(runner.run('contract auto').output.split('\n').slice(0, 2)).toEqual(switchLines(true, true));
+  });
+
+  it('an explicit off wins, one switch at a time', () => {
+    const { runner } = tutorial();
+    expect(runner.run('contract auto sell off').success).toBe(true);
+    expect(runner.run('contract auto').output.split('\n').slice(0, 2)).toEqual(switchLines(false, true));
+    expect(runner.run('contract auto rubble off').success).toBe(true);
+    expect(runner.run('contract auto').output.split('\n').slice(0, 2)).toEqual(switchLines(false, false));
+  });
+
+  it('turning a switch back on lists it on again', () => {
+    const { runner } = tutorial();
+    runner.run('contract auto rubble off');
+    runner.run('contract auto rubble on');
+    expect(runner.run('contract auto').output.split('\n').slice(0, 2)).toEqual(switchLines(true, true));
+  });
+
+  it('every campaign level lists both switches on by default', () => {
+    for (const id of ['tutorial_pit', 'dusty_hollow']) {
+      setLocale('en');
+      const { runner, ctx } = createRunner();
+      for (const entry of Object.values(ctx.campaignProfile.campaign.levels)) entry.unlocked = true;
+      expect(runner.run(`campaign start level:${id}`).success, id).toBe(true);
+      expect(runner.run('contract auto').output.split('\n').slice(0, 2), id).toEqual(switchLines(true, true));
+    }
   });
 });
 

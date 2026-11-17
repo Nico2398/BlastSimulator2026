@@ -69,7 +69,7 @@ import { bookTaxAuditIncome, tickTaxAudit, settleTaxAudit, taxAuditRng, type Aud
 import { getOperatingIncomePerHour } from '../economy/OperatingFinance.js';
 import { stateRubbleStockKg } from '../economy/SpoilHeaps.js';
 import { oreGradeScaleOf } from '../economy/OreGrade.js';
-import { resolveContractOres, resolveContractPriceMultiplier, resolveHiringScript, resolveScriptedOreSale, autoFulfilmentEnabled } from '../campaign/Level.js';
+import { resolveContractOres, resolveContractPriceMultiplier, resolveHiringScript, resolveScriptedOreSale } from '../campaign/Level.js';
 import { assertWorldInvariants, FATAL_VIOLATION_KINDS } from '../state/WorldInvariants.js';
 import { applyTaskCompletion } from './TaskCompletionEffects.js';
 import { checkGameOverConditions } from './GameOverConditions.js';
@@ -217,12 +217,12 @@ export function runTick(
 
   // 3. Contracts — stored ore is delivered first, so a deadline tick that stock
   // can still fill pays out and completes before the penalty is assessed.
-  if (autoFulfilmentEnabled(state, 'autoClearRubble')) autoAcceptRubbleClearances(state.contracts, stateRubbleStockKg(state), state.tickCount);
+  autoAcceptRubbleClearances(state.contracts, stateRubbleStockKg(state), state.tickCount);
   const contractsDelivered = autoDeliverContracts(state.contracts, state.logistics, state.collectedOre, state.tickCount, state.buildings.buildings, oreGradeScaleOf(state.world));
   for (const delivery of contractsDelivered) {
     settleDelivery(state, delivery, state.tickCount, emitter);
   }
-  if (autoFulfilmentEnabled(state, 'autoSell')) autoSellUnclaimedOre(state, state.tickCount);
+  autoSellUnclaimedOre(state, state.tickCount);
   // 3b. Pending mine-grade application (#1921)
   advanceGradeApplication(state, emitter);
   advanceGradeTier(state, emitter);

@@ -77,9 +77,11 @@ describe(`${COLLAPSE}: a collapse of thousands of fragments at 8x`, () => {
 describe(`${HAULING}: trucks hauling after a blast at 8x`, () => {
   const sim = () => scenarioRun(HAULING, 8);
 
-  it('is heard loading, dumping and breaking boulders, with every world request admitted', () => {
+  it('is heard loading and dumping, with every world request admitted', () => {
     const ids = new Set(sim().recorder.heard.map(p => p.id));
-    for (const id of ['haul_load', 'haul_dump', 'boulder_break'] as const) expect(ids.has(id), id).toBe(true);
+    // The tutorial's G0 holes sit on the reachable plateau (#2318) and the shot leaves no boulder for the fragmenter, so
+    // boulder_break is no longer heard here.
+    for (const id of ['haul_load', 'haul_dump'] as const) expect(ids.has(id), id).toBe(true);
     // Measured (#1895): the explosives delivery wait moves the haul onto a different crew rest cycle, and one reverse beep
     // lands in a busy second and is refused for budget; every other request is admitted.
     const refused = sim().recorder.plays.filter(p => !isBlastSound(p.id) && !p.accepted);

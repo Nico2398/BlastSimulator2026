@@ -4108,7 +4108,6 @@
   "mining.drill_plan.grid_all_blocked": "Toutes les cellules de cette grille sont sous un bâtiment ou un chantier ; rien n'a été ordonné.",
   "mining.drill_plan.confirm_replace": "Une nouvelle grille remplace le plan actuel : {drilled} trou(s) forés et {charged} charge(s) seraient perdus. Rien n'a changé. Relancez la commande avec confirm:true pour le remplacer.",
   "mining.charge.missing_explosive": "Explosif manquant. Utilisation : charge hole:1 explosive:boomite stemming:2.5m (chaque trou est rempli jusqu'au bourrage)",
-  "mining.charge.explosive_not_available": "{explosive} n'est pas disponible sur {level}. Disponibles : {available}",
   "mining.charge.column_exceeds_hole": "Une charge de {amount} kg occupe {column} m ; avec {stemming} m de bourrage, elle déborde du trou de {depth} m. Maximum admissible : {max} kg.",
   "mining.charge.no_room": "Pas de place pour l'explosif : {stemming} m de bourrage ne laissent rien à remplir du trou de {depth} m.",
   "mining.charge.invalid_amount": "La quantité {amount} n'est pas une charge : indiquez un nombre de kg positif, ou omettez amount pour remplir le trou jusqu'au bourrage.",

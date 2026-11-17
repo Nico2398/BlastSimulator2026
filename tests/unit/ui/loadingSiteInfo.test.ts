@@ -2,7 +2,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildLoadingSiteInfo, buildSandboxLoadingSiteInfo } from '../../../src/ui/loadingSiteInfo.js';
-import { getAllLevels } from '../../../src/core/campaign/Level.js';
+import { getAllLevels, getLevel } from '../../../src/core/campaign/Level.js';
+import { getAllExplosives } from '../../../src/core/world/ExplosiveCatalog.js';
 import { SANDBOX_DEFAULTS } from '../../../src/core/campaign/Sandbox.js';
 
 describe('loadingSiteInfo briefing', () => {
@@ -40,9 +41,30 @@ describe('loadingSiteInfo briefing', () => {
 
   it('explosives row counts available explosives', () => {
     const base = getAllLevels()[0]!;
-    const level = { ...base, legacy: { availableExplosives: ['pop_rock'], manualContracts: false } };
+    const level = { ...base, preset: { grade: 0, tier: 1 as const, completedQuests: [] } };
     const row = (buildLoadingSiteInfo(level).briefing ?? []).find(r => r.labelKey === 'loading.brief.explosives');
-    expect(row?.value).toBe('1');
+    expect(row?.value).toBe(String(getAllExplosives().filter(e => e.tier === 1).length));
+  });
+
+  it('the tutorial counts the tier 1 explosives its quest-derived list opens, not a level list (#2318)', () => {
+    const tutorial = getLevel('tutorial_pit')!;
+    const row = (buildLoadingSiteInfo(tutorial).briefing ?? []).find(r => r.labelKey === 'loading.brief.explosives');
+    expect(row?.value).toBe(String(getAllExplosives().filter(e => e.tier === 1).length));
+  });
+
+  it('a level whose preset completed the tier 2 explosive quest counts tier 1 and tier 2', () => {
+    const base = getAllLevels()[0]!;
+    const level = { ...base, preset: { grade: 0, tier: 1 as const, completedQuests: ['quest_explosive_t2'] } };
+    const row = (buildLoadingSiteInfo(level).briefing ?? []).find(r => r.labelKey === 'loading.brief.explosives');
+    expect(row?.value).toBe(String(getAllExplosives().filter(e => e.tier <= 2).length));
+  });
+
+  it('a level with no preset counts the tier 1 explosives only', () => {
+    const { preset: _preset, ...bare } = getLevel('tutorial_pit')!;
+    const rows = buildLoadingSiteInfo(bare).briefing ?? [];
+    const withPreset = buildLoadingSiteInfo(getLevel('tutorial_pit')!).briefing ?? [];
+    const count = (rs: typeof rows) => rs.find(r => r.labelKey === 'loading.brief.explosives')!.value;
+    expect(count(rows)).toBe(count(withPreset));
   });
 
   it('sandbox info has no site number, zero difficulty and sandbox subtitle for each biome', () => {

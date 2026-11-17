@@ -457,7 +457,7 @@
       }
     },
     {
-      "command": "build_ramp start:10,23 end:10,35 depth:6",
+      "command": "build_ramp start:10,23 end:10,41 depth:6",
       "description": "NEW step (Finding #74/#75 follow-up): this file never drove the tutorial's own box-cut stage at all -- the real tutorial requires an access ramp dug before the first shot (tutorialSteps.ts step 4, region-gated to the exact line 10,23-10,35), and with the rail active a real click on the drill grid tool downstream would stay inert until this stage completes. Inserted verbatim from tutorial-interactive.json's own proven box-cut step. buildRampCommand's own depth default is 8 (mining.ts: `named['depth'] ?? '8'`) -- matches this file's own drill_plan depth:8 below with zero stepper clicks needed, unlike the Blast panel's grid tool (default 6). tutorial_start (step 1) arms the tutorial rail (tutorialStages.ts): a control not on the current stage is inert, so every player-facing step below is a real click gated by waitForTutorialStep, matching tutorial-interactive.json's proven pattern. #553-followup (issue #586 CI): dropped the hardcoded `cash: 140364` -- a real CI run produced 138646 (a $1,718 gap), the cumulative real-time payroll/fuel accrual class documented elsewhere in this PR, compounded here by the several player-facing waits between game start and this step (driving-center build, licence training, rig purchase, rig assignment). `decreased` proves the ramp build (and everything before it) spent cash without pinning a host-timing-sensitive cumulative figure. #923 had advanced the card to 'speed-up-for-dig' next; #1015 removes that step (and its 'speed-normal-after-dig' pair) entirely -- the speed bar is unconditionally player-controlled from the tutorial's first step onward -- so box-cut now advances straight to 'drill-plan', same as before #923.",
       "timeout": 90,
       "interaction": [
@@ -479,11 +479,18 @@
           "selector": "#bs-tile-select-confirm"
         },
         {
+          "type": "focusTile",
+          "x": 10,
+          "z": 38,
+          "distance": 40,
+          "pitch": 75
+        },
+        {
           "type": "dragTiles",
           "x1": 10,
           "z1": 23,
           "x2": 10,
-          "z2": 35
+          "z2": 41
         },
         {
           "type": "screenshot"
@@ -782,7 +789,7 @@
       }
     },
     {
-      "command": "charge hole:* explosive:boomite stemming:2.5",
+      "command": "charge hole:* explosive:boomite stemming:2.8",
       "timeout": 90,
       "interaction": [
         {
@@ -797,7 +804,7 @@
           "type": "assert",
           "selector": "#bs-blast-panel [data-field=\"stemming\"] .bsx-stepper-value",
           "property": "textContent",
-          "expectedValue": "2.5 m"
+          "expectedValue": "2.8 m"
         },
         {
           "type": "clickSelector",
@@ -850,7 +857,7 @@
     },
     {
       "command": "tick 60",
-      "description": "#707: converges the blast step's own deathCount across command and interaction mode, using the same absolute-tickCount waitUntil idiom as the the retired accept step (#1335) step further down this file (both retargeted together -- see that step's own note for the offer-pool side of this change). forceShiftRestIfNeededByPolicy (GameLoop.ts) now gives idle employees the same proactive rest as working ones, so once Kurt Pickaxe (driller) and Walt Dusty (surveyor) finish their last queued task they get routed away from the grid toward living_quarters within a handful of ticks -- a tick-by-tick command-mode probe from the chargedCount:9 landing point (npx tsx scripts/scenario-test.ts, custom script replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found BOTH employees still standing in the blast footprint (Walt mid-dig in the build_ramp start:10,23 end:10,35 shaft, Kurt at the drill grid's own spawn point) for the first 5 ticks after chargedCount lands (deathCount:2), Walt alone for exactly 1 more tick (deathCount:1), and both clear (deathCount:0) from 6 ticks onward, continuously through at least 900 ticks past that point. Command mode's own chargedCount:9 lands at tick 337-338; interaction mode's lands at tick 428 (direct-traced both ways, real interaction-mode run) -- a raw `tick 50` command here does NOT work in interaction mode: tutorial_start's own pause (tutorialRails.ts's clock-hold) means a single multi-tick console command's internal loop breaks after its first iteration once state.isPaused is true (events.ts's tickCommand checks `if (state.isPaused) break` at the end of each loop iteration), so it silently advances only 1 tick regardless of the requested count -- the same class of bug the file's own step-2 \"time resume\" step already documents as command-mode-only. `waitUntil` sidesteps this entirely (interaction-executor.ts loops the console's own `tick 1` directly, same mechanism `wait_until field:chargedCount`/`field:holeCount` above already rely on, never affected by the pause-triggered early break since each individual `tick 1` call completes its one iteration before any break check matters) -- so this step targets a fixed absolute tickCount (480) comfortably past both modes' own chargedCount-landing tick plus the 6-tick danger window, the same absolute-target technique the file's own the retired accept step (#1335) step below already established (tickCount is reseeded fresh per tick via `new Random(state.seed + state.tickCount)`, so which tick a run's own path happens to land the wait on does not change what a shared target tick means). Verified in both command mode and a real interaction-mode run: deathCount is 0 at the blast step below in both. RETARGETED for #556: the absolute target (tickCount 480) is long behind us — ordering the living quarters and the driving centre is real queued work now, and this beat lands past tick 500. The waitUntil therefore spent its whole 200-tick budget going nowhere, and with wellBeing already at zero coming out of the charge phase those 200 idle ticks ran the revolt clock (REVOLT_TICKS 120) out and ended the level in a worker_revolt before the blast below. What the step is actually for is the handful of ticks it takes forceShiftRestIfNeededByPolicy to route the crew off the grid, so it is a plain short tick block now rather than an absolute tick target that has to be re-measured every time anything upstream moves. Lengthened 40 -> 60 (#556): the surveyor now shares the charge dispatches, so there are two people to route off the pattern before the shot rather than one.",
+      "description": "#707: converges the blast step's own deathCount across command and interaction mode, using the same absolute-tickCount waitUntil idiom as the the retired accept step (#1335) step further down this file (both retargeted together -- see that step's own note for the offer-pool side of this change). forceShiftRestIfNeededByPolicy (GameLoop.ts) now gives idle employees the same proactive rest as working ones, so once Kurt Pickaxe (driller) and Walt Dusty (surveyor) finish their last queued task they get routed away from the grid toward living_quarters within a handful of ticks -- a tick-by-tick command-mode probe from the chargedCount:9 landing point (npx tsx scripts/scenario-test.ts, custom script replaying this file's own command sequence, then ticking one at a time and firing a throwaway `blast` at each point) found BOTH employees still standing in the blast footprint (Walt mid-dig in the build_ramp start:10,23 end:10,41 shaft, Kurt at the drill grid's own spawn point) for the first 5 ticks after chargedCount lands (deathCount:2), Walt alone for exactly 1 more tick (deathCount:1), and both clear (deathCount:0) from 6 ticks onward, continuously through at least 900 ticks past that point. Command mode's own chargedCount:9 lands at tick 337-338; interaction mode's lands at tick 428 (direct-traced both ways, real interaction-mode run) -- a raw `tick 50` command here does NOT work in interaction mode: tutorial_start's own pause (tutorialRails.ts's clock-hold) means a single multi-tick console command's internal loop breaks after its first iteration once state.isPaused is true (events.ts's tickCommand checks `if (state.isPaused) break` at the end of each loop iteration), so it silently advances only 1 tick regardless of the requested count -- the same class of bug the file's own step-2 \"time resume\" step already documents as command-mode-only. `waitUntil` sidesteps this entirely (interaction-executor.ts loops the console's own `tick 1` directly, same mechanism `wait_until field:chargedCount`/`field:holeCount` above already rely on, never affected by the pause-triggered early break since each individual `tick 1` call completes its one iteration before any break check matters) -- so this step targets a fixed absolute tickCount (480) comfortably past both modes' own chargedCount-landing tick plus the 6-tick danger window, the same absolute-target technique the file's own the retired accept step (#1335) step below already established (tickCount is reseeded fresh per tick via `new Random(state.seed + state.tickCount)`, so which tick a run's own path happens to land the wait on does not change what a shared target tick means). Verified in both command mode and a real interaction-mode run: deathCount is 0 at the blast step below in both. RETARGETED for #556: the absolute target (tickCount 480) is long behind us — ordering the living quarters and the driving centre is real queued work now, and this beat lands past tick 500. The waitUntil therefore spent its whole 200-tick budget going nowhere, and with wellBeing already at zero coming out of the charge phase those 200 idle ticks ran the revolt clock (REVOLT_TICKS 120) out and ended the level in a worker_revolt before the blast below. What the step is actually for is the handful of ticks it takes forceShiftRestIfNeededByPolicy to route the crew off the grid, so it is a plain short tick block now rather than an absolute tick target that has to be re-measured every time anything upstream moves. Lengthened 40 -> 60 (#556): the surveyor now shares the charge dispatches, so there are two people to route off the pattern before the shot rather than one.",
       "interaction": [
         {
           "type": "command",
