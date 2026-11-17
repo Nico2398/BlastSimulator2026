@@ -11,7 +11,7 @@ interface SeatAnchor {
   z: number;
 }
 
-/** Seat-surface height of the shuttle's benches (m, model space). */
+/** Underside of the shuttle benches' cushions (m, model space); the cushion spans 0.52-0.64. */
 const SHUTTLE_SEAT_Y = 0.52;
 /** Seat-surface height of the race car's bucket seat (m, model space). */
 const RACE_CAR_SEAT_Y = 0.55;
