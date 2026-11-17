@@ -72,7 +72,7 @@ describe('SurveyPanel', () => {
     liveContainers.length = 0;
   });
 
-  it('renders all four methods with real cost and accuracy', () => {
+  it('renders all five methods with real cost and accuracy', () => {
     const { panel } = makePanel();
     panel.update(makeState({ employees: { employees: [makeSurveyor()], nextId: 2 } as GameState['employees'] }));
     const text = panel.root.textContent!;
@@ -80,7 +80,8 @@ describe('SurveyPanel', () => {
     expect(text).toContain('$800'); // core_sample
     expect(text).toContain('$1,500'); // aerial
     expect(text).toContain(`$${SURVEY_COSTS.prospection.toLocaleString('en-US')}`); // prospection
-    expect(panel.root.querySelectorAll('[data-method]').length).toBe(4);
+    expect(text).toContain(`$${SURVEY_COSTS.meteorite_detector.toLocaleString('en-US')}`); // meteorite detector
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(5);
   });
 
   it('#1676: each method row shows its reach in metres, taken from SURVEY_DEPTH_BELOW_SURFACE', () => {
@@ -1348,6 +1349,225 @@ describe('SurveyPanel — prospection (#2286)', () => {
       const rows = rowsOf(panelWith([prospectionResult()]));
       for (const row of rows) row.click();
       expect(focus.mock.calls.map(c => [c[0], c[1]])).toEqual(ISLANDS.map(i => [i.x, i.z]));
+    });
+  });
+});
+
+// ── Meteorite detector card, run and readings (#2291) ───────────────────────
+
+describe('SurveyPanel — meteorite detector (#2291)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    for (const c of liveContainers) c.remove();
+    liveContainers.length = 0;
+  });
+
+  const DEG = Math.PI / 180;
+  const runBtn = (panel: SurveyPanel): HTMLButtonElement => panel.root.querySelector<HTMLButtonElement>('#bs-survey-run')!;
+
+  describe('method card', () => {
+    it('is listed right after prospection', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(3));
+      const order = [...panel.root.querySelectorAll('[data-method]')].map(e => e.getAttribute('data-method'));
+      expect(order.indexOf('meteorite_detector')).toBe(order.indexOf('prospection') + 1);
+    });
+
+    it('shows its name, its cost and its note', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(3));
+      const card = method(panel, 'meteorite_detector');
+      expect(card.textContent).toContain(t('survey.meteorite_detector'));
+      expect(card.textContent).toContain(`$${SURVEY_COSTS.meteorite_detector.toLocaleString('en-US')}`);
+      expect(card.textContent).toContain(t('ui.survey.note_meteorite_detector'));
+    });
+
+    it.each([0, 1, 2])('is locked below G3 (grade %i) and says G3 opens it', (grade) => {
+      const { panel } = makePanel();
+      panel.update(gradedState(grade));
+      const card = method(panel, 'meteorite_detector');
+      expect(card.getAttribute('data-locked')).toBe('true');
+      expect(card.getAttribute('aria-disabled')).toBe('true');
+      expect(card.querySelector('.bs-survey-method-lock')!.textContent).toContain('G3');
+    });
+
+    it('is open at G3, with no lock text', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(3));
+      const card = method(panel, 'meteorite_detector');
+      expect(card.getAttribute('data-locked')).not.toBe('true');
+      expect(card.getAttribute('aria-disabled')).not.toBe('true');
+      expect(card.querySelector('.bs-survey-method-lock')).toBeNull();
+    });
+
+    it('is open on a site with no grade', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(undefined));
+      expect(method(panel, 'meteorite_detector').getAttribute('data-locked')).not.toBe('true');
+    });
+
+    it('opens when the grade rises on the same panel', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(2));
+      expect(method(panel, 'meteorite_detector').getAttribute('data-locked')).toBe('true');
+      panel.update(gradedState(3));
+      expect(method(panel, 'meteorite_detector').getAttribute('data-locked')).not.toBe('true');
+    });
+
+    it('clicking it at G3 selects it', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(3));
+      method(panel, 'meteorite_detector').click();
+      expect(method(panel, 'meteorite_detector').classList.contains('selected')).toBe(true);
+    });
+
+    it('clicking it at G2 does not select it, run it or arm a pick', () => {
+      const { panel } = makePanel();
+      const { kit, controller } = makeKit();
+      const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+      panel.setGameConsole(gameConsole as never);
+      panel.setPlacementKit(kit);
+      panel.update(gradedState(2));
+      method(panel, 'meteorite_detector').click();
+      expect(method(panel, 'meteorite_detector').classList.contains('selected')).toBe(false);
+      expect(controller.arm).not.toHaveBeenCalled();
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('running it', () => {
+    it('selecting it arms the point pick: a reading is taken at a point', () => {
+      const { panel } = makePanel();
+      const { kit, controller } = makeKit();
+      panel.setGameConsole(vi.fn(() => ({ success: true, output: 'ok' })) as never);
+      panel.setPlacementKit(kit);
+      panel.update(gradedState(3));
+      method(panel, 'meteorite_detector').click();
+      expect(controller.arm).toHaveBeenCalledTimes(1);
+    });
+
+    it('confirming the picked point queues the survey at that point through the game console', () => {
+      const { panel } = makePanel();
+      const { kit, controller } = makeKit();
+      const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+      panel.setGameConsole(gameConsole as never);
+      panel.setPlacementKit(kit);
+      panel.update(gradedState(3));
+      method(panel, 'meteorite_detector').click();
+      const confirm = controller.setConfirmHandler.mock.calls.at(-1)![0] as (s: unknown) => void;
+      confirm({ x1: 140, z1: 10, x2: 140, z2: 10 });
+      expect(gameConsole).toHaveBeenCalledTimes(1);
+      expect(gameConsole).toHaveBeenCalledWith('survey meteorite_detector x:140 z:10');
+    });
+
+    it('the Run button re-arms the pick for the detector, never running a pickless command', () => {
+      const { panel } = makePanel();
+      const { kit, controller } = makeKit();
+      const gameConsole = vi.fn(() => ({ success: true, output: 'ok' }));
+      panel.setGameConsole(gameConsole as never);
+      panel.setPlacementKit(kit);
+      panel.update(gradedState(3));
+      method(panel, 'meteorite_detector').click();
+      controller.isArmed = false;
+      runBtn(panel).click();
+      expect(controller.arm).toHaveBeenCalledTimes(2);
+      expect(gameConsole).not.toHaveBeenCalled();
+    });
+
+    it('the Run button is disabled with no surveyor', () => {
+      const { panel } = makePanel();
+      const state = noSurveyorState();
+      state.grade = { ...createGradeState(), grade: 3 };
+      panel.update(state);
+      method(panel, 'meteorite_detector').click();
+      expect(runBtn(panel).disabled).toBe(true);
+    });
+
+    it('the Run button is disabled when the detector is unaffordable', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(3, SURVEY_COSTS.meteorite_detector - 1));
+      method(panel, 'meteorite_detector').click();
+      expect(runBtn(panel).disabled).toBe(true);
+    });
+
+    it('the Run button is enabled with a surveyor and the cash', () => {
+      const { panel } = makePanel();
+      panel.update(gradedState(3, SURVEY_COSTS.meteorite_detector));
+      method(panel, 'meteorite_detector').click();
+      expect(runBtn(panel).disabled).toBe(false);
+    });
+  });
+
+  describe('result card', () => {
+    const READING = { bearing: 30 * DEG, halfAngle: 12 * DEG, minDistance: 410, maxDistance: 560 };
+    const detectorResult = (id: number, reading?: typeof READING): SurveyResult => makeSurveyResult({
+      id, method: 'meteorite_detector', centerX: 40, centerZ: 30, estimates: {}, confidence: 0.8,
+      ...(reading ? { reading } : {}),
+    });
+    const cardOf = (panel: SurveyPanel, id: number): HTMLElement => panel.root.querySelector<HTMLElement>(`[data-survey-id="${id}"]`)!;
+    const rowsOf = (panel: SurveyPanel): HTMLElement[] => [...panel.root.querySelectorAll<HTMLElement>('[data-reading]')];
+
+    function panelWith(results: SurveyResult[]): SurveyPanel {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: results }));
+      return panel;
+    }
+
+    it('lists one reading row for a result with a reading', () => {
+      expect(rowsOf(panelWith([detectorResult(9, READING)]))).toHaveLength(1);
+    });
+
+    it('the row shows the bearing in degrees with its error, and the distance band', () => {
+      const text = rowsOf(panelWith([detectorResult(9, READING)]))[0]!.textContent!;
+      expect(text).toContain('30');
+      expect(text).toContain('12');
+      expect(text).toContain('410');
+      expect(text).toContain('560');
+      expect(text).not.toMatch(/0\.5\d*\s*rad/);
+    });
+
+    it('lists one row per reading across results, in their own cards', () => {
+      const panel = panelWith([detectorResult(9, READING), detectorResult(10, { ...READING, bearing: 100 * DEG, minDistance: 250, maxDistance: 400 })]);
+      expect(rowsOf(panel)).toHaveLength(2);
+      expect(cardOf(panel, 9).querySelectorAll('[data-reading]')).toHaveLength(1);
+      expect(cardOf(panel, 10).querySelectorAll('[data-reading]')).toHaveLength(1);
+      expect(cardOf(panel, 10).textContent).toContain('250');
+      expect(cardOf(panel, 10).textContent).toContain('400');
+    });
+
+    it('still shows the method name and the confidence', () => {
+      const text = cardOf(panelWith([detectorResult(9, READING)]), 9).textContent!;
+      expect(text).toContain(t('survey.meteorite_detector'));
+      expect(text).toContain('80%');
+    });
+
+    it('shows no ore bars and no "no ore" message', () => {
+      const card = cardOf(panelWith([detectorResult(9, READING)]), 9);
+      expect(card.querySelector('.bsx-progress')).toBeNull();
+      expect(card.textContent).not.toContain(t('ui.survey.no_ore'));
+    });
+
+    it('a result with no crater has a card with a nothing-detected line and no reading row', () => {
+      const panel = panelWith([detectorResult(9)]);
+      expect(cardOf(panel, 9)).not.toBeNull();
+      expect(rowsOf(panel)).toHaveLength(0);
+      expect(cardOf(panel, 9).textContent).toMatch(/nothing detected/i);
+    });
+
+    it('a result with a reading has no nothing-detected line', () => {
+      expect(cardOf(panelWith([detectorResult(9, READING)]), 9).textContent).not.toMatch(/nothing detected/i);
+    });
+
+    it('other methods have no reading rows', () => {
+      const { panel } = makePanel();
+      panel.update(makeState({ surveyResults: [makeSurveyResult()] }));
+      expect(panel.root.querySelectorAll('[data-reading]')).toHaveLength(0);
+    });
+
+    it('the row text follows the locale', () => {
+      const row = rowsOf(panelWith([detectorResult(9, READING)]))[0]!;
+      expect(row.textContent!.trim().length).toBeGreaterThan(0);
+      expect(row.textContent).not.toMatch(/ui\.survey\./);
     });
   });
 });
