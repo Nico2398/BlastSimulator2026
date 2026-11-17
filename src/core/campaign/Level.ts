@@ -95,6 +95,26 @@ export interface LevelDef {
   market?: MarketId;
   /** Turns the mine-grade progression ladder on; omitted = off (#1921). */
   progression?: boolean;
+  /** Where the site starts on the ladder: grade, tier and the quests already completed (#2292). */
+  preset?: LevelPreset;
+}
+
+/** A level's start on the one progression ladder (#2292). */
+export interface LevelPreset {
+  grade: number;
+  tier: 1 | 2 | 3;
+  completedQuests: readonly string[];
+}
+
+/** Start grade/tier a console command may pin over a level's preset. */
+export interface LadderStartOverride {
+  grade?: number;
+  tier?: number;
+}
+
+/** Give `state` its grade and quest state from `preset`, with `override` pinning grade and/or tier (#2292). */
+export function applyLevelPreset(_state: GameState, _preset: LevelPreset, _override?: LadderStartOverride): void {
+  throw new Error('not implemented');
 }
 
 /** Market of the active level; 'legacy' by default (#1681). */

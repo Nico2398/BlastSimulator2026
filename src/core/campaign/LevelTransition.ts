@@ -3,7 +3,7 @@
 
 import { resolveStartingSite } from '../state/StartingBuildings.js';
 import { createGame, createWorldState, type GameConfig, type GameState } from '../state/GameState.js';
-import { getLevel } from './Level.js';
+import { getLevel, type LadderStartOverride } from './Level.js';
 import { recordProfit, recordStars, startLevel, type CampaignState } from './Campaign.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import { calculateStarRating, snapshotStats } from './SuccessTracker.js';
@@ -146,6 +146,7 @@ export function createGameForLevel(
   campaign: CampaignState,
   levelId: string,
   staffed?: boolean,
+  _start?: LadderStartOverride,
 ): GameState | null {
   if (!startLevel(campaign, levelId)) return null;
 
