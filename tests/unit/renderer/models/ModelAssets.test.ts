@@ -16,6 +16,7 @@ import { BUILDING_DEFS } from '../../../../src/core/entities/BuildingDefs.js';
 import { getFootprintSize, isSingleTierType } from '../../../../src/core/entities/Building.js';
 import type { BuildingTier, BuildingType } from '../../../../src/core/entities/Building.js';
 import { loadedModelLibrary, MODEL_DIR } from '../../../helpers/models.js';
+import { describeModel, readModelManifest } from '../../../../scripts/shared/model-manifest.js';
 import { workerRig } from '../../../../src/renderer/character/WorkerRig.js';
 import { GARMENT_COLORS, GARMENT_TINT, ROLE_COLORS, ROLE_TINT } from '../../../../src/renderer/CharacterMesh.js';
 
@@ -301,5 +302,96 @@ describe('public/models', () => {
       expect(centre.x).toBeCloseTo(0.25, 1);
       expect(centre.z).toBeCloseTo(0.25, 1);
     }
+  });
+
+  describe('travel vehicle models (#2289)', () => {
+    const TRAVEL = [
+      { tier: 1 as const, id: 'vehicle_travel_vehicle_t1', builder: 'vehicles_t1.py', maxTris: 11500 },
+      { tier: 2 as const, id: 'vehicle_travel_vehicle_t2', builder: 'vehicles.py', maxTris: 11200 },
+    ];
+    const WHEELS = ['WheelFL', 'WheelFR', 'WheelRL', 'WheelRR'];
+    const entry = (id: string) => readModelManifest()!.models[id]!;
+    const bodyParts = (id: string): string[] => entry(id).nodes['Body']?.parts ?? [];
+    const extent = (id: string): THREE.Vector3 => library.prototype(id)!.bounds.getSize(new THREE.Vector3());
+
+    for (const { tier, id, builder, maxTris } of TRAVEL) {
+      describe(`tier ${tier} (${id})`, () => {
+        it('is built by its own generator and carries none of the debris hauler\'s parts', () => {
+          expect(vehicleModelId('travel_vehicle', tier)).toBe(id);
+          expect(entry(id).builder).toBe(builder);
+          const parts = bodyParts(id);
+          expect(parts.length, 'Body has parts').toBeGreaterThan(0);
+          expect(parts.filter(n => n.startsWith('Bed')), 'no Bed* parts').toEqual([]);
+          expect(parts, 'no hauler rock').not.toContain('SkipLoadRock');
+          expect(parts, 'no hauler rock').not.toContain('BedLoadRock');
+          const hauler = entry(vehicleModelId('debris_hauler', tier));
+          expect(entry(id).nodes, 'node layout differs from the hauler\'s').not.toEqual(hauler.nodes);
+          expect(bodyParts(id), 'Body parts differ from the hauler\'s').not.toEqual(hauler.nodes['Body']?.parts);
+          expect(readFileSync(resolve(MODEL_DIR, `${id}.glb`)).equals(readFileSync(resolve(MODEL_DIR, `${vehicleModelId('debris_hauler', tier)}.glb`))), 'not a byte copy of the hauler').toBe(false);
+        });
+
+        it('has a Body node, a TintBody material, ground contact at y=0 and four wheel nodes directly under the scene root', () => {
+          const inst = library.instantiate(id, { size: [1, 1, 1] });
+          expect(inst.node('Body')).not.toBeNull();
+          expect(inst.tints.has('TintBody')).toBe(true);
+          expect(inst.bounds.min.y, 'on the ground').toBeCloseTo(0, 1);
+          const children = library.prototype(id)!.root.children.map(c => c.name);
+          for (const wheel of WHEELS) {
+            expect(children, wheel).toContain(wheel);
+            expect(inst.node(wheel), wheel).not.toBeNull();
+          }
+          expect(children).toContain('Body');
+        });
+
+        it('carries a driver seat on the Body', () => {
+          expect(bodyParts(id).filter(n => n.startsWith('DriverSeat')).length).toBeGreaterThanOrEqual(1);
+        });
+
+        it('stays within the triangle and file budget, and the manifest matches the export', async () => {
+          const e = entry(id);
+          expect(e.triangles, 'triangles').toBeLessThanOrEqual(maxTris);
+          expect(e.glbKb, 'manifest glbKb').toBeLessThanOrEqual(MAX_ASSET_KB);
+          expect(statSync(resolve(MODEL_DIR, `${id}.glb`)).size / 1024, 'glb KB').toBeLessThanOrEqual(MAX_ASSET_KB);
+          expect(await describeModel(id)).toEqual(e);
+        });
+      });
+    }
+
+    it('the shuttle is a people carrier: at least four passenger seats beside the driver\'s', () => {
+      const seats = bodyParts('vehicle_travel_vehicle_t1').filter(n => n.startsWith('PassengerSeat'));
+      expect(seats.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('the shuttle is a van: 2.2 to 3.2 m long and at most 1.6 m tall', () => {
+      const size = extent('vehicle_travel_vehicle_t1');
+      expect(size.x, 'length').toBeGreaterThanOrEqual(2.2);
+      expect(size.x, 'length').toBeLessThanOrEqual(3.2);
+      expect(size.y, 'height').toBeLessThanOrEqual(1.6);
+    });
+
+    it('the race car has no passenger seat but a spoiler', () => {
+      const parts = bodyParts('vehicle_travel_vehicle_t2');
+      expect(parts.filter(n => n.startsWith('PassengerSeat')), 'no passenger seats').toEqual([]);
+      expect(parts.filter(n => n.startsWith('Spoiler')).length, 'spoiler').toBeGreaterThanOrEqual(1);
+    });
+
+    it('the race car is a low, wide racer: 2.2 to 3.4 m long, at most 0.9 m tall, wider than tall', () => {
+      const size = extent('vehicle_travel_vehicle_t2');
+      expect(size.x, 'length').toBeGreaterThanOrEqual(2.2);
+      expect(size.x, 'length').toBeLessThanOrEqual(3.4);
+      expect(size.y, 'height').toBeLessThanOrEqual(0.9);
+      expect(size.z, 'width exceeds height').toBeGreaterThan(size.y);
+    });
+
+    it('the travel role stops at tier 2: no tier 3 model id is catalogued', () => {
+      expect(allModelIds()).not.toContain('vehicle_travel_vehicle_t3');
+      expect(entry('vehicle_travel_vehicle_t1')).toBeDefined();
+      expect(readModelManifest()!.models['vehicle_travel_vehicle_t3']).toBeUndefined();
+    });
+
+    it('ModelIds no longer carries the placeholder TODO(#2289)', () => {
+      const src = readFileSync(resolve(MODEL_DIR, '..', '..', 'src', 'renderer', 'models', 'ModelIds.ts'), 'utf8');
+      expect(src).not.toContain('TODO(#2289)');
+    });
   });
 });
