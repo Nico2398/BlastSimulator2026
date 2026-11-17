@@ -25,6 +25,7 @@
 // grade 3 inside its window (8,000-14,000 ticks), about half an hour to `--horizon 14000`. Reaching
 // grade 5 takes `--horizon 50000`, hours of run time: a measurement, never a CI check. Ladder runs also
 // print a per-grade summary (median tick and cash at each grade against the target windows) after the table.
+// The milestone summary lists the tick of each quest completion and frontier mark (bench2, prospection, shuttle, detector, island, treranium); from G2 the ladder plays those mechanics (#2322).
 //
 // The full default matrix (24 runs to 10000 ticks) outlives one foreground Bash
 // call, so run it detached and wait inside the same turn, always with an
