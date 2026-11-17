@@ -5,7 +5,7 @@
 import type { VehicleRole, VehicleTier } from '../core/entities/Vehicle.js';
 
 /** A seat position in the vehicle group's local space (model units). */
-export interface SeatAnchor {
+interface SeatAnchor {
   x: number;
   y: number;
   z: number;
