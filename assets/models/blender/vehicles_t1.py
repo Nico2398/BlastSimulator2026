@@ -1175,7 +1175,12 @@ def build_charging_truck(m) -> None:
         fat_wheel(name, r, 0.24, (x, y, r), m)
 
 
+def build_travel_shuttle(m) -> None:
+    raise NotImplementedError('travel shuttle')
+
+
 BUILDERS = {
+    'travel_vehicle': build_travel_shuttle,
     'debris_hauler': build_debris_hauler,
     'rock_digger': build_rock_digger,
     'drill_rig': build_drill_rig,
@@ -1186,6 +1191,7 @@ BUILDERS = {
 
 
 BODY_PAINT = {
+    'travel_vehicle': 0xE8B93A,      # tired school-bus yellow
     'debris_hauler': 0x5C7A3A,       # municipal-skip green
     'rock_digger': 0x5C7B9A,         # faded wheelbarrow blue
     'drill_rig': 0x8A8F96,           # shopping-cart zinc

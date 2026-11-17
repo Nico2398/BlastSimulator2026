@@ -19,6 +19,8 @@ from common import (
 )
 
 ROLES = ['debris_hauler', 'rock_digger', 'drill_rig', 'building_destroyer', 'rock_fragmenter', 'charging_truck']
+# Roles sold in two tiers only (tier 1 in vehicles_t1.py, tier 2 here): the travel vehicle, shuttle then race car.
+TWO_TIER_ROLES = ['travel_vehicle']
 
 
 def _materials() -> dict[str, bpy.types.Material]:
@@ -685,7 +687,12 @@ def hydraulic(name: str, a: Vector, b: Vector, radius: float, m) -> list[bpy.typ
     return [barrel, rod]
 
 
+def build_travel_race_car(m) -> None:
+    raise NotImplementedError('travel race car')
+
+
 BUILDERS = {
+    'travel_vehicle': build_travel_race_car,
     'debris_hauler': build_debris_hauler,
     'rock_digger': build_rock_digger,
     'drill_rig': build_drill_rig,
