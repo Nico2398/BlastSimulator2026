@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRunner } from '../../../src/console/createRunner.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
-import { oreIslandsOf, terrainConfigOf } from '../../../src/core/world/TerrainConfigOf.js';
+import { oreIslandsOf, terrainConfigOf, meteoriteCraterOf } from '../../../src/core/world/TerrainConfigOf.js';
 import { terrainConfigOf as terrainConfigViaConsole } from '../../../src/console/commands/world.js';
 import { buildTerrainContext } from '../../../src/core/world/TerrainGen.js';
 import { ORE_ISLAND_ORE_IDS } from '../../../src/core/config/balance.js';
@@ -79,5 +79,44 @@ describe('oreIslandsOf (#2286, C7)', () => {
     const state = sandboxState(42);
     state.mineType = 'no_such_biome' as GameState['mineType'];
     expect(oreIslandsOf(state)).toEqual([]);
+  });
+});
+
+describe('meteoriteCraterOf (#2291)', () => {
+  it.each([42, 1, 7])('gives the crater centre the terrain generated (seed %i)', (seed) => {
+    const state = sandboxState(seed);
+    const info = buildTerrainContext(terrainConfigOf(state)!).crater!.info!;
+    expect(meteoriteCraterOf(state)).toEqual({ x: info.x, z: info.z });
+  });
+
+  it('carries only the centre: no radius, no distance', () => {
+    const crater = meteoriteCraterOf(sandboxState(42))!;
+    expect(Object.keys(crater).sort()).toEqual(['x', 'z']);
+  });
+
+  it('differs between seeds', () => {
+    expect(meteoriteCraterOf(sandboxState(42))).not.toEqual(meteoriteCraterOf(sandboxState(1)));
+  });
+
+  it('is deterministic for the same state', () => {
+    const state = sandboxState(42);
+    expect(meteoriteCraterOf(state)).toEqual(meteoriteCraterOf(state));
+  });
+
+  it('is null for a game with no ore deposits', () => {
+    const ctx = makeGameContext({ mineType: 'desert', seed: '42' });
+    expect(meteoriteCraterOf(ctx.state!)).toBeNull();
+  });
+
+  it('is null when the state has no world', () => {
+    const state = createGame({ seed: 1, mineType: 'desert' });
+    state.world = undefined as unknown as GameState['world'];
+    expect(meteoriteCraterOf(state)).toBeNull();
+  });
+
+  it('is null when the mine type names no biome', () => {
+    const state = sandboxState(42);
+    state.mineType = 'no_such_biome' as GameState['mineType'];
+    expect(meteoriteCraterOf(state)).toBeNull();
   });
 });

@@ -17,7 +17,7 @@ export function isColumnInSurveyDisc(
   x: number,
   z: number,
 ): boolean {
-  if (survey.method === 'prospection') return false; // an island map reads no column
+  if (survey.method === 'prospection' || survey.method === 'meteorite_detector') return false; // reads no column
   const dx = x - survey.centerX;
   const dz = z - survey.centerZ;
   return Math.sqrt(dx * dx + dz * dz) <= SURVEY_COVERAGE_RADIUS[survey.method];

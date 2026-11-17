@@ -84,8 +84,13 @@ describe('SurveyCalc — SurveyMethod', () => {
     expect(m).toBe('prospection');
   });
 
-  it('SurveyMethod union contains exactly four members', () => {
-    expect(SURVEY_METHODS).toHaveLength(4);
+  it("'meteorite_detector' is a valid SurveyMethod value (#2291)", () => {
+    const m: SurveyMethod = 'meteorite_detector';
+    expect(SURVEY_METHODS).toContain(m);
+  });
+
+  it('SurveyMethod union contains exactly five members', () => {
+    expect(SURVEY_METHODS).toHaveLength(5);
     expect(SURVEY_METHODS).toContain('seismic');
     expect(SURVEY_METHODS).toContain('core_sample');
     expect(SURVEY_METHODS).toContain('aerial');
@@ -1332,7 +1337,7 @@ describe('SurveyCalc — surfaceYs (#1703)', () => {
   });
 
   it('has a surface for every column that has estimates, for every voxel-reading method', () => {
-    for (const method of SURVEY_METHODS.filter(m => m !== 'prospection')) {
+    for (const method of SURVEY_METHODS.filter(m => m !== 'prospection' && m !== 'meteorite_detector')) {
       const r = run(method);
       expect(Object.keys(r.estimates).length).toBeGreaterThan(0);
       expect(Object.keys(r.surfaceYs ?? {}).sort()).toEqual(Object.keys(r.estimates).sort());
@@ -1792,5 +1797,172 @@ describe('SurveyCalc — markSurveysStaleByBlast ignores prospection (#2286, C6)
     expect(markSurveysStaleByBlast([seismic, prospection], ['10,10'])).toBe(1);
     expect(isSurveyStale(seismic)).toBe(true);
     expect(isSurveyStale(prospection)).toBe(false);
+  });
+});
+
+// ── Meteorite detector (#2291) ───────────────────────────────────────────────
+
+describe('SurveyCalc — estimateSurveyResult for the meteorite detector (#2291, C2, C4)', () => {
+  const CRATER = { x: -330, z: 89 };
+  const params = (over: Partial<EstimateSurveyParams> = {}): EstimateSurveyParams => ({
+    id: 8, method: 'meteorite_detector', centerX: 40, centerZ: 30, surveyorId: 3, skillLevel: 3, completedTick: 55,
+    crater: CRATER, ...over,
+  });
+  const angleGap = (a: number, b: number): number => {
+    const d = Math.abs(a - b) % (2 * Math.PI);
+    return d > Math.PI ? 2 * Math.PI - d : d;
+  };
+
+  it('echoes id, method, centre, surveyor and tick', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params(), new Random(1));
+    expect(r).toMatchObject({ id: 8, method: 'meteorite_detector', centerX: 40, centerZ: 30, surveyorId: 3, completedTick: 55 });
+  });
+
+  it('carries a reading and no per-voxel detail', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params(), new Random(1));
+    expect(r.reading).toBeDefined();
+    expect(r.estimates).toEqual({});
+    expect(r.depthProfile).toBeUndefined();
+    expect(r.islands).toBeUndefined();
+  });
+
+  it('the reading points at the crater from the survey centre and holds its distance', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params(), new Random(1));
+    const reading = r.reading!;
+    const truth = Math.atan2(CRATER.z - 30, CRATER.x - 40);
+    const d = Math.hypot(CRATER.x - 40, CRATER.z - 30);
+    expect(angleGap(reading.bearing, truth)).toBeLessThanOrEqual(reading.halfAngle + 1e-9);
+    expect(reading.minDistance).toBeLessThanOrEqual(d);
+    expect(reading.maxDistance).toBeGreaterThanOrEqual(d);
+  });
+
+  it('with no crater the result is still produced, with no reading', () => {
+    const none = estimateSurveyResult(new VoxelGrid(8, 8), params({ crater: null }), new Random(1));
+    expect(none).toMatchObject({ id: 8, method: 'meteorite_detector' });
+    expect(none.reading).toBeUndefined();
+    const { crater: _omitted, ...withoutCrater } = params();
+    void _omitted;
+    const absent = estimateSurveyResult(new VoxelGrid(8, 8), withoutCrater, new Random(1));
+    expect(absent.reading).toBeUndefined();
+  });
+
+  it('confidence stays within [0, 1] at every skill', () => {
+    for (const skill of [1, 2, 3, 4, 5]) {
+      const r = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: skill }), new Random(1));
+      expect(r.confidence).toBeGreaterThanOrEqual(0);
+      expect(r.confidence).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('reads no voxel: a grid full of ore changes nothing', () => {
+    const withOre = estimateSurveyResult(makeOreGrid(), params(), new Random(1));
+    const bare = estimateSurveyResult(new VoxelGrid(8, 8), params(), new Random(1));
+    expect(withOre.estimates).toEqual({});
+    expect(withOre.reading).toEqual(bare.reading);
+  });
+
+  it('the same seed gives the same result; another seed another reading', () => {
+    const a = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 1 }), new Random(21));
+    const b = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 1 }), new Random(21));
+    const c = estimateSurveyResult(new VoxelGrid(8, 8), params({ skillLevel: 1 }), new Random(22));
+    expect(a).toEqual(b);
+    expect(c.reading).not.toEqual(a.reading);
+  });
+
+  it('never carries the crater centre or radius', () => {
+    const r = estimateSurveyResult(new VoxelGrid(8, 8), params(), new Random(1));
+    expect(Object.keys(r.reading!).sort()).toEqual(['bearing', 'halfAngle', 'maxDistance', 'minDistance']);
+  });
+
+  it('other methods carry no reading, even when given a crater', () => {
+    for (const method of ['seismic', 'core_sample', 'aerial', 'prospection'] as const) {
+      const r = estimateSurveyResult(makeOreGrid(), params({ method, centerX: 10, centerZ: 10, islands: [] }), new Random(1));
+      expect(r.reading).toBeUndefined();
+    }
+  });
+});
+
+describe('SurveyCalc — runSurvey for the meteorite detector (#2291, C1, C3)', () => {
+  const surveyorState = (cash: number, grade: number | undefined): ReturnType<typeof createGame> => {
+    const state = createGame({ seed: 42, startingCash: cash });
+    const { employee } = hireEmployee(state.employees, 'surveyor', new Random(99));
+    assignSkill(state.employees, employee.id, 'geology', 1);
+    if (grade !== undefined) state.grade = { ...createGradeState(), grade };
+    return state;
+  };
+  const PARAMS: RunSurveyParams = { method: 'meteorite_detector', centerX: 50, centerZ: 60 };
+
+  it.each([0, 1, 2])('below G3 (grade %i) fails method_locked and names grade 3', (grade) => {
+    const state = surveyorState(1_000_000, grade);
+    expect(runSurvey(state, PARAMS)).toEqual({ success: false, error: 'method_locked', neededGrade: 3 });
+  });
+
+  it('a locked detector mutates nothing', () => {
+    const state = surveyorState(1_000_000, 2);
+    const cash = state.cash;
+    runSurvey(state, PARAMS);
+    expect(state.cash).toBe(cash);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+
+  it('at G3 it queues a detector action and charges its cost', () => {
+    const state = surveyorState(1_000_000, 3);
+    expect(runSurvey(state, PARAMS).success).toBe(true);
+    expect(state.cash).toBe(1_000_000 - SURVEY_COSTS.meteorite_detector);
+    const pending = state.pendingActions.filter(a => a.type === 'survey');
+    expect(pending).toHaveLength(1);
+    expect(pending[0]!.payload).toMatchObject({
+      method: 'meteorite_detector', centerX: 50, centerZ: 60, durationTicks: SURVEY_DURATION_TICKS.meteorite_detector,
+    });
+  });
+
+  it('a site with no grade is open', () => {
+    expect(runSurvey(surveyorState(1_000_000, undefined), PARAMS).success).toBe(true);
+  });
+
+  it('refuses without a surveyor', () => {
+    const state = createGame({ seed: 42, startingCash: 1_000_000 });
+    state.grade = { ...createGradeState(), grade: 3 };
+    expect(runSurvey(state, PARAMS)).toEqual({ success: false, error: 'no_surveyor' });
+  });
+
+  it('refuses when cash is one short, charging nothing', () => {
+    const state = surveyorState(SURVEY_COSTS.meteorite_detector - 1, 3);
+    expect(runSurvey(state, PARAMS)).toEqual({ success: false, error: 'insufficient_funds' });
+    expect(state.cash).toBe(SURVEY_COSTS.meteorite_detector - 1);
+    expect(state.pendingActions).toHaveLength(0);
+  });
+});
+
+describe('SurveyCalc — detector results are never stale (#2291, C9)', () => {
+  const detectorAt = (id: number, x: number, z: number): SurveyResult => ({
+    ...BASE_RESULT, id, method: 'meteorite_detector', centerX: x, centerZ: z, estimates: {},
+    reading: { bearing: 0.5, halfAngle: 0.2, minDistance: 300, maxDistance: 450 },
+  });
+
+  it('no column is inside its disc, not even the one at its centre', () => {
+    const survey = detectorAt(1, 10, 10);
+    expect(isColumnInSurveyDisc(survey, 10, 10)).toBe(false);
+    expect(isColumnInSurveyDisc(survey, 11, 10)).toBe(false);
+    expect(isColumnInSurveyDisc(survey, 0, 0)).toBe(false);
+  });
+
+  it('a blast over its centre never marks it stale', () => {
+    const surveys = [detectorAt(1, 10, 10)];
+    expect(markSurveysStaleByBlast(surveys, ['10,10', '11,11'])).toBe(0);
+    expect(surveys[0]!.stale).toBeUndefined();
+    expect(isSurveyStale(surveys[0]!)).toBe(false);
+  });
+
+  it('stales a seismic neighbour while leaving the detector result fresh', () => {
+    const seismic: SurveyResult = { ...BASE_RESULT, id: 2, method: 'seismic', centerX: 10, centerZ: 10 };
+    const detector = detectorAt(3, 10, 10);
+    expect(markSurveysStaleByBlast([seismic, detector], ['10,10'])).toBe(1);
+    expect(isSurveyStale(seismic)).toBe(true);
+    expect(isSurveyStale(detector)).toBe(false);
+  });
+
+  it('keeps every existing method as it was: a seismic centre column is still inside its disc', () => {
+    expect(isColumnInSurveyDisc({ method: 'seismic', centerX: 10, centerZ: 10 }, 10, 10)).toBe(true);
   });
 });
