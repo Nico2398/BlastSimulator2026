@@ -15,7 +15,6 @@ import { sandboxLevelDef, SANDBOX_DEFAULTS } from '../../../src/core/campaign/Sa
 import { createCampaignState } from '../../../src/core/campaign/Campaign.js';
 import { createGameForLevel } from '../../../src/core/campaign/LevelTransition.js';
 import { getQuest } from '../../../src/core/economy/QuestCatalog.js';
-import { autoSellUnclaimedOre } from '../../../src/core/economy/ContractFulfilment.js';
 import { createGame } from '../../../src/core/state/GameState.js';
 import { getAllExplosives, getExplosive } from '../../../src/core/world/ExplosiveCatalog.js';
 import { MINE_TIERS_PER_GRADE, MINE_LAST_NAMED_GRADE } from '../../../src/core/config/balance.js';
