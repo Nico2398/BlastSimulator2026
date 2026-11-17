@@ -52,9 +52,12 @@ export function readMeteoriteDetector(
 }
 
 /** One reading as text: bearing in degrees (0-360, from +x toward +z), its spread, and the distance band. */
-export function detectorReadingText(reading: DetectorReading): string {
+export function detectorReadingText(
+  reading: DetectorReading,
+  key: 'ui.survey.reading_row' | 'mining.survey.reading_line' = 'ui.survey.reading_row',
+): string {
   const deg = (reading.bearing / DEG_TO_RAD + 360) % 360;
-  return t('ui.survey.reading_row', {
+  return t(key, {
     bearing: Math.round(deg),
     spread: Math.round(reading.halfAngle / DEG_TO_RAD),
     min: reading.minDistance,

@@ -71,8 +71,8 @@ export function surveyCommand(
   }
 
   if (sub === 'readings') {
-    const readings = ctx.state!.surveyResults.flatMap(r => (r.reading ? [{ r, reading: r.reading }] : []));
-    const lines = readings.map(({ r, reading }) => `  (${r.centerX}, ${r.centerZ}) ${detectorReadingText(reading)}`);
+    const readings = ctx.state!.surveyResults.flatMap(r => (r.reading ? [r.reading] : []));
+    const lines = readings.map(reading => `  ${detectorReadingText(reading, 'mining.survey.reading_line')}`);
     return { success: true, output: [`Detector readings: ${readings.length}`, ...lines].join('\n') };
   }
 
