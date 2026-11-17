@@ -14,6 +14,8 @@ import {
   drawTerrain,
   drawGridLines,
   drawSurveyedOre,
+  detectorReadingsOf,
+  drawDetectorCones,
   drawProspectedIslands,
   miniMapProjection,
   prospectedIslandsOf,
@@ -202,7 +204,7 @@ export class MiniMap {
     // The site's bounding box, not a square at the origin: a site claimed
     // westward starts at a negative x (#473 P5).
     // Widened to hold the islands a prospection found, which lie beyond the site (#2286).
-    const proj: MapProjection = miniMapProjection({ minX, minZ, sizeX, sizeZ }, prospectedIslandsOf(state));
+    const proj: MapProjection = miniMapProjection({ minX, minZ, sizeX, sizeZ }, prospectedIslandsOf(state), detectorReadingsOf(state));
     this.projection = proj;
 
     if (this.staticCtx !== null) {
@@ -217,6 +219,7 @@ export class MiniMap {
       drawGridLines(ctx, MAP_SIZE / proj.scaleX, MAP_SIZE / proj.scaleZ, proj);
     }
     drawProspectedIslands(ctx, state, proj);
+    drawDetectorCones(ctx, state, proj);
     drawSurveyedOre(ctx, state, proj);
 
     // Draw buildings

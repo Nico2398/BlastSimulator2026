@@ -9,7 +9,7 @@
 import { autoChargeHole, dispatchChargeAction } from '../mining/ChargeOrder.js';
 import type { GameState, PlannedBuilding } from '../state/GameState.js';
 import type { VoxelGrid } from '../world/VoxelGrid.js';
-import { oreIslandsOf } from '../world/TerrainConfigOf.js';
+import { meteoriteCraterOf, oreIslandsOf } from '../world/TerrainConfigOf.js';
 import type { Employee } from '../entities/Employee.js';
 import type { EventEmitter } from '../state/EventEmitter.js';
 import type { TaskProgressResult } from './TaskProgress.js';
@@ -180,6 +180,7 @@ export function applyTaskCompletion(
         completedTick: state.tickCount,
         grade: state.grade?.grade,
         ...(method === 'prospection' ? { islands: oreIslandsOf(state) } : {}),
+        ...(method === 'meteorite_detector' ? { crater: meteoriteCraterOf(state) } : {}),
       }, new Random(state.seed + state.tickCount + emp.id));
       state.surveyResults.push(surveyResult);
       if (method === 'seismic') {

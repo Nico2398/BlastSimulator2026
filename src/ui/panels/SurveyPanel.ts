@@ -21,6 +21,7 @@ import type { GameState } from '../../core/state/GameState.js';
 import { surveyCostFor, type SurveyMethod, type SurveyResult } from '../../core/mining/SurveyCalc.js';
 import { surveyMethodGate, surveyMethodLockLabel, surveyDepthM } from '../../core/mining/SurveyGate.js';
 import { isSurveyStale } from '../../core/mining/SurveyStaleness.js';
+import { detectorReadingText } from '../../core/mining/SurveyDetector.js';
 import type { ProspectedIsland } from '../../core/mining/SurveyProspection.js';
 import { getOre } from '../../core/world/OreCatalog.js';
 import {
@@ -52,7 +53,10 @@ const MAX_RESULTS_SHOWN = 4;
 const MAX_ORES_SHOWN = 4;
 
 /** Methods offered, cheapest first so the tutorial's default is affordable. */
-const METHOD_ORDER: SurveyMethod[] = ['core_sample', 'seismic', 'aerial', 'prospection'];
+const METHOD_ORDER: SurveyMethod[] = ['core_sample', 'seismic', 'aerial', 'prospection', 'meteorite_detector'];
+
+/** Methods whose result holds no ore estimates: they get no ore-filter choice and no depth span. */
+const NON_ORE_METHODS: readonly SurveyMethod[] = ['prospection', 'meteorite_detector'];
 
 export class SurveyPanel extends PanelBase {
   private readonly bodyEl: HTMLElement;
@@ -352,7 +356,7 @@ export class SurveyPanel extends PanelBase {
     meta.append(
       el('span', { text: t('ui.survey.method_accuracy', { pct: accuracy }) }),
       el('span', { text: radius > 0 ? t('ui.survey.radius_cells', { radius }) : t('ui.survey.radius_point') }),
-      ...(method === 'prospection' ? [] : [el('span', { text: t('ui.survey.depth_metres', { depth: surveyDepthM(method, this.lastState?.grade?.grade) }) })]),
+      ...(NON_ORE_METHODS.includes(method) ? [] : [el('span', { text: t('ui.survey.depth_metres', { depth: surveyDepthM(method, this.lastState?.grade?.grade) }) })]),
       el('span', { text: t('ui.survey.duration_ticks', { ticks: SURVEY_DURATION_TICKS[method] }) }),
     );
 
@@ -478,8 +482,8 @@ export class SurveyPanel extends PanelBase {
       choices: [...ores].sort((a, b) => richest(b) - richest(a) || a.localeCompare(b)).map(value => ({ value, label: t(`ore.${value}.name`) })),
       groups: [{
         id: 'method', label: t('ui.survey.filter_method'),
-        // Ore-reading methods only: a prospection holds islands, no ore estimates, so no ore filter selects it.
-        choices: METHOD_ORDER.filter(value => value !== 'prospection').map(value => ({ value, label: t(`survey.${value}`) })),
+        // Ore-reading methods only: a prospection or a detector reading holds no ore estimates, so no ore filter selects it.
+        choices: METHOD_ORDER.filter(value => !NON_ORE_METHODS.includes(value)).map(value => ({ value, label: t(`survey.${value}`) })),
       }],
       sorts: [],
       onChange: () => {
@@ -541,6 +545,13 @@ export class SurveyPanel extends PanelBase {
       return islandCard;
     }
 
+    if (survey.method === 'meteorite_detector') {
+      rows.push(this.makeReadingRow(survey), this.confidenceLine(survey));
+      const readingCard = card(rows);
+      readingCard.dataset['surveyId'] = String(survey.id);
+      return readingCard;
+    }
+
     const ores = summarizeSurveyOres(survey, marketId).slice(0, MAX_ORES_SHOWN);
     if (ores.length === 0) {
       rows.push(el('span', { text: t('ui.survey.no_ore'), attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' } }));
@@ -563,6 +574,13 @@ export class SurveyPanel extends PanelBase {
       className: 'bsx-mono',
       attrs: { style: 'font-size:10px;color:var(--bsx-text-muted)' },
     });
+  }
+
+  /** The detector's bearing and distance band, or a none line when the world held no crater. */
+  private makeReadingRow(survey: SurveyResult): HTMLElement {
+    const style = 'font-size:10px;color:var(--bsx-text-muted)';
+    if (!survey.reading) return el('span', { text: t('ui.survey.reading_none'), attrs: { style } });
+    return el('span', { text: detectorReadingText(survey.reading), className: 'bsx-mono', attrs: { style, 'data-reading': `${survey.centerX},${survey.centerZ}` } });
   }
 
   /** One row per detected island: ore and position; a click (or the locate button) centres the camera on it. */
