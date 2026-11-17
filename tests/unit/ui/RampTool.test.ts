@@ -482,7 +482,7 @@ describe('RampTool: the roles line (#2288 C6)', () => {
     expect(Number.isFinite(g)).toBe(true);
     const roles = climbingRoles(g, true);
     expect(roles.length).toBeGreaterThan(0);
-    expect(readout.at(-1)).toContain(t(`vehicle.role_name.${roles[0]!}`));
+    expect(readout.at(-1)).toContain(t(`vehicle_type.${roles[0]!}`));
   });
 
   it('at the 20 degree ceiling the work roles are named and the shuttle is not', () => {
@@ -491,9 +491,9 @@ describe('RampTool: the roles line (#2288 C6)', () => {
     for (let i = 0; i < 60; i++) s.field('grade').onInc();
     const readout = s.shown().readout!;
     const last = readout.at(-1)!;
-    expect(last).toContain(t('vehicle.role_name.drill_rig'));
-    expect(last).toContain(t('vehicle.role_name.debris_hauler'));
-    expect(last).not.toContain(t('vehicle.role_name.travel_vehicle'));
+    expect(last).toContain(t('vehicle_type.drill_rig'));
+    expect(last).toContain(t('vehicle_type.debris_hauler'));
+    expect(last).not.toContain(t('vehicle_type.travel_vehicle'));
   });
 
   it('a gentle grade names the shuttle too', () => {
@@ -503,16 +503,16 @@ describe('RampTool: the roles line (#2288 C6)', () => {
     for (let i = 0; i < 60; i++) s.field('grade').onDec();
     const readout = s.shown().readout!;
     expect(s.field('grade').value).toBeLessThan(8);
-    expect(readout.at(-1)).toContain(t('vehicle.role_name.travel_vehicle'));
-    expect(readout.at(-1)).toContain(t('vehicle.role_name.drill_rig'));
+    expect(readout.at(-1)).toContain(t('vehicle_type.travel_vehicle'));
+    expect(readout.at(-1)).toContain(t('vehicle_type.drill_rig'));
   });
 
   it('off a progression site there is no roles line', () => {
     const s = setup();
     s.controller.simulateWaypoints([A, B, C]);
     const text = (s.shown().readout ?? []).join('\n');
-    expect(text).not.toContain(t('vehicle.role_name.drill_rig'));
-    expect(text).not.toContain(t('vehicle.role_name.travel_vehicle'));
+    expect(text).not.toContain(t('vehicle_type.drill_rig'));
+    expect(text).not.toContain(t('vehicle_type.travel_vehicle'));
     expect(text).not.toContain(t('ui.build.ramp_roles_none'));
   });
 });

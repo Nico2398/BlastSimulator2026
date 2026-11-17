@@ -93,7 +93,7 @@ describe('describeRampPlan: the roles line (#2288 C6)', () => {
   beforeEach(() => setLocale('en'));
   const plan = { length: 22, legs: 2, cost: 2200, gradeDeg: 14, climb: { gradeDeg: 14, climbable: true, maxDeg: 20 } };
   const work: VehicleRole[] = getAllVehicleRoles().filter(r => r !== 'travel_vehicle');
-  const name = (r: VehicleRole): string => t(`vehicle.role_name.${r}`);
+  const name = (r: VehicleRole): string => t(`vehicle_type.${r}`);
 
   it('without roles the output is unchanged', () => {
     expect(describeRampPlan(plan)).toHaveLength(2);
@@ -146,14 +146,14 @@ describe('describeRampPlan: the roles line (#2288 C6)', () => {
     setLocale('fr');
     const fr = describeRampPlan({ ...plan, roles: work });
     expect(fr.at(-1)).not.toEqual(en.at(-1));
-    expect(fr.at(-1)).toContain(t('vehicle.role_name.drill_rig'));
+    expect(fr.at(-1)).toContain(t('vehicle_type.drill_rig'));
     setLocale('en');
   });
 });
 
 describe('vehicle role name i18n keys (#2288)', () => {
-  it.each(getAllVehicleRoles())('vehicle.role_name.%s exists in en and fr and differs between them', (role) => {
-    const key = `vehicle.role_name.${role}`;
+  it.each(getAllVehicleRoles())('vehicle_type.%s exists in en and fr and differs between them', (role) => {
+    const key = `vehicle_type.${role}`;
     expect(locale('en')[key], `en ${key}`).toBeTruthy();
     expect(locale('fr')[key], `fr ${key}`).toBeTruthy();
     expect(locale('fr')[key]).not.toBe(locale('en')[key]);

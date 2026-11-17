@@ -547,8 +547,8 @@ describe('en.json / fr.json — key-set parity', () => {
     // #2280: +28 keys (quests, explosive tier locks, progression panel, notification): 5085.
     // #2283: Research Center and research UI removed (-55 keys), building-tier quests added (+12) on top of #2282's 5091: 5048.
     // #2285: +15 keys (travel vehicle names, quest, locks, fleet panel lines): 5063.
-    // #2288: +9 keys (ramp line naming the vehicle roles that can climb the planned grade)
-    expect(Object.keys(en).length).toBe(5072);
+    // #2288: +2 keys (ramp line naming the vehicle roles that can climb the planned grade)
+    expect(Object.keys(en).length).toBe(5065);
   });
 
   it('carries the weak-explosive warning key no more, and the breaks-nothing keys in both locales (#2197)', () => {

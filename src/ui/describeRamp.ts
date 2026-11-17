@@ -37,20 +37,7 @@ export function describeRampPlan(p: { length: number; legs: number; cost: number
   return lines;
 }
 
-/** Localized role name; literal keys so key scans find them. */
-function roleName(role: VehicleRole): string {
-  switch (role) {
-    case 'drill_rig': return t('vehicle.role_name.drill_rig');
-    case 'rock_digger': return t('vehicle.role_name.rock_digger');
-    case 'rock_fragmenter': return t('vehicle.role_name.rock_fragmenter');
-    case 'charging_truck': return t('vehicle.role_name.charging_truck');
-    case 'debris_hauler': return t('vehicle.role_name.debris_hauler');
-    case 'building_destroyer': return t('vehicle.role_name.building_destroyer');
-    case 'travel_vehicle': return t('vehicle.role_name.travel_vehicle');
-  }
-}
-
 /** The vehicle roles that can climb the planned ramp, or the line saying none can (#2288). */
 function rolesLine(roles: readonly VehicleRole[]): string {
-  return roles.length === 0 ? t('ui.build.ramp_roles_none') : t('ui.build.ramp_roles', { roles: roles.map(roleName).join(', ') });
+  return roles.length === 0 ? t('ui.build.ramp_roles_none') : t('ui.build.ramp_roles', { roles: roles.map(r => t(`vehicle_type.${r}`)).join(', ') });
 }
