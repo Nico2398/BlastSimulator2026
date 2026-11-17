@@ -42,14 +42,14 @@ describe('vehicleReachesCell (#2091)', () => {
   it("is true on the vehicle's own side of a wall and false across it", () => {
     const state = createGame({ seed: 42 });
     state.navGrid = walledGrid();
-    expect(vehicleReachesCell(state, { x: 3, z: 5 }, 6, 6)).toBe(true);
-    expect(vehicleReachesCell(state, { x: 3, z: 5 }, 18, 6)).toBe(false);
+    expect(vehicleReachesCell(state, { x: 3, z: 5, type: 'drill_rig' as const }, 6, 6)).toBe(true);
+    expect(vehicleReachesCell(state, { x: 3, z: 5, type: 'drill_rig' as const }, 18, 6)).toBe(false);
   });
 
   it('is false for a blocked target cell', () => {
     const state = createGame({ seed: 42 });
     state.navGrid = walledGrid();
-    expect(vehicleReachesCell(state, { x: 3, z: 5 }, 10, 6)).toBe(false);
+    expect(vehicleReachesCell(state, { x: 3, z: 5, type: 'drill_rig' as const }, 10, 6)).toBe(false);
   });
 
   it('is false for a vehicle parked on a thin cell it cannot climb off, and true one step gentler', () => {
@@ -73,13 +73,13 @@ describe('vehicleReachesCell (#2091)', () => {
     const limit = vehicleMaxSlopeRatio(isProgressionSite(state));
     // Too steep straight off and diagonally off (a diagonal step's run is longer).
     state.navGrid = ledge((limit + 0.015) * Math.SQRT2);
-    expect(vehicleReachesCell(state, { x: 9, z: 5 }, 3, 5)).toBe(false);
+    expect(vehicleReachesCell(state, { x: 9, z: 5, type: 'drill_rig' as const }, 3, 5)).toBe(false);
     state.navGrid = ledge(limit - 0.05);
-    expect(vehicleReachesCell(state, { x: 9, z: 5 }, 3, 5)).toBe(true);
+    expect(vehicleReachesCell(state, { x: 9, z: 5, type: 'drill_rig' as const }, 3, 5)).toBe(true);
   });
 
   it('is true with no nav grid: nothing to weigh', () => {
-    expect(vehicleReachesCell(createGame({ seed: 42 }), { x: 3, z: 5 }, 18, 6)).toBe(true);
+    expect(vehicleReachesCell(createGame({ seed: 42 }), { x: 3, z: 5, type: 'drill_rig' as const }, 18, 6)).toBe(true);
   });
 });
 
