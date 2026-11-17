@@ -1,14 +1,15 @@
 // BlastSimulator2026 — Unit tests: ramp steepness against the one vehicle limit (#1938, #2045)
 
 import { describe, it, expect } from 'vitest';
-import { rampSteepestGradeDegrees, steepestBlockingRamp, describeRampClimbability } from '../../../src/core/mining/RampGrade.js';
+import { rampSteepestGradeDegrees, steepestBlockingRamp, describeRampClimbability, climbingRoles } from '../../../src/core/mining/RampGrade.js';
 import { createGame, type GameState } from '../../../src/core/state/GameState.js';
 import { installGradedRamps, buildGradedRampGrid, gradedBuiltRamp } from '../../helpers/gradedRamps.js';
 import { NavGrid, type NavCell } from '../../../src/core/nav/NavGrid.js';
 import { rampPathCells, rampBoundingFootprint } from '../../../src/core/mining/RampPath.js';
 import type { BuiltRamp } from '../../../src/core/state/GameState.js';
-import { slopeRatioForDegrees } from '../../../src/core/nav/ClimbLimit.js';
-import { VEHICLE_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
+import { slopeRatioForDegrees, slopeDegreesForRatio } from '../../../src/core/nav/ClimbLimit.js';
+import { VEHICLE_MAX_SLOPE_RATIO, NAV_MAX_SLOPE_RATIO } from '../../../src/core/config/balance.js';
+import { getAllVehicleRoles, type VehicleRole } from '../../../src/core/entities/Vehicle.js';
 
 function stateWith(degrees: number[]): GameState {
   const state = createGame({ seed: 42 });
@@ -152,5 +153,52 @@ describe('rampSteepestGradeDegrees on a multi-leg ramp (#1939)', () => {
 
   it('is not fooled by the empty corner of the bounding box', () => {
     expect(rampSteepestGradeDegrees(lGrid(), lRamp())).toBeLessThan(DEG + 5);
+  });
+});
+
+describe('climbingRoles (#2288 C6)', () => {
+  const all = getAllVehicleRoles();
+  const work = all.filter((r): r is VehicleRole => r !== 'travel_vehicle');
+
+  it('a gentle grade on a progression site admits every role, in fleet order', () => {
+    expect(climbingRoles(5, true)).toEqual(all);
+  });
+
+  it('a flat ramp admits every role', () => {
+    expect(climbingRoles(0, true)).toEqual(all);
+  });
+
+  it('a grade between the two limits admits the work roles and not the travel vehicle', () => {
+    expect(climbingRoles(14, true)).toEqual(work);
+    expect(climbingRoles(14, true)).not.toContain('travel_vehicle');
+  });
+
+  it('a grade exactly at the travel limit (8 degrees) admits the travel vehicle', () => {
+    expect(climbingRoles(8, true)).toEqual(all);
+  });
+
+  it('a grade just over the travel limit drops the travel vehicle only', () => {
+    expect(climbingRoles(8.01, true)).toEqual(work);
+  });
+
+  it('a grade exactly at the work limit (20 degrees) admits the work roles', () => {
+    expect(climbingRoles(20, true)).toEqual(work);
+  });
+
+  it('a grade just over the work limit admits no role', () => {
+    expect(climbingRoles(20.01, true)).toEqual([]);
+    expect(climbingRoles(26, true)).toEqual([]);
+  });
+
+  it('the work limit used is the vehicle limit constant', () => {
+    expect(climbingRoles(slopeDegreesForRatio(VEHICLE_MAX_SLOPE_RATIO), true)).toEqual(work);
+  });
+
+  it('off a progression site every role shares the nav limit', () => {
+    const navDeg = slopeDegreesForRatio(NAV_MAX_SLOPE_RATIO);
+    expect(climbingRoles(14, false)).toEqual(all);
+    expect(climbingRoles(25, false)).toEqual(all);
+    expect(climbingRoles(navDeg, false)).toEqual(all);
+    expect(climbingRoles(navDeg + 0.5, false)).toEqual([]);
   });
 });

@@ -1343,6 +1343,12 @@ export const VEHICLE_MAX_SLOPE_DEGREES = 20;
 /** tan(VEHICLE_MAX_SLOPE_DEGREES): rise per metre of run (#2045). */
 export const VEHICLE_MAX_SLOPE_RATIO = Math.tan(VEHICLE_MAX_SLOPE_DEGREES * Math.PI / 180);
 
+/** The steepest slope (degrees) the travel vehicle (both tiers) climbs on a progression site: fast, but gentle slopes only (#2288). */
+export const TRAVEL_VEHICLE_MAX_SLOPE_DEGREES = 8;
+
+/** tan(TRAVEL_VEHICLE_MAX_SLOPE_DEGREES): rise per metre of run (#2288). */
+export const TRAVEL_VEHICLE_MAX_SLOPE_RATIO = Math.tan(TRAVEL_VEHICLE_MAX_SLOPE_DEGREES * Math.PI / 180);
+
 /**
  * Anti-noise floor, in metres, below which a graded cardinal-neighbour
  * height delta reads as flat rather than a ramp. Ramp classification uses

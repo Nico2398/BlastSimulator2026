@@ -18,7 +18,7 @@ import { isProgressionSite, type GameState, type PendingAction, type BlockedOrde
 import { findById } from '../state/IdIndex.js';
 import { isDrillHoleBuried } from '../mining/BuriedHoles.js';
 import type { Employee } from '../entities/Employee.js';
-import { vehicleDriverId, vehicleMaxSlopeRatio } from '../entities/Vehicle.js';
+import { vehicleDriverId, vehicleMaxSlopeRatio, roleMaxSlopeRatio } from '../entities/Vehicle.js';
 import type { Vehicle, VehicleRole, VehicleTier } from '../entities/Vehicle.js';
 import { retargetBesideRampLayers, retargetRampLayers } from './RampLayerRetarget.js';
 import { lowestFleetTier, minVehicleTierFor } from './VehicleReservation.js';
@@ -113,8 +113,8 @@ function fillPool(
     const driverId = vehicleDriverId(v);
     return (driverId !== null && candidateIds.has(driverId)) || onFoot.has(Math.round(v.x), Math.round(v.z));
   });
-  // Every vehicle climbs at the site's one vehicle limit (#2045).
-  const ratio = uniformRatio ?? vehicleMaxSlopeRatio(isProgressionSite(state));
+  // Every vehicle of the order's role climbs at that role's limit (#2045, #2288).
+  const ratio = uniformRatio ?? roleMaxSlopeRatio(role, isProgressionSite(state));
   // A vehicle parked on a docking cell stands for the cells it docked from (#2045).
   const vehicleReach = componentsOf(cache, NAV_CLEARANCE_VEHICLE_CELLS, ratio).reachableFrom(dockedFrom(cache.navGrid, usable, NAV_CLEARANCE_VEHICLE_CELLS, ratio));
   // A clearance-1 approach cell beside a building is where a vehicle docks (#1840).

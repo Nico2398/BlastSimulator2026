@@ -19,11 +19,13 @@ import type { Vehicle } from '../../../src/core/entities/Vehicle.js';
 import { purchaseVehicle, getVehicleReservation, resolveVehicleDriver } from '../../../src/core/entities/Vehicle.js';
 import { reserveVehicle } from '../../../src/core/engine/VehicleReservation.js';
 import { Random } from '../../../src/core/math/Random.js';
+import { buildSlopedWorld, plateauStartX, type SlopedWorldOpts } from '../../helpers/slopedWorld.js';
 import { EVACUATION_CLEARANCE_M, ACTION_STARVATION_TICK_THRESHOLD } from '../../../src/core/config/balance.js';
 import { addBlastFragments, pickupFragment } from '../../../src/core/economy/Logistics.js';
 import type { FragmentData } from '../../../src/core/mining/BlastExecution.js';
 
 const EVACUATION_SEED = 42;
+
 
 /** A flat, fully solid, fully walkable size×size NavGrid — every column passable. */
 function flatWalkableGrid(size: number): NavGrid {
@@ -1176,5 +1178,51 @@ describe('an evacuated worker takes one route out and stays out until the shot (
     const direct = Math.hypot(employee.x - 15, employee.z - 15);
     expect(travelled).toBeLessThanOrEqual(direct * 1.5 + 2);
     expect(isInZone(employee.x, employee.z, zone)).toBe(false);
+  });
+});
+
+
+describe('findSafeEvacuationCell — the driven vehicle\'s own climb limit (#2288 C2)', () => {
+  // Floor x <= 20 walled by a zone; the only way out is east up one 14 degree ramp (over the 8 degree shuttle limit,
+  // under the 20 degree work limit) onto a plateau from x = 26.
+  const opts: SlopedWorldOpts = { width: 40, floorEnd: 20, rise: 1.2, degrees: [14] };
+  const zone: ZoneBounds = { x1: 0, z1: 0, x2: 24, z2: 4 };
+
+  function site(progression: boolean) {
+    const state = createGame({ seed: EVACUATION_SEED });
+    state.navGrid = buildSlopedWorld(opts);
+    if (progression) state.grade = createGradeState();
+    return state;
+  }
+
+  it('a drill rig is sent up the ramp onto the plateau', () => {
+    const state = site(true);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'drill_rig', 10, 2);
+    const dest = findSafeEvacuationCell(state, 10, 2, zone, vehicle);
+    expect(dest).not.toBeNull();
+    expect(dest!.x).toBeGreaterThanOrEqual(plateauStartX(opts));
+  });
+
+  it('a shuttle is never given a cell that is only reachable up the 14 degree ramp', () => {
+    const state = site(true);
+    for (const tier of [1, 2] as const) {
+      const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 10, 2, tier);
+      expect(findSafeEvacuationCell(state, 10, 2, zone, vehicle)).toBeNull();
+    }
+  });
+
+  it('off a progression site the shuttle shares the nav limit and is sent up the ramp', () => {
+    const state = site(false);
+    const { vehicle } = purchaseVehicle(state.vehicles, 'travel_vehicle', 10, 2);
+    const dest = findSafeEvacuationCell(state, 10, 2, zone, vehicle);
+    expect(dest).not.toBeNull();
+    expect(dest!.x).toBeGreaterThanOrEqual(plateauStartX(opts));
+  });
+
+  it('a walker (no vehicle) is not held to a vehicle limit', () => {
+    const state = site(true);
+    const dest = findSafeEvacuationCell(state, 10, 2, zone);
+    expect(dest).not.toBeNull();
+    expect(dest!.x).toBeGreaterThanOrEqual(plateauStartX(opts));
   });
 });

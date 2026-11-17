@@ -3515,6 +3515,8 @@
   "ui.build.ramp_grade": "Grade",
   "ui.build.ramp_climbable": "Vehicles can climb it (max {max}°)",
   "ui.build.ramp_not_climbable": "Too steep for vehicles (max {max}°)",
+  "ui.build.ramp_roles": "Climbed by: {roles}",
+  "ui.build.ramp_roles_none": "No vehicle role can climb it",
   "ui.build.ramp_spiral": "Spiral",
   "ui.build.ramp_undo_corner": "Undo corner",
   "ui.build.ramp_spiral_ordered": "Spiral ramp ordered — excavation underway.",
