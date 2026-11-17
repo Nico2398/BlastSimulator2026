@@ -6,6 +6,7 @@
 import type { GameState } from '../core/state/GameState.js';
 import type { NavGrid, NavCellType } from '../core/nav/NavGrid.js';
 import type { ProspectedIsland } from '../core/mining/SurveyProspection.js';
+import type { DetectorReading } from '../core/mining/SurveyDetector.js';
 import { getOre } from '../core/world/OreCatalog.js';
 
 export const MAP_SIZE = 120; // px
@@ -340,4 +341,14 @@ export function drawProspectedIslands(
     ctx.fill();
     ctx.globalAlpha = 1;
   }
+}
+
+/** Every meteorite-detector reading of every result, with the point it was taken from (#2291). */
+export function detectorReadingsOf(_state: GameState): { originX: number; originZ: number; reading: DetectorReading }[] {
+  throw new Error('not implemented');
+}
+
+/** Paint every detector reading as a cone clipped to its distance band (#2291). */
+export function drawDetectorCones(_ctx: CanvasRenderingContext2D, _state: GameState, _proj: MapProjection): void {
+  throw new Error('not implemented');
 }

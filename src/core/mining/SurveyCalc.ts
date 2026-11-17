@@ -19,15 +19,16 @@ import { buildDepthProfile, type SurveyDepthBand } from './SurveyDepthProfile.js
 import { surveyColumnKey } from './SurveyColumn.js';
 import { isColumnInSurveyDisc } from './SurveyStaleness.js';
 import { surveyMethodGate, surveyDepthM } from './SurveyGate.js';
+import type { DetectorReading } from './SurveyDetector.js';
 import { prospectIslands, type ProspectedIsland } from './SurveyProspection.js';
 import type { OreIsland } from '../world/OreIslands.js';
 import { dispatchPendingAction } from '../engine/TaskDispatch.js';
 
 /** The supported methods for surveying a mining site. */
-export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial' | 'prospection';
+export type SurveyMethod = 'seismic' | 'core_sample' | 'aerial' | 'prospection' | 'meteorite_detector';
 
 /** Runtime array of every valid SurveyMethod value. */
-export const SURVEY_METHODS: SurveyMethod[] = ['seismic', 'core_sample', 'aerial', 'prospection'];
+export const SURVEY_METHODS: SurveyMethod[] = ['seismic', 'core_sample', 'aerial', 'prospection', 'meteorite_detector'];
 
 /**
  * The result produced when a survey is completed.
@@ -62,6 +63,8 @@ export interface SurveyResult {
   depthM?: number;
   /** Prospection only: the coarse island map. Absent on every other method. */
   islands?: ProspectedIsland[];
+  /** Meteorite detector only: the bearing cone and distance band toward the crater. Absent on every other method, and when no crater exists. */
+  reading?: DetectorReading;
   /** Set once a blast clears a column inside this survey's disc. Absent means fresh. */
   stale?: boolean;
 }
@@ -80,6 +83,8 @@ export interface EstimateSurveyParams {
   grade?: number | undefined;
   /** Prospection only: the world's ore islands to report from. */
   islands?: readonly OreIsland[];
+  /** Meteorite detector only: the world's crater, read from. */
+  crater?: { x: number; z: number } | null;
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -132,6 +137,7 @@ export function estimateSurveyResult(
     const found = prospectIslands(params.islands ?? [], { centerX, centerZ, skillLevel }, rng);
     return { id, method, centerX, centerZ, surveyorId, completedTick, estimates: {}, confidence, islands: found };
   }
+  if (method === 'meteorite_detector') throw new Error('not implemented');
   const depthM = surveyDepthM(method, grade);
 
   const skillBonus = (skillLevel - 1) * SURVEY_SKILL_BONUS_PER_LEVEL;

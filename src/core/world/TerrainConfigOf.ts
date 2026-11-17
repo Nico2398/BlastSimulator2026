@@ -49,3 +49,8 @@ export function oreIslandsOf(state: GameState): readonly OreIsland[] {
   const config = terrainConfigOf(state);
   return config ? buildTerrainContext(config).oreIslands?.list() ?? [] : [];
 }
+
+/** The meteorite crater's centre (#2291): for the detector's engine-side readings only, never shown to a player. */
+export function meteoriteCraterOf(_state: GameState): { x: number; z: number } | null {
+  throw new Error('not implemented');
+}

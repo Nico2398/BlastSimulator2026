@@ -380,6 +380,7 @@ export class SurveyPanel extends PanelBase {
       case 'seismic': return t('ui.survey.note_seismic', { radius: SEISMIC_SURVEY_DAMAGE_RADIUS, hp: SEISMIC_SURVEY_DAMAGE_HP });
       case 'aerial': return t('ui.survey.note_aerial');
       case 'prospection': return t('ui.survey.note_prospection');
+      case 'meteorite_detector': return t('ui.survey.note_meteorite_detector');
     }
   }
 
