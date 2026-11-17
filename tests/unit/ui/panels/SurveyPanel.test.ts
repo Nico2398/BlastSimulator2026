@@ -636,7 +636,7 @@ describe('SurveyPanel — method click arms the target pick (#1771)', () => {
     panel.update(surveyorState());
     expect(panel.root.querySelector('#bs-survey-run')).not.toBeNull();
     expect(panel.root.querySelector('.bs-survey-status')).not.toBeNull();
-    expect(panel.root.querySelectorAll('[data-method]').length).toBe(4);
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(5);
   });
 
   it('Pick Target in Scene while already armed leaves the pick armed (no toggle-cancel)', () => {
@@ -1100,10 +1100,10 @@ describe('SurveyPanel — grade-gated method cards (#2279)', () => {
     expect(method(panel, 'core_sample').textContent).not.toContain('opens at');
   });
 
-  it('a locked card is still one of the four method cards', () => {
+  it('a locked card is still one of the five method cards', () => {
     const { panel } = makePanel();
     panel.update(gradedState(0));
-    expect(panel.root.querySelectorAll('[data-method]').length).toBe(4);
+    expect(panel.root.querySelectorAll('[data-method]').length).toBe(5);
   });
 
   describe('depth shown per card follows the grade', () => {
