@@ -1232,25 +1232,25 @@ def build_travel_shuttle(m) -> None:
     body.append(bumper)
     body.append(tape_band('Bumper.Tape', 0.08, (1.45, 0.4, 0.44), axis='Y', width=0.1, m=m))
     # Windscreen and roof on four posts.
-    screen = box('Windscreen', (0.05, 1.0, 0.5), loc=(0.72, 0, 1.15), rot=(0, math.radians(-14), 0))
+    screen = box('Windscreen', (0.05, 1.0, 0.4), loc=(0.72, 0, 1.12), rot=(0, math.radians(-14), 0))
     bevel(screen, 0.015, 2)
     assign(screen, m['glass'])
     body.append(screen)
     for x in (0.72, -1.3):
         for side in (-1, 1):
-            post = cylinder('Post', 0.045, 0.98, loc=(x, side * 0.52, 0.99), segments=10)
+            post = cylinder('Post', 0.045, 0.86, loc=(x, side * 0.52, 0.93), segments=10)
             assign(post, m['body'])
             body.append(post)
-    roof = box('Roof', (2.2, 1.24, 0.09), loc=(-0.3, 0, 1.52))
+    roof = box('Roof', (2.2, 1.24, 0.09), loc=(-0.3, 0, 1.4))
     bevel(roof, 0.04, 3)
     assign(roof, m['body'])
     body.append(roof)
-    luggage = box('Luggage', (0.6, 0.6, 0.22), loc=(-0.6, 0.05, 1.7), rot=(0, 0, math.radians(8)))
+    luggage = box('Luggage', (0.6, 0.6, 0.12), loc=(-0.6, 0.05, 1.5), rot=(0, 0, math.radians(8)))
     bevel(luggage, 0.04, 3)
     assign(luggage, m['wood'])
     body.append(luggage)
     for dx in (-0.2, 0.2):
-        rope = box('Luggage.Rope', (0.04, 0.64, 0.24), loc=(-0.6 + dx, 0.05, 1.7), rot=(0, 0, math.radians(8)))
+        rope = box('Luggage.Rope', (0.04, 0.64, 0.14), loc=(-0.6 + dx, 0.05, 1.5), rot=(0, 0, math.radians(8)))
         assign(rope, m['rope'])
         body.append(rope)
     # Seats: the driver in front, then two benches of two, then a back row of two.

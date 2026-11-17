@@ -721,17 +721,17 @@ def build_travel_race_car(m) -> None:
     cushion = box('DriverSeat.Cushion', (0.4, 0.38, 0.1), loc=(-0.05, 0, 0.55))
     bevel(cushion, 0.04, 3)
     assign(cushion, m['stripe'])
-    back = box('DriverSeat.Back', (0.1, 0.4, 0.4), loc=(-0.3, 0, 0.72))
+    back = box('DriverSeat.Back', (0.1, 0.4, 0.4), loc=(-0.3, 0, 0.66))
     bevel(back, 0.04, 3)
     assign(back, m['stripe'])
-    head = sphere('DriverSeat.Head', 0.09, loc=(-0.3, 0, 0.98), segments=12, rings=8)
+    head = sphere('DriverSeat.Head', 0.09, loc=(-0.3, 0, 0.78), segments=12, rings=8)
     assign(head, m['stripe'])
     body += [cushion, back, head]
-    hoop = torus('RollHoop', 0.2, 0.03, loc=(-0.45, 0, 0.7), rot=(math.radians(90), 0, 0),
+    hoop = torus('RollHoop', 0.2, 0.03, loc=(-0.45, 0, 0.6), rot=(math.radians(90), 0, 0),
                  major_segments=18, minor_segments=6)
     assign(hoop, m['chrome'])
     body.append(hoop)
-    wheelbar = torus('Steering', 0.1, 0.02, loc=(0.3, 0, 0.7), rot=(0, math.radians(60), 0),
+    wheelbar = torus('Steering', 0.1, 0.02, loc=(0.3, 0, 0.62), rot=(0, math.radians(60), 0),
                      major_segments=14, minor_segments=6)
     assign(wheelbar, m['dark'])
     body.append(wheelbar)
