@@ -169,10 +169,12 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
   const belowGrade = new Set(autoSellOreIds(state.grade?.grade));
   const siteGrade = Math.min(state.grade?.grade ?? 0, ORE_MAX_PERMIT_GRADE);
   if (siteGrade < 1) return [];
-  // Active contracts claim their remaining kg; an offer on the board claims nothing, so it cannot hold ore back (#2328).
+  // An active contract protects its whole ore from the reduced current-grade sale; an offer on the board holds nothing back (#2328).
   const claimed: Record<string, number> = {};
+  const named = new Set<string>();
   for (const c of contracts.active) {
     if (c.type === 'rubble_disposal' || c.completed || c.expired) continue;
+    named.add(c.materialId);
     claimed[c.materialId] = (claimed[c.materialId] ?? 0) + remainingKg(c);
   }
   const sales: AutoSale[] = [];
@@ -180,7 +182,7 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
   for (const [oreId, stock] of Object.entries(state.collectedOre)) {
     const unclaimed = stock - (claimed[oreId] ?? 0);
     const isBelow = belowGrade.has(oreId);
-    const isCurrent = !isBelow && (orePermitGrade(oreId) ?? 0) === siteGrade;
+    const isCurrent = !isBelow && (orePermitGrade(oreId) ?? 0) === siteGrade && !named.has(oreId);
     if (!(isBelow || isCurrent) || !(unclaimed > FRAGMENT_SPLIT_EPSILON_KG)) continue;
     const consumed = consumeStoredOre(state.logistics, state.collectedOre, oreId, unclaimed, state.buildings.buildings, gradeScale);
     if (!consumed.success || !(consumed.consumedKg > 0)) continue;
