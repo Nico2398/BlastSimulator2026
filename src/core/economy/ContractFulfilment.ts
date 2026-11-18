@@ -160,7 +160,7 @@ export interface AutoSale {
 
 /**
  * Sell stored ore of a grade below the site's, at once, when no active contract claims it (#2145, #2278).
- * Current-grade ore sells at a reduced price when no open contract names it (#2328); higher-grade ore is never sold; at G0 (or without a grade) nothing is. Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
+ * Current-grade ore sells at a reduced price beyond what active contracts claim (#2328); higher-grade ore is never sold; at G0 (or without a grade) nothing is. Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
  * Sells nothing when `state.contracts.autoSell === false`.
  */
 export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[] {
@@ -169,12 +169,7 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
   const belowGrade = new Set(autoSellOreIds(state.grade?.grade));
   const siteGrade = Math.min(state.grade?.grade ?? 0, ORE_MAX_PERMIT_GRADE);
   if (siteGrade < 1) return [];
-  // Ore any open contract names is never sold at the reduced current-grade price (#2328).
-  const named = new Set<string>();
-  for (const c of [...contracts.active, ...contracts.available]) {
-    if (c.type === 'rubble_disposal' || c.completed || c.expired) continue;
-    named.add(c.materialId);
-  }
+  // Active contracts claim their remaining kg; an offer on the board claims nothing, so it cannot hold ore back (#2328).
   const claimed: Record<string, number> = {};
   for (const c of contracts.active) {
     if (c.type === 'rubble_disposal' || c.completed || c.expired) continue;
@@ -185,7 +180,7 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
   for (const [oreId, stock] of Object.entries(state.collectedOre)) {
     const unclaimed = stock - (claimed[oreId] ?? 0);
     const isBelow = belowGrade.has(oreId);
-    const isCurrent = !isBelow && (orePermitGrade(oreId) ?? 0) === siteGrade && !named.has(oreId);
+    const isCurrent = !isBelow && (orePermitGrade(oreId) ?? 0) === siteGrade;
     if (!(isBelow || isCurrent) || !(unclaimed > FRAGMENT_SPLIT_EPSILON_KG)) continue;
     const consumed = consumeStoredOre(state.logistics, state.collectedOre, oreId, unclaimed, state.buildings.buildings, gradeScale);
     if (!consumed.success || !(consumed.consumedKg > 0)) continue;

@@ -955,13 +955,11 @@ describe('autoSellUnclaimedOre: current-grade ore (#2328)', () => {
     expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
   });
 
-  it('never sells it while an available (offered) contract names the ore', () => {
+  it('sells it although an available (offered) contract names the ore: an offer claims nothing', () => {
     const state = gameWithOre({ [CURRENT]: 300 }, { grade: 1 });
     state.contracts.available.push(contract({ materialId: CURRENT, quantityKg: 100 }));
-    const cash = state.cash;
-    expect(autoSellUnclaimedOre(state, 0)).toEqual([]);
-    expect(state.cash).toBe(cash);
-    expect(state.collectedOre[CURRENT]).toBeCloseTo(300, 6);
+    expect(autoSellUnclaimedOre(state, 0).map(s => s.oreId)).toEqual([CURRENT]);
+    expect(state.collectedOre[CURRENT] ?? 0).toBeCloseTo(0, 6);
   });
 
   it('a completed or expired active contract no longer protects it', () => {
@@ -980,12 +978,10 @@ describe('autoSellUnclaimedOre: current-grade ore (#2328)', () => {
     expect(autoSellUnclaimedOre(state, 0).map(s => s.oreId)).toEqual([CURRENT]);
   });
 
-  it('protects only the ore a contract names: a sibling current-grade ore still sells', () => {
+  it('a board naming every current-grade ore holds none of it back', () => {
     const state = gameWithOre({ blingite: 100, gloomium: 100 }, { grade: 1 });
-    state.contracts.available.push(contract({ materialId: 'blingite' }));
-    const sales = autoSellUnclaimedOre(state, 0);
-    expect(sales.map(s => s.oreId)).toEqual(['gloomium']);
-    expect(state.collectedOre['blingite']).toBeCloseTo(100, 6);
+    state.contracts.available.push(contract({ materialId: 'blingite' }), contract({ id: 2, materialId: 'gloomium' }));
+    expect(autoSellUnclaimedOre(state, 0).map(s => s.oreId).sort()).toEqual(['blingite', 'gloomium']);
   });
 
   it('an available contract does not stop a below-grade sale at the full factor', () => {
