@@ -2528,6 +2528,9 @@ export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
 /** Share of the board's base ore price an automatic sale of unclaimed stored ore pays; below 1 so a contract still beats it (#2145, #2323). */
 export const AUTO_SALE_PRICE_FACTOR = 0.9;
 
+/** Share of the board's base ore price an automatic sale of unclaimed ore of the site's own grade pays, when no contract names that ore; below AUTO_SALE_PRICE_FACTOR so waiting for a contract or a grade-up still pays more (#2328). */
+export const AUTO_SALE_CURRENT_GRADE_FACTOR = 0.5;
+
 /** Base demolition duration (ticks) per footprint cell, before tier scaling (#1392). */
 export const DEMOLITION_BASE_TICKS_PER_FOOTPRINT_CELL = 3;
 
