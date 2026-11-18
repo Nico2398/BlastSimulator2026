@@ -176,7 +176,7 @@ describe('Shareholder Summit contract prices (#2117)', () => {
 
 import { autoSalePricePerKg } from '../../../src/core/economy/Market.js';
 import { saturationFactor } from '../../../src/core/economy/OreSaturation.js';
-import { AUTO_SALE_PRICE_FACTOR } from '../../../src/core/config/balance.js';
+import { AUTO_SALE_PRICE_FACTOR, AUTO_SALE_CURRENT_GRADE_FACTOR } from '../../../src/core/config/balance.js';
 
 describe('auto sale constants (#2145)', () => {
   it('pays 0.9 of the market value (#2323)', () => {
@@ -261,5 +261,58 @@ describe('autoSalePricePerKg (#2145)', () => {
   it('an unknown ore is worth nothing in legacy and the cheapest ore\'s share in production', () => {
     expect(autoSalePricePerKg('nonsense', 'legacy', 0)).toBe(0);
     expect(autoSalePricePerKg('nonsense', 'production', 0)).toBeCloseTo(AUTO_SALE_PRICE_FACTOR * oreValuePerKg('dirtite', 'production'), 9);
+  });
+});
+
+describe('current-grade auto sale factor (#2328)', () => {
+  it('is 0.5', () => {
+    expect(AUTO_SALE_CURRENT_GRADE_FACTOR).toBe(0.5);
+  });
+
+  it('sits above 0 and below the below-grade factor', () => {
+    expect(AUTO_SALE_CURRENT_GRADE_FACTOR).toBeGreaterThan(0);
+    expect(AUTO_SALE_CURRENT_GRADE_FACTOR).toBeLessThan(AUTO_SALE_PRICE_FACTOR);
+  });
+
+  it('autoSalePricePerKg takes the factor as a fourth argument', () => {
+    for (const id of Object.keys(PRODUCTION_ORE_PRICES)) {
+      expect(autoSalePricePerKg(id, 'production', 0, AUTO_SALE_CURRENT_GRADE_FACTOR), id)
+        .toBeCloseTo(0.5 * oreValuePerKg(id, 'production'), 9);
+    }
+    for (const ore of getAllOres()) {
+      expect(autoSalePricePerKg(ore.id, 'legacy', 0, 0.5), ore.id).toBeCloseTo(0.5 * ore.valuePerKg, 9);
+    }
+  });
+
+  it('applies the saturation cut on top of the given factor', () => {
+    for (const s of [0.25, 0.5, 1]) {
+      expect(autoSalePricePerKg('blingite', 'production', s, 0.5)).toBeCloseTo(
+        0.5 * oreValuePerKg('blingite', 'production') * saturationFactor(s), 9,
+      );
+    }
+  });
+
+  it('honours an arbitrary factor, not just the two constants', () => {
+    expect(autoSalePricePerKg('dirtite', 'production', 0, 0.25)).toBeCloseTo(0.25 * oreValuePerKg('dirtite', 'production'), 9);
+    expect(autoSalePricePerKg('dirtite', 'production', 0, 0)).toBe(0);
+  });
+
+  it('defaults to the below-grade factor when none is given', () => {
+    for (const s of [0, 0.5]) {
+      expect(autoSalePricePerKg('blingite', 'production', s)).toBeCloseTo(
+        autoSalePricePerKg('blingite', 'production', s, AUTO_SALE_PRICE_FACTOR), 9,
+      );
+    }
+  });
+
+  it('the current-grade price is below the default price for every ore', () => {
+    for (const id of Object.keys(PRODUCTION_ORE_PRICES)) {
+      expect(autoSalePricePerKg(id, 'production', 0, AUTO_SALE_CURRENT_GRADE_FACTOR))
+        .toBeLessThan(autoSalePricePerKg(id, 'production', 0));
+    }
+  });
+
+  it('an unknown ore is worth nothing in legacy at any factor', () => {
+    expect(autoSalePricePerKg('nonsense', 'legacy', 0, 0.5)).toBe(0);
   });
 });
