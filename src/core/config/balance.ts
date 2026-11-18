@@ -2525,8 +2525,8 @@ export const OPERATING_INCOME_WINDOW_TICKS = 72;
 /** Income categories that count as operating income (#1375). */
 export const OPERATING_INCOME_CATEGORIES = ['sales', 'contracts'] as const;
 
-/** Share of the board's base ore price an automatic sale of unclaimed stored ore pays; below 1 so a contract still beats it (#2145, #2323). */
-export const AUTO_SALE_PRICE_FACTOR = 0.9;
+/** Share of the board's base ore price an automatic sale of unclaimed stored ore pays (#2145). */
+export const AUTO_SALE_PRICE_FACTOR = 0.6;
 
 /** Base demolition duration (ticks) per footprint cell, before tier scaling (#1392). */
 export const DEMOLITION_BASE_TICKS_PER_FOOTPRINT_CELL = 3;
