@@ -1861,7 +1861,6 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteC
  * (~t450-490), the full kit ~280-305k, measured at the thin ore grade scale. 330k / 370k
  * keep that trough at or above ~15% of the start (digger ~55k at the worst seed). Full stays
  * above digger. Bisected earlier (#1747): the old 150k / 120k went bankrupt at ~t609 / ~t582.
- * Rerun and numbers: docs/plans/issue-1944-sandbox-yield.md.
  *
  * +150k (#2118): 480k / 520k. The opening charge now draws from the starter
  * warehouse's stock, so the first shot waits no delivery, and a slow-start run
@@ -3057,8 +3056,7 @@ export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
  * the crew (pinned 0.9-1.8x). That shot lands on the starter deposit's flat pad (#2116); its pocket became rustite at
  * 0.30 (#2126) and the shot is now worth ~4.5x the crew (pinned 3.5-6x).
  * #1944: the sandbox ore grade scale (0.08) thins ore ~12x, so prices were raised 5x (the old
- * 21-336 ladder above is the pre-#1944 pitch); the quoted figures predate it. Measurements:
- * docs/plans/issue-1944-sandbox-yield.md.
+ * 21-336 ladder above is the pre-#1944 pitch); the quoted figures predate it.
  * #2117: x0.6 (the old ladder ran 105-1,680). Read off the ledger (sales over all costs after the first sale, events
  * answered by their cheapest option) the old level paid ~3.5x its costs and banked ~$6M by t6000 against a ~$1.5M
  * catalog; reinvesting now sits near 2x. Rarity order and price ratios are unchanged.
