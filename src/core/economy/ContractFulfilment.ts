@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Delivery of stored ore to active contracts, by hand or automatically.
 
-import { FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
+import { AUTO_SALE_CURRENT_GRADE_FACTOR, AUTO_SALE_PRICE_FACTOR, FRAGMENT_SPLIT_EPSILON_KG, ORE_GRADE_SCALE_DEFAULT } from '../config/balance.js';
 import { t } from '../i18n/I18n.js';
 import { acceptContract, deliverMaterials, isAutoDeliverable, isPaidClearance, remainingKg, sortByDeadline, storedStockKg, type ContractState } from './Contract.js';
 import { addExpense, addIncome, type FinanceState } from './Finance.js';
@@ -160,14 +160,21 @@ export interface AutoSale {
 
 /**
  * Sell stored ore of a grade below the site's, at once, when no active contract claims it (#2145, #2278).
- * Current-grade and higher-grade ore is never sold; at G0 (or without a grade) nothing is. Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
+ * Current-grade ore sells at a reduced price when no open contract names it (#2328); higher-grade ore is never sold; at G0 (or without a grade) nothing is. Performs the whole sale on `state`: draws the ore down, books `sales` income, records saturation and mine grade.
  * Sells nothing when `state.contracts.autoSell === false`.
  */
 export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[] {
   const contracts = state.contracts;
   if (contracts.autoSell === false) return [];
-  const sellable = new Set(autoSellOreIds(state.grade?.grade));
-  if (sellable.size === 0) return [];
+  const belowGrade = new Set(autoSellOreIds(state.grade?.grade));
+  const siteGrade = Math.min(state.grade?.grade ?? 0, ORE_MAX_PERMIT_GRADE);
+  if (siteGrade < 1) return [];
+  // Ore any open contract names is never sold at the reduced current-grade price (#2328).
+  const named = new Set<string>();
+  for (const c of [...contracts.active, ...contracts.available]) {
+    if (c.type === 'rubble_disposal' || c.completed || c.expired) continue;
+    named.add(c.materialId);
+  }
   const claimed: Record<string, number> = {};
   for (const c of contracts.active) {
     if (c.type === 'rubble_disposal' || c.completed || c.expired) continue;
@@ -177,13 +184,20 @@ export function autoSellUnclaimedOre(state: GameState, tick: number): AutoSale[]
   const gradeScale = oreGradeScaleOf(state.world);
   for (const [oreId, stock] of Object.entries(state.collectedOre)) {
     const unclaimed = stock - (claimed[oreId] ?? 0);
-    if (!sellable.has(oreId) || !(unclaimed > FRAGMENT_SPLIT_EPSILON_KG)) continue;
+    const isBelow = belowGrade.has(oreId);
+    const isCurrent = !isBelow && (orePermitGrade(oreId) ?? 0) === siteGrade && !named.has(oreId);
+    if (!(isBelow || isCurrent) || !(unclaimed > FRAGMENT_SPLIT_EPSILON_KG)) continue;
     const consumed = consumeStoredOre(state.logistics, state.collectedOre, oreId, unclaimed, state.buildings.buildings, gradeScale);
     if (!consumed.success || !(consumed.consumedKg > 0)) continue;
     const kg = consumed.consumedKg;
     // Saturation only exists on a progression site (`state.grade`), as for a contract delivery (settleDelivery).
     const saturation = state.grade !== undefined ? saturationAt(state.saturation?.[oreId], tick) : 0;
-    const payment = kg * autoSalePricePerKg(oreId, contracts.market ?? 'legacy', saturation);
+    const payment = kg * autoSalePricePerKg(
+      oreId,
+      contracts.market ?? 'legacy',
+      saturation,
+      isBelow ? AUTO_SALE_PRICE_FACTOR : AUTO_SALE_CURRENT_GRADE_FACTOR,
+    );
     state.cash += payment;
     addIncome(state.finances, payment, 'sales', `Auto sale: ${oreId}`, tick);
     recordOreDelivery(state.grade, 'ore_sale', kg);
