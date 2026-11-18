@@ -131,3 +131,7 @@ geometrically from the old grade-0 caps to the old grade-5 caps over twelve rung
 (fee, processing, inspection, +1 contract offer, in a fixed cycle); buyer tiers move to grades 0-3 and vehicle tier 2/3
 to grades 1/2. Old saves migrate to the lowest rung whose caps cover the old grade's, so no player loses a granted cap.
 The probe's grade windows were left on the old numbering (a recalibration belongs to the calibration task).
+
+## 2026-11-18 — Progression probe removed
+
+- **Why.** The owner: the progression probe (`npm run probe:progression`, its strategies under `scripts/shared/probe-*`) was meant to help agents balance the economy, but it balanced the scripted player rather than the game and cost a large share of pipeline runs to maintain. It is gone with its tests; balance is judged by playtest. The skill keeps only what the game itself does.

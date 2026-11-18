@@ -1,7 +1,6 @@
 // BlastSimulator2026 — Full-level integration test: Shareholder Summit (#1949)
 // The fourth campaign level: board of directors, progression ladder, production market.
-// An idle mine is fired by the board. The competent run lives in
-// shareholder-summit-competent.integration.test.ts (kept out of the coverage run).
+// An idle mine is fired by the board.
 
 import { describe, it, expect } from 'vitest';
 import {

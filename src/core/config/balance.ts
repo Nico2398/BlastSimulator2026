@@ -601,8 +601,8 @@ export const DRILL_GRID_DEFAULT_DEPTH_M = 8;
  *  It is also the G0 default hole depth (DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M), so a G0 shot clears exactly the G0 layer. */
 export const ORE_G0_LAYER_DEPTH_M = 5;
 /** Grid default depth (m) per permit grade (#2101): the depth where the permit-derived
- *  default charge still breaks out on the softest sandbox rock. 5 m at grade 0 matches the
- *  probe's SHOT. A grade with no entry keeps DRILL_GRID_DEFAULT_DEPTH_M; a site without a
+ *  default charge still breaks out on the softest sandbox rock. 5 m at grade 0 is the G0
+ *  layer depth. A grade with no entry keeps DRILL_GRID_DEFAULT_DEPTH_M; a site without a
  *  permit never reads this map. */
 export const DRILL_GRID_DEFAULT_DEPTH_BY_GRADE_M: Readonly<Record<number, number>> = { 0: ORE_G0_LAYER_DEPTH_M };
 
@@ -1853,8 +1853,8 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteC
  * Opening cash per sandbox kit (#1747, #1891). The richer kit starts with more
  * cash. The retired 195k hard tier (same kit as digger, less cash) is gone.
  *
- * Re-calibrated (#1944) with the progression probe (`npm run probe:progression`, reinvest
- * strategy, desert_badlands and green_foothills, seeds 42/7/13). The opening is the
+ * Re-calibrated (#1944) with a scripted reinvest player, since retired (desert_badlands and
+ * green_foothills, seeds 42/7/13). The opening is the
  * 3x3 Krackle 4 kg pattern (spacing 4, depth 5, 36 kg, inside the grade-0 limit) after a
  * tier-1 Living Quarters. Payroll and upkeep drain cash until the first sale, so the early
  * trough is linear in the start: the digger kit bottoms ~260-275k under its start
@@ -1865,7 +1865,7 @@ export const SANDBOX_STARTING_SITES: Readonly<Record<SandboxKitId, StartingSiteC
  *
  * +150k (#2118): 480k / 520k. The opening charge now draws from the starter
  * warehouse's stock, so the first shot waits no delivery, and a slow-start run
- * (`probe:progression --start-delay`) keeps a cash cushion. Full stays above digger.
+ * keeps a cash cushion. Full stays above digger.
  */
 export const SANDBOX_STARTING_CASH: Readonly<Record<SandboxKitId, number>> = {
   digger: 480_000,
@@ -3057,7 +3057,7 @@ export const LEGACY_SUPPLY_PRICE_FACTOR = { min: 0.6, max: 0.9 } as const;
  * the crew (pinned 0.9-1.8x). That shot lands on the starter deposit's flat pad (#2116); its pocket became rustite at
  * 0.30 (#2126) and the shot is now worth ~4.5x the crew (pinned 3.5-6x).
  * #1944: the sandbox ore grade scale (0.08) thins ore ~12x, so prices were raised 5x (the old
- * 21-336 ladder above is the pre-#1944 pitch); the quoted figures predate it. Probe numbers:
+ * 21-336 ladder above is the pre-#1944 pitch); the quoted figures predate it. Measurements:
  * docs/plans/issue-1944-sandbox-yield.md.
  * #2117: x0.6 (the old ladder ran 105-1,680). Read off the ledger (sales over all costs after the first sale, events
  * answered by their cheapest option) the old level paid ~3.5x its costs and banked ~$6M by t6000 against a ~$1.5M
@@ -3587,7 +3587,7 @@ export const WALL_OVERLAY_OPACITY = 0.55;
 export const WALL_OVERLAY_MAX_FACE_CELLS = 24;
 
 // ── Shareholder Summit (#1949) ──
-// Measured with the #1945 probe (`ladder`, campaign start, dynatomics shots, seed 4001 volcanic_flats, tier-1 digger
+// Measured with the #1945 scripted ladder player, since retired (campaign start, dynatomics shots, seed 4001 volcanic_flats, tier-1 digger
 // kit) and an idle run. Measurements in .claude/skills/gameplay-game-design/SKILL.md (Shareholder Summit).
 
 /** Digger kit plus the tier-1 freight warehouse and spoil heap it already carries; hard volcanic rock is reached with the level's own explosives. */
@@ -3622,7 +3622,7 @@ export const SHAREHOLDER_SUMMIT_BOARD: BoardConfig = {
   growth: 1.25,
 };
 
-// ── Crater access planner (#2082; pure, called by the progression probe since #2095) ──
+// ── Crater access planner (#2082; pure, called by the access-ramp proposal) ──
 
 /** Fraction of the maximum nav grade a crater access ramp may use (1 = right at the limit; below 1 keeps margin). */
 export const CRATER_ACCESS_MAX_GRADE_MARGIN = 0.9;

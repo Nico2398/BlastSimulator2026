@@ -11,11 +11,6 @@
 //     measurement. (Until the replay lint was retired this directory also
 //     drove every scenario through the console — 2486s of a 2880s run under
 //     instrumentation; `npm run scenarios` owns that replay now.)
-//   shareholder-summit-competent — an ~8,000-tick scripted playthrough. Under
-//     instrumentation it ran ~40 min, and its hottest Pathfinding branches pass
-//     2^31 hits: v8's int32 block counters wrap negative and istanbul reports
-//     them as uncovered, so the run LOWERED Pathfinding.ts's branch figure from
-//     the mid 90s to 84-88% (#1949).
 //
 // All of them still run, unexcluded, in the ordinary `npm run test` suite that
 // the `logic` channel uses. In CI they run uninstrumented beside each coverage
@@ -34,7 +29,6 @@ import base from './vitest.config.js';
 export const COVERAGE_EXCLUDED_TESTS: readonly string[] = [
   'tests/unit/benchmarks/**/*.test.ts',
   'tests/unit/lint/**/*.test.ts',
-  'tests/integration/full-level/shareholder-summit-competent.integration.test.ts',
 ];
 
 export default mergeConfig(base, defineConfig({

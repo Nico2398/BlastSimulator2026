@@ -1,7 +1,7 @@
 // BlastSimulator2026 — Crater access planning (#2082, #2095)
 // Pure planner: finds floors stranded below the existing ramp network and proposes a ramp down to them.
 // Reads terrain only through the narrow AccessSurface seam; no GameState. Nothing in the tick calls it:
-// opening a crater is the player's job, and the progression probe plays that player with it.
+// opening a crater is the player's job, offered through `proposeAccessRamp`.
 
 import {
   CRATER_ACCESS_CLUSTER_GAP_CELLS, CRATER_ACCESS_FLOOR_LEVEL_M, CRATER_ACCESS_MAX_GRADE_MARGIN, CRATER_ACCESS_SPIRAL_START_ATTEMPTS, MAX_RAMP_LENGTH,
