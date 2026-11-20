@@ -13,10 +13,6 @@ import {
   SANDBOX_ORE_GRADE_SCALE,
 } from '../../../src/core/config/balance.js';
 import { buyerDeadlineRange } from '../../../src/core/economy/BuyerTiers.js';
-import { createGridPlan } from '../../../src/core/mining/DrillPlan.js';
-import { patternAreaM2 } from '../../../src/core/mining/ChargePlan.js';
-import { SHOT } from '../../../scripts/shared/probe-strategies.js';
-import { GRADE_TARGET_WINDOWS, TIER_TARGET_WINDOWS, limitSizedShot } from '../../../scripts/shared/probe-ladder.js';
 
 /** Ladder steps of the permit table, keyed by rung (grade x 3 + tier - 1). */
 const RUNGS = Array.from({ length: 12 }, (_, i) => i);
@@ -24,9 +20,6 @@ const NAMED = [0, 1, 2, 3];
 /** Every tier target of the named grades in ladder order, then each grade's mastery after its tiers. */
 const tierValues = (g: number, kind: string): number[] =>
   MINE_GRADES[g]!.tiers.flatMap(x => x.targets.filter(tg => tg.kind === kind).map(tg => tg.value));
-/** Permit area (m²) of the rows x cols grid `spacing` apart both ways a shot drills, as the permit measures it. */
-const squareGridAreaM2 = (rows: number, cols: number, spacing: number): number =>
-  patternAreaM2(createGridPlan({ nextHoleId: 1 }, { x: 0, z: 0 }, rows, cols, spacing, SHOT.depth, 0.089));
 
 describe('progression balance invariants (#1945, #2277)', () => {
   it('grade fees strictly increase across grades 1-3', () => {
@@ -61,25 +54,6 @@ describe('progression balance invariants (#1945, #2277)', () => {
       expect(PERMIT_LIMITS[r]!.maxChargeKg).toBeGreaterThan(PERMIT_LIMITS[r - 1]!.maxChargeKg);
       expect(PERMIT_LIMITS[r]!.maxAreaM2).toBeGreaterThan(PERMIT_LIMITS[r - 1]!.maxAreaM2);
     }
-  });
-
-  it('the reference shot fits the permit of the first step', () => {
-    const limit = PERMIT_LIMITS[0]!;
-    expect(SHOT.rows * SHOT.cols * SHOT.kg).toBeLessThanOrEqual(limit.maxChargeKg);
-    expect(squareGridAreaM2(SHOT.rows, SHOT.cols, SHOT.spacing)).toBeLessThanOrEqual(limit.maxAreaM2);
-  });
-
-  it('the ladder shot grows with the permit yet stays inside it across the ladder steps', () => {
-    const base = { rows: SHOT.rows, cols: SHOT.cols, spacing: SHOT.spacing, depth: SHOT.depth,
-      kgPerHole: SHOT.kg, stemming: SHOT.stemming, diameterM: 0.089 };
-    for (const r of RUNGS) {
-      const s = limitSizedShot(PERMIT_LIMITS[r]!, base, 0.165);
-      expect(squareGridAreaM2(s.rows, s.cols, s.spacing)).toBeLessThanOrEqual(PERMIT_LIMITS[r]!.maxAreaM2);
-      expect(s.rows * s.cols * s.kgPerHole).toBeLessThanOrEqual(PERMIT_LIMITS[r]!.maxChargeKg + 1e-9);
-    }
-    const first = limitSizedShot(PERMIT_LIMITS[1]!, base, 0.165);
-    const last = limitSizedShot(PERMIT_LIMITS[11]!, base, 0.165);
-    expect(last.rows * last.cols).toBeGreaterThan(first.rows * first.cols);
   });
 
   it('keeps the ore grade scale levers where calibration left them', () => {
@@ -120,23 +94,5 @@ describe('progression balance invariants (#1945, #2277)', () => {
       }
       for (const t of tiers) expect(BUYER_ORE_SALE_QTY_KG[t].max).toBeGreaterThan(BUYER_ORE_SALE_QTY_KG[t].min);
     });
-  });
-
-  it('tier target windows are well-formed and never move earlier as the ladder climbs (G0.2 .. G3.3)', () => {
-    const keys = Object.keys(TIER_TARGET_WINDOWS).sort();
-    expect(keys).toHaveLength(11);
-    let prev: readonly [number, number] = [0, 0];
-    for (const key of keys) {
-      const [lo, hi] = TIER_TARGET_WINDOWS[key]!;
-      expect(lo).toBeGreaterThan(0);
-      expect(hi).toBeGreaterThan(lo);
-      expect(lo).toBeGreaterThanOrEqual(prev[0]);
-      expect(hi).toBeGreaterThanOrEqual(prev[1]);
-      prev = [lo, hi];
-    }
-  });
-
-  it('grade target windows cover G1-G3', () => {
-    for (const g of [1, 2, 3]) expect(GRADE_TARGET_WINDOWS[g]).toBeDefined();
   });
 });

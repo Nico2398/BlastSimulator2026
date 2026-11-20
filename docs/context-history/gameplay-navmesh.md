@@ -81,3 +81,7 @@ Records why the rules in the `gameplay-navmesh` skill exist: the issues that int
 ## 2026-11-12 — Rubble blocks vehicles over its footprint
 
 - **Why.** The owner: a fragment blocks the nav grid over its whole body, and trucks load from beside a pile instead of driving over it; gravel is driven over, a rock the size of a vehicle never. Replaced: "component labelling ignores fragment occupancy and a drive leg paths with `avoidVehicles: false`, so a ramp column buried under fragments is reachable" (drive legs used to cross rubble; a fragment marked only the cell of its centre).
+
+## 2026-11-18 — Progression probe removed
+
+- **Why.** The owner: the progression probe (`npm run probe:progression`, its strategies under `scripts/shared/probe-*`) was meant to help agents balance the economy, but it balanced the scripted player rather than the game and cost a large share of pipeline runs to maintain. It is gone with its tests; balance is judged by playtest. The skill keeps only what the game itself does.

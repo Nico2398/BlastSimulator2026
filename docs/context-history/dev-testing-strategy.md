@@ -58,3 +58,7 @@ On CI run 42579175214 the ten interaction shards carried equal static cost (1735
 ## Visual Validation Protocol — targeted captures (Nov 2026)
 
 The protocol ran each scenario with `--screenshots`; `--screenshot-steps` captures only the steps that show the change (`docs/context-history/agent-visual-tester.md`).
+
+## 2026-11-18 — Progression probe removed
+
+- **Why.** The owner: the progression probe (`npm run probe:progression`, its strategies under `scripts/shared/probe-*`) was meant to help agents balance the economy, but it balanced the scripted player rather than the game and cost a large share of pipeline runs to maintain. It is gone with its tests; balance is judged by playtest. The skill keeps only what the game itself does.

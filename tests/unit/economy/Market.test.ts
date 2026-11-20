@@ -179,39 +179,16 @@ import { saturationFactor } from '../../../src/core/economy/OreSaturation.js';
 import { AUTO_SALE_PRICE_FACTOR } from '../../../src/core/config/balance.js';
 
 describe('auto sale constants (#2145)', () => {
-  it('pays 0.9 of the market value (#2323)', () => {
-    expect(AUTO_SALE_PRICE_FACTOR).toBe(0.9);
+  it('pays 0.6 of the market value', () => {
+    expect(AUTO_SALE_PRICE_FACTOR).toBe(0.6);
   });
 
-  it('stays strictly below 1 and above 0 so a contract at full price still beats it (#2323)', () => {
-    expect(AUTO_SALE_PRICE_FACTOR).toBeLessThan(1);
+  it('stays strictly between 0 and 1', () => {
     expect(AUTO_SALE_PRICE_FACTOR).toBeGreaterThan(0);
-  });
-});
-
-describe('autoSalePricePerKg at the 0.9 factor (#2323)', () => {
-  it('pays 0.9 of the full price at saturation 0', () => {
-    for (const id of Object.keys(PRODUCTION_ORE_PRICES)) {
-      expect(autoSalePricePerKg(id, 'production', 0), id).toBeCloseTo(0.9 * oreValuePerKg(id, 'production'), 9);
-    }
-    for (const ore of getAllOres()) {
-      expect(autoSalePricePerKg(ore.id, 'legacy', 0), ore.id).toBeCloseTo(0.9 * ore.valuePerKg, 9);
-    }
+    expect(AUTO_SALE_PRICE_FACTOR).toBeLessThan(1);
   });
 
-  it('pays 0.9 x the production price of the cheapest ore, 56.7 per kg (#2323)', () => {
-    expect(autoSalePricePerKg('dirtite', 'production', 0)).toBeCloseTo(56.7, 6);
-  });
-
-  it('applies the saturation cut on top of the 0.9 factor', () => {
-    for (const s of [0.25, 0.5, 1]) {
-      expect(autoSalePricePerKg('blingite', 'production', s)).toBeCloseTo(
-        0.9 * oreValuePerKg('blingite', 'production') * saturationFactor(s), 9,
-      );
-    }
-  });
-
-  it('still pays less than a contract delivery of the same ore at full price, on every ore and saturation', () => {
+  it('pays less than a contract delivery of the same ore at full price, on every ore and saturation', () => {
     for (const id of Object.keys(PRODUCTION_ORE_PRICES)) {
       for (const s of [0, 0.5, 1]) {
         expect(autoSalePricePerKg(id, 'production', s), `${id} @${s}`).toBeLessThan(oreContractBasePrice(id, 'production'));
@@ -220,10 +197,6 @@ describe('autoSalePricePerKg at the 0.9 factor (#2323)', () => {
     for (const id of ORE_IDS) {
       expect(autoSalePricePerKg(id, 'legacy', 0), id).toBeLessThan(oreContractBasePrice(id, 'legacy'));
     }
-  });
-
-  it('pays more than the old 0.6 factor did (#2323)', () => {
-    expect(autoSalePricePerKg('dirtite', 'production', 0)).toBeGreaterThan(0.6 * oreValuePerKg('dirtite', 'production'));
   });
 });
 

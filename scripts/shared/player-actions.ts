@@ -16,7 +16,7 @@ import { isPaidClearance } from '../../src/core/economy/Contract.js';
 export type Run = (cmd: string) => { success: boolean; output: string };
 
 /** How a probe answers a pending event: `first` is option 0, `cheapest` the cheapest option that keeps the crew (#2117, #2126). */
-export type EventPolicy = 'first' | 'cheapest';
+type EventPolicy = 'first' | 'cheapest';
 
 export { outcomeCostsCrew, cheapestEventOption };
 

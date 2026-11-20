@@ -1,6 +1,6 @@
 // BlastSimulator2026 — Access ramps into a crater that stranded rubble: the floors, the plan, the order (#2045, #2144)
-// Pure reads of GameState: nothing here orders, charges or digs. The progression probe orders what this plans; the
-// player's offer (`proposeAccessRamp`) shows it first.
+// Pure reads of GameState: nothing here orders, charges or digs. The player's offer (`proposeAccessRamp`) shows what
+// this plans; only the player orders it.
 
 import { withRubbleSetAside } from '../engine/TerrainStrandedDebris.js';
 import type { GameState } from '../state/GameState.js';
@@ -49,7 +49,7 @@ export function accessSurface(state: GameState, grid: VoxelGrid): AccessSurface 
  * zone. Two drivers and a digger left on a rib between two craters disarmed every later shot whose zone took them in,
  * and the game frees no one (#2095): the player digs them out.
  */
-export function strandedCrew(state: GameState): Array<{ x: number; z: number }> {
+function strandedCrew(state: GameState): Array<{ x: number; z: number }> {
   const nav = state.navGrid;
   const reach = siteVehicleReach(state);
   if (nav === null || state.rallyPoint === undefined || reach === null) return [];
@@ -140,7 +140,7 @@ const ACCESS_SEVER_TOLERANCE_CELLS = 25;
  * between the rally and the rest of the site walls the rally and its depots off from every pit (#2045): the player
  * never cuts their own road.
  */
-export function keepsVehicleNetwork(state: GameState, grid: VoxelGrid, def: RampDef): boolean {
+function keepsVehicleNetwork(state: GameState, grid: VoxelGrid, def: RampDef): boolean {
   const nav = state.navGrid;
   if (nav === null) return true;
   const before = networkCells(state, nav);
@@ -159,7 +159,7 @@ const ACCESS_PLAN_ATTEMPTS = 4;
 const HAUL_DEPOTS: ReadonlySet<string> = new Set(['freight_warehouse', 'spoil_heap']);
 
 /** The haul depot nearest `floor`, where its access ramp should face; null on a site with none. */
-export function nearestHaulDepot(state: Pick<GameState, 'buildings'>, floor: { x: number; z: number }): { x: number; z: number } | null {
+function nearestHaulDepot(state: Pick<GameState, 'buildings'>, floor: { x: number; z: number }): { x: number; z: number } | null {
   let best: { x: number; z: number } | null = null;
   let bestDistance = Infinity;
   for (const b of state.buildings.buildings) {
@@ -170,7 +170,7 @@ export function nearestHaulDepot(state: Pick<GameState, 'buildings'>, floor: { x
   return best;
 }
 
-/** Longest ramp (m) the probe cuts to free crew stranded on ground shallower than a dug crater: a notch, never a trench. */
+/** Longest ramp (m) an access plan cuts to free crew stranded on ground shallower than a dug crater: a notch, never a trench. */
 const ACCESS_RESCUE_MAX_RUN_M = 10;
 
 /**

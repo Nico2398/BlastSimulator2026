@@ -20,7 +20,7 @@ import { resolveContractOres } from '../../../../src/core/campaign/Level.js';
 import { getOre } from '../../../../src/core/world/OreCatalog.js';
 import { oreValuePerKg } from '../../../../src/core/economy/Market.js';
 import type { Building } from '../../../../src/core/entities/Building.js';
-import { CONTRACT_EARLY_BONUS_DEADLINE_FRACTION, NEGOTIATION_MAX_IMPROVEMENT, NEGOTIATION_MAX_WORSENING } from '../../../../src/core/config/balance.js';
+import { AUTO_SALE_PRICE_FACTOR, CONTRACT_EARLY_BONUS_DEADLINE_FRACTION, NEGOTIATION_MAX_IMPROVEMENT, NEGOTIATION_MAX_WORSENING } from '../../../../src/core/config/balance.js';
 
 function makeState(): GameState {
   return createGame({ seed: 1, mineType: 'desert' });
@@ -2707,5 +2707,40 @@ describe('ContractsPanel ore stock lines (#2278)', () => {
     panel.root.querySelector<HTMLButtonElement>(btnSel('blingite'))!.click();
     expect(configs[0]!.body).toContain('120');
     expect(configs[0]!.body).not.toMatch(/(?<![\d,.])300(?![\d,.])/);
+  });
+});
+
+describe('ContractsPanel automatic sale toggle', () => {
+  /** The text beside the automatic-sale toggle: its label and its hint. */
+  function autoSellText(): string {
+    const state = makeState();
+    state.grade = { ...createGradeState(), grade: 1 };
+    const { panel } = makePanel();
+    panel.show();
+    panel.update(state);
+    const btn = panel.root.querySelector<HTMLElement>('[data-action="auto-sell-toggle"]')!;
+    return btn.parentElement!.textContent ?? '';
+  }
+
+  it('says what it sells: lower-grade ore, at once, at the automatic-sale price, and nothing at the first grade', () => {
+    setLocale('en');
+    const text = autoSellText();
+    const pct = Math.round(AUTO_SALE_PRICE_FACTOR * 100);
+    expect(text).toContain(t('ui.contracts.auto_sell'));
+    expect(text).toContain(t('ui.contracts.auto_sell_hint', { pct, surface: t('permit.grade.0') }));
+    expect(text).toContain(`${pct}%`);
+    expect(text).toContain(t('permit.grade.0'));
+    expect(text).not.toMatch(/short wait|unclaimed/i);
+  });
+
+  it('names the first grade in the player language', () => {
+    setLocale('fr');
+    try {
+      const text = autoSellText();
+      expect(text).toContain(t('permit.grade.0'));
+      expect(text).not.toMatch(/courte attente|non réclamé/);
+    } finally {
+      setLocale('en');
+    }
   });
 });

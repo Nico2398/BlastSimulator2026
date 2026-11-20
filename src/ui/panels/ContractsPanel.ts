@@ -469,7 +469,7 @@ export class ContractsPanel extends PanelBase {
       const text = el('div', { attrs: { style: 'display:flex;flex-direction:column;gap:2px;min-width:0;flex:1' } });
       text.append(
         el('span', { text: t(labelKey), attrs: { style: 'font:600 11px/1.2 var(--bsx-font-ui)' } }),
-        el('span', { text: t(hintKey, { pct: Math.round(AUTO_SALE_PRICE_FACTOR * 100) }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
+        el('span', { text: t(hintKey, { pct: Math.round(AUTO_SALE_PRICE_FACTOR * 100), surface: t('permit.grade.0') }), attrs: { style: 'font:400 10px/1.3 var(--bsx-font-ui);color:var(--bsx-text-micro)' } }),
       );
       const row = el('div', { attrs: { style: 'display:flex;align-items:center;gap:8px' } });
       row.append(text, btn);

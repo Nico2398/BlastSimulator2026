@@ -659,8 +659,7 @@ describe('sandbox generated biome equals the picked biome (#1668)', () => {
 
 // #1677: the opening-site survey finds ore in the two biomes whose ore used to be locked out.
 // Pins ore_grade:1 (the biome's own ore, #1944): the sandbox default 0.08 thins a core column below the
-// survey's 0.05 rounding, so a blind core sample can read barren there. Recorded in
-// docs/plans/issue-1944-sandbox-yield.md as a player-facing finding.
+// survey's 0.05 rounding, so a blind core sample can read barren there: a player-facing finding.
 describe.each(['tropical_karst', 'volcanic_flats'] as const)('sandbox %s start survey finds ore (#1677)', (biome) => {
   it.each(['aerial', 'core_sample'] as const)('%s survey at the start reports ore', (method) => {
     const { runner, ctx } = createRunner();
